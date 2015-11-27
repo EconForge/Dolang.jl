@@ -1,0 +1,22 @@
+expressions:
+    - E( s[1] for s[1] in S(s) )
+    - E[ s[1] for s[1] in S(s) ]
+    - E[ s[1] | s[1] in S(s) ]     ####
+    - E[ s[1] | s[1] | S(s) ]
+    - E[ s[1] | s[1] , S(s) ]
+    - E[ s[1] | s[1] ∈ S(s) ]
+    # - E[ s[1]  | s]
+
+symbols:
+
+    - Symbol(name='symbol', subscripts=['i','j'])
+    - Symbol(name='β', subscripts=['i','j'], date=1)
+    - Symbol(name='β', subscripts=['i'], date=1)
+    - Symbol(name='β', subscripts=['i'])
+    - Symbol(name='β', date=1)
+    - Symbol(name='β')
+    - Symbol(name='β', subscripts=['i','j'], date=-1)
+    - Symbol(name='β', subscripts=['i'], date=-1)
+    - Symbol(name='β', subscripts=['i'])
+    - Symbol(name='β', subscripts=['i','j'], date=1)
+    - Symbol(name='β', subscripts=['i'], date=1)

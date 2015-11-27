@@ -15,3 +15,7 @@ Features:
         - a[x,y] -> a__x__y
         - a[t,t+dt,t-dt] -> a__t__tpdt__tmdt
         - a[, 1, -1] -> a____p1__m1
+
+
+- suscripting on a tree
+    - v[s-1] + v[s] + E[ s[1] | s[1], S(s) ]
