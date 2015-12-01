@@ -154,7 +154,7 @@ def compute_jacobian(equations, variables):
 def solve_model(model, verbose=False):
     import numpy
 
-    mat,constants = model.compute_jacobian()
+    constants,mat,lb = model.compute_jacobian()
     lb = model.lower_bounds
 
     # print("Jacobian")

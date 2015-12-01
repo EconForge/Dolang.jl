@@ -86,7 +86,7 @@ R=10
 min_f = 0.0
 
 
-class IVar:
+class LIVar:
     def __init__(self, name, etree):
         self.name = name
         self.etree = etree

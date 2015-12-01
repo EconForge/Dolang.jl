@@ -134,33 +134,45 @@ def match(m,s):
     else:
         return d
 
+import ast
 class ReplaceExpectation(ast.NodeTransformer):
-    rule = ast.parse('E[ _expr | _x in _set]').body[0].value
+    import ast
     def visit_Subscript(self, node):
-        # return node
         from ast import Expr, Call, Name, Load, Lambda, arguments, arg
-        m = match(self.rule, node)
-        print("m {}".format(m))
+        m = match('E[ _expr | _x in _set]', node)
         if m:
             x_s = m['_x'].id # name of dummy vaqriable
-            print(x_s)
             expr = m['_expr']
             sset = m['_set']
-
-            res = Expr(value=Call(func=Name(id='Sum', ctx=Load()),
+            res = Call(func=Name(id='Ex', ctx=Load()),
                     args=[Lambda(args=arguments(args=[arg(arg=x_s, annotation=None)],
                     vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]), body=expr), sset],
-                    keywords=[], starargs=None, kwargs=None))
-            print(res)
-            print(ast.dump(res))
+                    keywords=[], starargs=None, kwargs=None)
             return res
-        else:
-            return node
+        m = match('Sum[ _expr | _x in _set]', node)
+        if m:
+            x_s = m['_x'].id # name of dummy vaqriable
+            expr = m['_expr']
+            sset = m['_set']
+            res = Call(func=Name(id='Sum', ctx=Load()),
+                    args=[Lambda(args=arguments(args=[arg(arg=x_s, annotation=None)],
+                    vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]), body=expr), sset],
+                    keywords=[], starargs=None, kwargs=None)
+            return res
 
+        return node
+
+### could easily be merged !
 
 s = ast.parse("E[ (f(x)) | x in S(s)]").body[0].value
 re_s = ReplaceExpectation().visit(s)
 re_s = ast.Expression(re_s)
+
+
+
+def fix_equation(eq):
+    eqq = ReplaceExpectation().visit(eq)
+    return eqq
 
 
 if __name__ == "__main__":
