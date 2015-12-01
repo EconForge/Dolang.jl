@@ -74,7 +74,8 @@ class LinearExpression:
 N = 20
 etree = DeterministicTree(N)
 
-
+for s in etree.nodes:
+    etree.values[s] = 0.1
 
 # now they are parameter
 beta = 0.97
@@ -86,17 +87,7 @@ R=10
 min_f = 0.0
 
 
-class LIVar:
-    def __init__(self, name, etree):
-        self.name = name
-        self.etree = etree
 
-    def __getitem__(self, x):
-        import sympy
-        # return sympy.Symbol(self.name+'_'+str.join('', map(str,x)))
-        ind = self.etree.nodes.index(x)
-        name = '{}_{}'.format(self.name,ind)
-        return LinearExpression(name=name)
 
 sym_names = str.split("e, f, z, Gamma, psi, phi",', ')
 e, f, z, Gamma, psi, phi = [IVar(zz, etree) for zz in sym_names]

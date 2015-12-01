@@ -1,4 +1,3 @@
-## Build the equations
 
 from treesolve import *
 

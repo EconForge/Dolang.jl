@@ -175,15 +175,15 @@ expr = Expression(eqn)
 
 
 expr = ast.fix_missing_locations(expr)
-
-print("HI")
-print(ast.dump(expr))
-cc = compile(expr,"<string>",'eval')
-
-ast.dump(tuple_to_ast(s))
-print("he")
-print(ast.dump(expr))
-# eval(cc)
+#
+# print("HI")
+# print(ast.dump(expr))
+# cc = compile(expr,"<string>",'eval')
+#
+# ast.dump(tuple_to_ast(s))
+# print("he")
+# print(ast.dump(expr))
+# # eval(cc)
 
 #####
 
