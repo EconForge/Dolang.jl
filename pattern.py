@@ -5,7 +5,6 @@ class Compare:
     def __init__(self):
         self.d = {}
 
-
     def compare(self, A, B):
         if isinstance(A, ast.Name) and (A.id[0] == '_'):
             if A.id not in self.d:
@@ -61,6 +60,7 @@ class Compare:
             print(A.__class__)
             raise Exception("Not implemented")
 
+
 tests = [
 ['b(_x)','b(1)', True],
 ['_x(1)','b(1)', True],
@@ -84,10 +84,20 @@ tests = [
 ['a | b',  'a | c', False],
 ['E[ _x | _y in _z]',  'E[ a | b in c]', True],
 ['E[ a | b in c]',  'E[ a | b in d]', False],
-['E[ f(s) ]',  'E[ _x ]', True],
+['E[ _x | _y in _z]',  'E[ f(a) | b in c]', True],
+['E[ _x | _y in _z]',  'E[ f(a)^2 | b in c]', True],
+# ['E[ f(s) ]',  'E[ _x ]', True],
 ['_a == _b | _x <= _y <= _z', 'a == b | x <= y <= z', True],
-
+['_eq | _comp','phi[s] + (-(f[s]-min_f))*1000    |  phi[s]', True],
+['_eq | _comp','phi[s] + (-(f[s]-min_f))*1000    | 0 <= phi[s]', True],
+['_eq | 0 <= _x','phi[s] + (-(f[s]-min_f))*1000  | 0 <= phi[s]', True],
 # ['_cond : _eq | _comp' ,  's>0 : a == 8 | x<=0<=y', True],
+]
+
+
+replacement_rules = [
+    ['E[ expr | x in S(s)]', 'Esp(lambda x: expr, S(s))'],
+    ['Sum[ expr | x in H(s)]', 'Sum(lambda x: expr, H(s)']
 ]
 
 def compare_strings(a,b):
@@ -105,21 +115,52 @@ def compare_strings(a,b):
 
 def test_strings():
     for l in tests:
-        print('{} : {}'.format(compare_strings(l[0], l[1]), l[2]))
-        assert(compare_strings(l[0], l[1]) ==  l[2])
+        print('{} : {} : {} : {}'.format(compare_strings(l[0], l[1]), l[2], l[0],l[1]))
+        # assert(compare_strings(l[0], l[1]) ==  l[2])
 
 def match(m,s):
-
+    if isinstance(m,str):
+        m = ast.parse(m).body[0].value
+    if isinstance(s,str):
+        s = ast.parse(s).body[0].value
     comp = Compare()
-    val = comp.compare(ast.parse(m), ast.parse(s))
+    val = comp.compare(m,s)
     d = comp.d
-    print("Match: {}".format(val))
-    for k in d.keys():
-        print("{} : {}".format(k, ast.dump(d[k])))
+    # print("Match: {}".format(val))
+    # for k in d.keys():
+        # print("{} : {}".format(k, ast.dump(d[k])))
     if len(d) == 0:
         return val
     else:
         return d
+
+class ReplaceExpectation(ast.NodeTransformer):
+    rule = ast.parse('E[ _expr | _x in _set]').body[0].value
+    def visit_Subscript(self, node):
+        # return node
+        from ast import Expr, Call, Name, Load, Lambda, arguments, arg
+        m = match(self.rule, node)
+        print("m {}".format(m))
+        if m:
+            x_s = m['_x'].id # name of dummy vaqriable
+            print(x_s)
+            expr = m['_expr']
+            sset = m['_set']
+
+            res = Expr(value=Call(func=Name(id='Sum', ctx=Load()),
+                    args=[Lambda(args=arguments(args=[arg(arg=x_s, annotation=None)],
+                    vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]), body=expr), sset],
+                    keywords=[], starargs=None, kwargs=None))
+            print(res)
+            print(ast.dump(res))
+            return res
+        else:
+            return node
+
+
+s = ast.parse("E[ (f(x)) | x in S(s)]").body[0].value
+re_s = ReplaceExpectation().visit(s)
+re_s = ast.Expression(re_s)
 
 
 if __name__ == "__main__":
