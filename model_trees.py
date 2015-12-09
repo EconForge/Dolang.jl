@@ -1,11 +1,11 @@
 import copy
-from pattern import ReplaceExpectation, match
+from .pattern import ReplaceExpectation, match
 
-from ex_symbols import LinearExpression
+from .ex_symbols import LinearExpression
 import time
 
 from dolo.compiler.codegen import to_source
-from treesolve import *
+from .treesolve import *
 
 
 def read_equations(lines):
@@ -69,8 +69,8 @@ class LIVar:
         name = '{}_{}'.format(self.name,ind)
         return LinearExpression(name=name)
 
-from treesolve import get_ts
-def determinstic_simul(model, sol):
+from .treesolve import get_ts
+def deterministic_simul(model, sol):
     import numpy
     variables = set([v.value.id for v in model.variables_ast])
     series = [ get_ts(model.etree, sol, v) for v in variables ]
@@ -103,20 +103,18 @@ class Model:
         model = self
         etree = model.etree
 
-        conditions_fun = [(eval("lambda s: " + l) if l is not None else None) for l in model.conditions_ast]
-
         indexed_variables_str = set( [va.value.id for va in model.variables_ast] )
         indexed_variables = [LIVar(vs, etree) for vs in indexed_variables_str]
 
         context = {}
         for iv in indexed_variables:
             context[iv.name]  =  iv
-        for c,v in calibration.items():
+        for c,v in self.calibration.items():
             context[c] = v
 
         t2 = time.time()
         import copy
-        from pattern import ReplaceExpectation
+        from .pattern import ReplaceExpectation
 
         context['s'] = etree.nodes[0]
         context['etree'] = etree
@@ -127,6 +125,9 @@ class Model:
         context['Sum'] = lambda fun, ss: sum([fun(x) for x in ss])
 
         tsf_equations = [ReplaceExpectation().visit( copy.copy(ee) ) for ee in model.equations_ast]
+
+        conditions_fun = [(eval("lambda s: " + l, context) if l is not None else None) for l in model.conditions_ast]
+
 
         # print(len(tsf_equations))
         t3 = time.time()
@@ -209,22 +210,22 @@ class Model:
         from collections import OrderedDict
         return OrderedDict(zip(map(str,model.full_variables), res))
 
-calibration = dict(
-    beta = 0.8/(0.8+0.15),
-    a = 0.8,
-    c = 0.15,
-    estar = 0.0,
-    Rbar = 0.1,
-    min_f = 0,
-    kappa = 1.0,
-    R = 0.00123
-)
-
 
 if __name__ == '__main__':
 
-    from tree_import import import_tree_model
+    from .tree_import import import_tree_model
     lines = import_tree_model('models_tree.yaml','optimal')
+    calibration = dict(
+        beta = 0.8/(0.8+0.15),
+        a = 0.8,
+        c = 0.15,
+        estar = 0.0,
+        Rbar = 0.1,
+        min_f = 0,
+        kappa = 1.0,
+        R = 0.00123
+    )
+
 
 
     t0 = time.time()
@@ -247,7 +248,7 @@ if __name__ == '__main__':
     t4 = time.time()
     sol = model.solve(verbose=False,jacs=[res,jac,lb])
     t5 = time.time()
-    sim = determinstic_simul(model, sol)
+    sim = deterministic_simul(model, sol)
     t6 = time.time()
     print("Total : {}".format(t5-t0))
     print('- construct the tree: {}'.format(t1-t0))
@@ -268,7 +269,7 @@ if __name__ == '__main__':
     t4 = time.time()
     sol = model.solve(verbose=False,jacs=[res,jac,lb])
     t5 = time.time()
-    sim = determinstic_simul(model, sol)
+    sim = deterministic_simul(model, sol)
     t6 = time.time()
     print("Total : {}".format(t5-t0))
     print('- construct the tree: {}'.format(t1-t0))
