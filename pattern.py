@@ -61,45 +61,6 @@ class Compare:
             raise Exception("Not implemented")
 
 
-tests = [
-['b(_x)','b(1)', True],
-['_x(1)','b(1)', True],
-['_x(2)','b(1)', False],
-['a + b + c', 'a + b + c', True],
-['a + b + d', 'a + b + c', False],
-['a + b + _d','a + b + c',  True],
-['a + _d + _d','a + b + c', False],
-['a + _d + _d','a + c + c', True],
-['a*_x+c*_x**2+d*_y',  'a*x+c*x**2+d*y', True],
-['a*_x+c*_x**2+d*_y',  'a*x+c*y**2+d*z', False],
-['-_a(_x) + _b(_x)',  '-u(-1)+v(-1)', True],
-['-_a(_x) + _b(_x)',  '-u(11)+v(11)', True],
-['-_a(_x) + _b(_x)',  '-u(1)+v(2)', False],
-['E[_x]',  'E[1]', True],
-['E[2]',  'E[1]', False],
-['E[1]',  'X[1]', False],
-['a in _x',  'a in b', True],
-['a in b',  'a in c', False],
-['a | _x',  'a | c', True],
-['a | b',  'a | c', False],
-['E[ _x | _y in _z]',  'E[ a | b in c]', True],
-['E[ a | b in c]',  'E[ a | b in d]', False],
-['E[ _x | _y in _z]',  'E[ f(a) | b in c]', True],
-['E[ _x | _y in _z]',  'E[ f(a)^2 | b in c]', True],
-# ['E[ f(s) ]',  'E[ _x ]', True],
-['_a == _b | _x <= _y <= _z', 'a == b | x <= y <= z', True],
-['_eq | _comp','phi[s] + (-(f[s]-min_f))*1000    |  phi[s]', True],
-['_eq | _comp','phi[s] + (-(f[s]-min_f))*1000    | 0 <= phi[s]', True],
-['_eq | 0 <= _x','phi[s] + (-(f[s]-min_f))*1000  | 0 <= phi[s]', True],
-# ['_cond : _eq | _comp' ,  's>0 : a == 8 | x<=0<=y', True],
-]
-
-
-replacement_rules = [
-    ['E[ expr | x in S(s)]', 'Esp(lambda x: expr, S(s))'],
-    ['Sum[ expr | x in H(s)]', 'Sum(lambda x: expr, H(s)']
-]
-
 def compare_strings(a,b):
     t1 = ast.parse(a)
     t2 = ast.parse(b)
@@ -107,16 +68,6 @@ def compare_strings(a,b):
     val = comp.compare(t1,t2)
     d = comp.d
     return val
-    # print(d)
-    # if val:
-    #     return d
-    # else:
-    #     return None
-
-def test_strings():
-    for l in tests:
-        print('{} : {} : {} : {}'.format(compare_strings(l[0], l[1]), l[2], l[0],l[1]))
-        # assert(compare_strings(l[0], l[1]) ==  l[2])
 
 def match(m,s):
     if isinstance(m,str):
@@ -126,9 +77,6 @@ def match(m,s):
     comp = Compare()
     val = comp.compare(m,s)
     d = comp.d
-    # print("Match: {}".format(val))
-    # for k in d.keys():
-        # print("{} : {}".format(k, ast.dump(d[k])))
     if len(d) == 0:
         return val
     else:
@@ -162,12 +110,51 @@ class ReplaceExpectation(ast.NodeTransformer):
 
         return node
 
-### could easily be merged !
 
-s = ast.parse("E[ (f(x)) | x in S(s)]").body[0].value
-re_s = ReplaceExpectation().visit(s)
-re_s = ast.Expression(re_s)
 
+
+def test_strings():
+
+    tests = [
+    ['b(_x)','b(1)', True],
+    ['_x(1)','b(1)', True],
+    ['_x(2)','b(1)', False],
+    ['a + b + c', 'a + b + c', True],
+    ['a + b + d', 'a + b + c', False],
+    ['a + b + _d','a + b + c',  True],
+    ['a + _d + _d','a + b + c', False],
+    ['a + _d + _d','a + c + c', True],
+    ['a*_x+c*_x**2+d*_y',  'a*x+c*x**2+d*y', True],
+    ['a*_x+c*_x**2+d*_y',  'a*x+c*y**2+d*z', False],
+    ['-_a(_x) + _b(_x)',  '-u(-1)+v(-1)', True],
+    ['-_a(_x) + _b(_x)',  '-u(11)+v(11)', True],
+    ['-_a(_x) + _b(_x)',  '-u(1)+v(2)', False],
+    ['E[_x]',  'E[1]', True],
+    ['E[2]',  'E[1]', False],
+    ['E[1]',  'X[1]', False],
+    ['a in _x',  'a in b', True],
+    ['a in b',  'a in c', False],
+    ['a | _x',  'a | c', True],
+    ['a | b',  'a | c', False],
+    ['E[ _x | _y in _z]',  'E[ a | b in c]', True],
+    ['E[ a | b in c]',  'E[ a | b in d]', False],
+    ['E[ _x | _y in _z]',  'E[ f(a) | b in c]', True],
+    ['E[ _x | _y in _z]',  'E[ f(a)^2 | b in c]', True],
+    # ['E[ f(s) ]',  'E[ _x ]', True],
+    ['_a == _b | _x <= _y <= _z', 'a == b | x <= y <= z', True],
+    ['_eq | _comp','phi[s] + (-(f[s]-min_f))*1000    |  phi[s]', True],
+    ['_eq | _comp','phi[s] + (-(f[s]-min_f))*1000    | 0 <= phi[s]', True],
+    ['_eq | 0 <= _x','phi[s] + (-(f[s]-min_f))*1000  | 0 <= phi[s]', True],
+    # ['_cond : _eq | _comp' ,  's>0 : a == 8 | x<=0<=y', True],
+    ]
+    replacement_rules = [
+        ['E[ expr | x in S(s)]', 'Esp(lambda x: expr, S(s))'],
+        ['Sum[ expr | x in H(s)]', 'Sum(lambda x: expr, H(s)']
+    ]
+
+    for l in tests:
+        print('{} : {} : {} : {}'.format(compare_strings(l[0], l[1]), l[2], l[0],l[1]))
+        # assert(compare_strings(l[0], l[1]) ==  l[2])
 
 
 def fix_equation(eq):

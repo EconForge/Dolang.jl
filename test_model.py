@@ -1,5 +1,9 @@
-from treesolve import DeterministicTree
+#### Proof of concept
 
+
+
+from treesolve import DeterministicTree
+from ex_symbols import LIVar
 
 
 class LinearExpression:
@@ -90,11 +94,12 @@ min_f = 0.0
 
 
 sym_names = str.split("e, f, z, Gamma, psi, phi",', ')
-e, f, z, Gamma, psi, phi = [IVar(zz, etree) for zz in sym_names]
+e, f, z, Gamma, psi, phi = [LIVar(zz, etree) for zz in sym_names]
 
 
 def Sum(f, S):
     return sum([f(zz) for zz in S], LinearExpression())
+p = etree.probas
 
 Sum(lambda x: e[x]*p[s,x], etree.children(s))
 
@@ -185,6 +190,7 @@ res = numpy.zeros(Neq)
 jac = numpy.zeros((Neq,Neq))
 for i in range(Neq):
     eq = equations[i]
+    print(eq)
     res[i] = eq.c[1]
     for k in eq.c.keys():
         if k != 1:

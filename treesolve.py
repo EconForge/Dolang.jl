@@ -1,18 +1,18 @@
-class IVar:
-    def __init__(self, name, etree):
-        self.name = name
-        self.etree = etree
-
-    def __getitem__(self, x):
-        import sympy
-        # return sympy.Symbol(self.name+'_'+str.join('', map(str,x)))
-        ind = self.etree.nodes.index(x)
-        return sympy.Symbol('{}_{}'.format(self.name,ind))
-
-def Sum(fun, ss):
-    import sympy
-    s = [sympy.sympify(fun(x)) for x in ss]
-    return sum(s)
+# class IVar:
+#     def __init__(self, name, etree):
+#         self.name = name
+#         self.etree = etree
+#
+#     def __getitem__(self, x):
+#         import sympy
+#         # return sympy.Symbol(self.name+'_'+str.join('', map(str,x)))
+#         ind = self.etree.nodes.index(x)
+#         return sympy.Symbol('{}_{}'.format(self.name,ind))
+#
+# def Sum(fun, ss):
+#     import sympy
+#     s = [sympy.sympify(fun(x)) for x in ss]
+#     return sum(s)
 
 
 def contained(t1,t2):
