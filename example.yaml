@@ -1,0 +1,68 @@
+equations:
+
+    # Friedman/Buffer Stock
+    - y(t) = p(t) * ξ(t) * W(t)
+    - p(t) = p(t-1) * ψ(t)
+
+    # symbols:
+    #
+    # objective:
+
+    - v(t) = max[ u(c(t)) + β*Ð*E[ψ(t+1)^(1-ρ)*v(t+1)] ]
+
+# transitions:
+
+    - a(t) = m(t)-c(t)
+    - k(t+1) = a(t)/(Ðψ(t+1))
+    - m(t+1) = (ℸ+r)*k(t+1) + xi(t+1)
+    - a(t) >= 0
+
+
+    - ℸ = (1-δ)
+
+#
+# production:
+    - Y = Z*K^α*(l*L)^(1-α)
+
+    - a(t) = m(t) - c(t)
+    - k(t+1) = a(t) / (Ðψ(t))
+
+    - m(t+1) = (ℸ+r)*k(t+1) + ξ(t+1)
+
+# aggregate wage:
+
+    - W(t) = (1-α)*Z(t)*(K(t)/l/L(t))^α
+
+# effective suuply of labor:
+    - L(t) = P(t)*Ξ(t)
+    - P(t) = P(t-1)*\Psi(t)
+
+shocks:
+    \xi:
+        u(t):      mu
+        (1-u(t)):  (1-tau(t))*l(t)*θ(t)
+
+
+calib:
+    β: 0.99
+    ρ: 1.0
+    α: 0.36
+    δ: 0.025
+    l: 1/09
+    capt_ratio: 10.26   # (K/Y)
+    eff_int_rat: 0.01   # r-δ
+    W: 2.37 # wage rate
+
+    μ: 0.15      # unempl insurance payment
+    D: 0.00625   # probability of death
+
+    σ_θ^2: 0.01*4
+    σ_ψ^2: 0.01/4
+    u: 0.07        # unemployment rate
+    σ_Ξ^2: 0.00001
+    σ_Ψ^2: 0.00004
+    Δ__Z: 0.01
+    u__g: 0.04
+    u__b: 0.1
+
+    aggregate_transition_probability: 0.0125
