@@ -70,10 +70,10 @@ class LIVar:
         return LinearExpression(name=name)
 
 from .treesolve import get_ts
-def deterministic_simul(model, sol):
+def deterministic_simul(model, sol, ts_ind=0):
     import numpy
     variables = set([v.value.id for v in model.variables_ast])
-    series = [ get_ts(model.etree, sol, v) for v in variables ]
+    series = [ get_ts(model.etree, sol, v, ts_ind) for v in variables ]
     import pandas
     df = pandas.DataFrame( numpy.array(series).T, columns=variables)
     return df

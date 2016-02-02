@@ -29,13 +29,16 @@ class EventTree:
     probas = dict()
     values = dict()
 
-    def children(self, s):
-        # returns a list of all children of s
-        if len(s)==len(self):
-            return [s]
-        else:
-            return [e for e in self.nodes if len(s)==len(e)-1 and contained(s,e)]
+    #def children(self, s):
+    #    # returns a list of all children of s
+    #    if len(s)==len(self):
+    #        return [s]
+    #    else:
+    #        return [e for e in self.nodes if len(s)==len(e)-1 and contained(s,e)]
 
+    def children(self, s):
+        return [e for e in self.nodes if (s,e) in self.probas]
+    
     def parent(self, s):
         # returns parent of s
         return s[:-1]
