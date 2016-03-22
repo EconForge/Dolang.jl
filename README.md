@@ -5,7 +5,7 @@ It is the current codename for a complete rewrite of the dolo language. It aims 
 - being a first stone for the rewrite of dolo in julia
 - improving model validity checks and providing not so cryptic error messages (for dolo 0.5)
 - allow for easy language extensions
-- being reusable in conjunction with other libraries (like pandas, or bttt)
+- being reusable in conjunction with other libraries (like pandas, or [bttt](https://github.com/albop/backtothetrees.git))
 
 **What does it consist in ?**
 
