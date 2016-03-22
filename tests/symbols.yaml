@@ -1,0 +1,12 @@
+symbols:
+    symbol__i__j:      Symbol(name='symbol', subscripts=['i','j'])
+    β__1__i__j:        Symbol(name='β', subscripts=['i','j'], date=1)
+    β__1__i:           Symbol(name='β', subscripts=['i'], date=1)
+    β__i:              Symbol(name='β', subscripts=['i'])
+    β__1:              Symbol(name='β', date=1)
+    β__:               Symbol(name='β')
+    β__m1__i__j:       Symbol(name='β', subscripts=['i','j'], date=-1)
+    β__m1__i:          Symbol(name='β', subscripts=['i'], date=-1)
+    β__i:              Symbol(name='β', subscripts=['i'])
+    β__1__i__j:        Symbol(name='β', subscripts=['i','j'], date=1)
+    β__1__i:           Symbol(name='β', subscripts=['i'], date=1)

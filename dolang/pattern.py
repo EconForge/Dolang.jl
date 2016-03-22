@@ -160,15 +160,15 @@ def test_strings():
 def fix_equation(eq):
     eqq = ReplaceExpectation().visit(eq)
     return eqq
-
-
-if __name__ == "__main__":
-    test_strings()
-    res = match("E[ _i | _v in _s]", "E[ y(1)*2 | y(1) in S(s)]")
-    res = match('_a == _b | _x <= _y <= _z', 'a == b | x <= y <= z')
-    if match("a_","b"):
-        print("yes")
-    if match("a","a"):
-        print("yes")
-    else:
-        print("no")
+#
+#
+# if __name__ == "__main__":
+#     test_strings()
+#     res = match("E[ _i | _v in _s]", "E[ y(1)*2 | y(1) in S(s)]")
+#     res = match('_a == _b | _x <= _y <= _z', 'a == b | x <= y <= z')
+#     if match("a_","b"):
+#         print("yes")
+#     if match("a","a"):
+#         print("yes")
+#     else:
+#         print("no")

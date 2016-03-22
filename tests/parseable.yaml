@@ -1,0 +1,8 @@
+expressions:
+    - E( s[1] for s[1] in S(s) )
+    - E[ s[1] for s[1] in S(s) ]
+    - E[ s[1] | s[1] in S(s) ]     ####
+    - E[ s[1] | s[1] | S(s) ]
+    - E[ s[1] | s[1] , S(s) ]
+    - E[ s[1] | s[1] ∈ S(s) ]
+    # - E[ s[1]  | s]

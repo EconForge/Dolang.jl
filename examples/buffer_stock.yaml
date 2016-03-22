@@ -35,7 +35,7 @@ equations:
 
 # effective suuply of labor:
     - L(t) = P(t)*Ξ(t)
-    - P(t) = P(t-1)*\Psi(t)
+    - P(t) = P(t-1)*ψ(t)
 
 shocks:
     ξ:

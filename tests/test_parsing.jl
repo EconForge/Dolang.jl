@@ -1,6 +1,6 @@
 import YAML
 
-doc = YAML.load_file("tests.yaml")
+doc = YAML.load_file("tests/tests.yaml")
 
 summary = []
 

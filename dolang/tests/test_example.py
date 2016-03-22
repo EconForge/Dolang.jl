@@ -1,10 +1,7 @@
 import yaml
 import ast
 
-ll = yaml.load(open('example.yaml'))
-
-print(ll)
-
+ll = yaml.load(open('tests/parseable.yaml'))
 
 for eqss in ll['equations']:
     eq = eqss.replace(' = ', '==')
