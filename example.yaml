@@ -1,8 +1,8 @@
 equations:
 
     # Friedman/Buffer Stock
-    - y(t) = p(t) * ξ(t) * W(t)
-    - p(t) = p(t-1) * ψ(t)
+    - y(t) = p(t)*ξ(t)*W(t)
+    - p(t) = p(t-1)*ψ(t)
 
     # symbols:
     #
@@ -13,7 +13,7 @@ equations:
 # transitions:
 
     - a(t) = m(t)-c(t)
-    - k(t+1) = a(t)/(Ðψ(t+1))
+    - k(t+1) = a(t)/(Ð*ψ(t+1))
     - m(t+1) = (ℸ+r)*k(t+1) + xi(t+1)
     - a(t) >= 0
 
@@ -38,7 +38,7 @@ equations:
     - P(t) = P(t-1)*\Psi(t)
 
 shocks:
-    \xi:
+    ξ:
         u(t):      mu
         (1-u(t)):  (1-tau(t))*l(t)*θ(t)
 
