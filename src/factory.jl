@@ -63,8 +63,8 @@ function time_shift(s::Symbol, args::Vector{Symbol}, defs::Associative=Dict(),
         return time_shift(defs[s], args, defs, shift)
     end
 
-    # any other symbol just goes through
-    return s
+    # any other symbols just gets parsed
+    return _parse(s)
 end
 
 # let numbers through
@@ -75,15 +75,16 @@ function time_shift(ex::Expr, args::Vector{Symbol}, defs::Associative=Dict(),
     # no shift, just return the parsed argument
     shift == 0 && return _parse(ex)
 
-    if is_time_shift(ex)
-        var, i = ex.args
-        return time_shift(var, args, defs, shift+i)
+    # need to pattern match here to make sure we don't normalize function names
+    @match ex begin
+        var_(i_Integer) => return time_shift(var, args, defs, shift+i)
+        f_(foo__) => begin
+            out = Expr(:call, f)
+            append!(out.args, [time_shift(_, args, defs, shift) for _ in foo])
+            out
+        end
+        _ => Expr(ex.head, [time_shift(_, args, defs, shift) for _ in ex.args]...)
     end
-
-    # otherwise, we have some work to do
-    out = Expr(ex.head)
-    out.args = [time_shift(_, args, defs, shift) for _ in ex.args]
-    out
 end
 
 subs(s::Symbol, d::Associative) = get(d, s, s)
@@ -110,28 +111,12 @@ function IncidenceTable(eqs::Vector{Expr})
     for (i, eq) in enumerate(eqs)
         visit!(it, eq, i, 0)
     end
-    recompute_by_var!(it)
     it
 end
 
 function IncidenceTable(eq::Expr)
     it = IncidenceTable()
     visit!(it, eq, 1, 0)
-    it
-end
-
-function recompute_by_var!(it::IncidenceTable)
-    empty!(it.by_var)
-
-    for (_, _dict) in it.t      # loop over equtions
-        for (k, _set) in _dict  # loop over variables in equation
-            _var_set = get!(it.by_var, k, Set{Int}())
-            for i in _set       # loop over incidence of var in eq
-                push!(_var_set, i)
-            end
-        end
-    end
-
     it
 end
 
@@ -142,10 +127,14 @@ function visit!(it::IncidenceTable, s::Symbol, n::Int, shift::Int)
     for_eq = get!(it.t, n, Dict{Symbol,Set{Int}}())
     for_sym = get!(for_eq, s, Set{Int}())
     push!(for_sym, shift)
+
+    # update by_var
+    push!(get!(it.by_var, s, Set{Int}()), shift)
+
     nothing
 end
 
-visit!(it::IncidenceTable, s::Int, n::Int, shift::Int) = nothing
+visit!(it::IncidenceTable, s::Number, n::Int, shift::Int) = nothing
 
 function visit!(it::IncidenceTable, ex::Expr, n::Int, shift::Int)
     @match ex begin
@@ -154,9 +143,6 @@ function visit!(it::IncidenceTable, ex::Expr, n::Int, shift::Int)
         _ => [visit!(it, _, n, shift) for _ in ex.args]
     end
     nothing
-end
-
-function is_valid(it::IncidenceTable, ex::Expr)
 end
 
 # --------------- #
@@ -212,7 +198,6 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
             for t in times
                 visit!(def_incidence, _ex, 1, t)
             end
-            recompute_by_var!(def_incidence)
 
             # make sure appearance of each variable is allowed
             for (v, _set) in def_incidence.by_var

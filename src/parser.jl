@@ -25,7 +25,6 @@ function eq_expr(ex::Expr, targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
 end
 
 _parse(x::Symbol) = Symbol(string(x, "_"))
-
 _parse(x::Number) = x
 
 function _parse(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])

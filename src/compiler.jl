@@ -142,32 +142,3 @@ function make_method(eqs::Vector{Expr},
 
     make_method(ff; mutating=mutating, allocating=allocating)
 end
-
-
-eqs = [:(foo = log(a)+b/x), :(bar = c(1)+u*d(1))]
-args = [(:a, 0), (:b, 0), (:c, 1), (:d, 1)]
-params = [:u]
-defs = Dict(:x=>:(a/(1-c(1))))
-targets=[:foo, :bar]
-ff = FunctionFactory(eqs, args, params, targets=targets, defs=defs)
-
-# arguments1 = OrderedDict(:x=>[(:a, 0), (:b, 0)], :y=>[(:c, 1), (:d, 1)])
-# params1 = OrderedDict(:p=>[:u])
-# ff1 = FunctionFactory(eqs, arguments1, params1, targets=[:foo, :bar])
-#
-# ff1f = FunctionFactory(Float64, eqs, arguments1, params1, targets=[:foo, :bar])
-
-ex = :(a + b - c/d | 0.0 <= c < 100)
-
-
-@match :(a + b - c/d | 0.0 <= c < 100) begin
-    $(Expr(:comparison, :__)) => true
-    _ => false
-end
-
-ex
-
-@match ex begin
-    a_ | b_ => a, b
-    _ => false
-end
