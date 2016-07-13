@@ -215,7 +215,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
         # now params and targets (they can only ever appear at 0)
         let
-            s0 = Set([0])
+            s0 = Set(0)
             for p in param_names(params)
                 allowed[p] = s0
             end
