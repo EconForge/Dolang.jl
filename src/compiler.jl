@@ -2,6 +2,17 @@
 # Building up expressions #
 # ----------------------- #
 
+_is_not_line(x) = true
+_is_not_line(ex::Expr) = ex.head != :line
+
+_filter_lines!(x) = x
+
+function _filter_lines!(ex::Expr)
+    filter!(_is_not_line, ex.args)  # filter these args
+    map(_filter_lines!, ex.args)    # then map over any nested Expr
+    ex
+end
+
 function _unpack_expr(names::Vector, rhs::Symbol)
     _args = [:($(_parse(names[i])) = Dolang._unpack_var($rhs, $i))
              for i in 1:length(names)]
@@ -51,7 +62,7 @@ end
 
 "Expression that allocates memory for variable `out` in non-mutating version"
 _allocate_block(ff::FunctionFactory) =
-    :(out = Dolang._allocate_out(eltype($(arg_names(ff)[1])), $(length(eqs)),
+    :(out = Dolang._allocate_out(eltype($(arg_names(ff)[1])), $(length(ff.eqs)),
                           $(arg_names(ff)...)))
 
 "Expression that checks the size of `out` in mutating version"
@@ -63,6 +74,7 @@ function _sizecheck_block(ff::FunctionFactory)
             throw(DimensionMismatch(msg))
         end
     end
+    _filter_lines!(ex)
     ex
 end
 
@@ -138,6 +150,20 @@ function make_method(eqs::Vector{Expr},
                      mutating::Bool=true,
                      allocating::Bool=true)
     ff = FunctionFactory(eqs, arguments, params,
+                         targets=targets, defs=defs, funname=funname)
+
+    make_method(ff; mutating=mutating, allocating=allocating)
+end
+
+function make_method{T}(::Type{T}, eqs::Vector{Expr},
+                        arguments::ArgType,
+                        params::ParamType;
+                        targets::Vector{Symbol}=Symbol[],
+                        defs::Associative=Dict(),
+                        funname::Symbol=:anonymous,
+                        mutating::Bool=true,
+                        allocating::Bool=true)
+    ff = FunctionFactory(T, eqs, arguments, params,
                          targets=targets, defs=defs, funname=funname)
 
     make_method(ff; mutating=mutating, allocating=allocating)

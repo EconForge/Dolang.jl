@@ -149,6 +149,8 @@ end
 end
 
 @testset "Function Factory" begin
+    # TODO: test grouped argument style
+    
     eqs = [:(foo = log(a)+b/x(-1)), :(bar = c(1)+u*d(1))]
     args = [(:a, -1), (:a, 0), (:b, 0), (:c, 0), (:c, 1), (:d, 1)]
     params = [:u]
