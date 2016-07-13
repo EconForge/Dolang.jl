@@ -29,6 +29,8 @@
     @test Dolang._output_size(4, X, x, X) == (3, 4)
     @test Dolang._output_size(4, x, X, x) == (3, 4)
 
+    @test_throws DimensionMismatch Dolang._output_size(4, X, eye(4))
+
     foo = Dolang._allocate_out(Int, 4, x)
     @test isa(foo, Vector{Int})
     @test size(foo) == (4,)
