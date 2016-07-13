@@ -1,6 +1,6 @@
-# ---------- #
-# Base Types #
-# ---------- #
+# ------------------ #
+# Exception handling #
+# ------------------ #
 
 immutable UnknownSymbolError <: Exception
     bad_var::Symbol
@@ -43,6 +43,10 @@ function Base.showerror(io::IO, d::DefinitionNotAllowedError)
     print(io, "Cannot apply at shift $(d.shift) given argument restrictions")
 end
 
+# ---------- #
+# Base Types #
+# ---------- #
+
 typealias FlatArgs Vector{Tuple{Symbol,Int}}
 typealias GroupedArgs Associative{Symbol,Vector{Tuple{Symbol,Int}}}
 typealias ArgType Union{FlatArgs,GroupedArgs}
@@ -50,6 +54,9 @@ typealias ArgType Union{FlatArgs,GroupedArgs}
 typealias FlatParams Vector{Symbol}
 typealias GroupedParams Associative{Symbol,Vector{Symbol}}
 typealias ParamType Union{FlatParams,GroupedParams}
+
+immutable Der{T} end
+typealias TDer{n} Type{Der{n}}
 
 immutable SkipArg end
 
@@ -277,6 +284,8 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
             incidence)
     end
 end
+
+typealias FFSkipArg{T1,T2,T3} FunctionFactory{T1,T2,T3,Type{SkipArg}}
 
 # default outer constructor to do inference and fill in type params
 function FunctionFactory{T1,T2,T3,T4}(eqs::Vector{Expr}, args::T1, params::T2,

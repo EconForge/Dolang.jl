@@ -53,8 +53,8 @@ ffd = Dolang.FunctionFactory(Int, eqs, args, params, targets=targets,
 end
 
 @testset "_unpack_.+?\(::FunctionFactory\)" begin
-    @test Dolang._unpack_args(ff, :V) == Dolang._unpack_expr(args, :V)
-    @test Dolang._unpack_params(ff, :p) == Dolang._unpack_expr(params, :p)
+    @test Dolang.arg_block(ff, :V) == Dolang._unpack_expr(args, :V)
+    @test Dolang.param_block(ff, :p) == Dolang._unpack_expr(params, :p)
 end
 
 @testset "_assign_var_expr" begin
@@ -65,8 +65,8 @@ end
     @test Dolang._assign_var_expr(:z__m_1, 0, :foo) == want
 end
 
-@testset "_equation_block" begin
-    have = Dolang._equation_block(ff)
+@testset "equation_block" begin
+    have = Dolang.equation_block(ff)
     @test have.head == :block
     @test length(have.args) == 4
     @test have.args[1] == :(foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_)))
@@ -75,7 +75,7 @@ end
     @test have.args[4] == :(Dolang._assign_var(out, bar_, 2))
 
     # now test without targets
-    have = Dolang._equation_block(ffnt)
+    have = Dolang.equation_block(ffnt)
     @test have.head == :block
     @test length(have.args) == 2
 
@@ -85,14 +85,14 @@ end
     @test have.args[2] == :(Dolang._assign_var(out, $ex2, 2))
 end
 
-@testset "_allocate_block" begin
-    have = Dolang._allocate_block(ff)
+@testset "allocate_block" begin
+    have = Dolang.allocate_block(ff)
     want = :(out = Dolang._allocate_out(eltype(V), 2, V))
     @test have == want
 end
 
-@testset "_sizecheck_block" begin
-    have = Dolang._sizecheck_block(ff)
+@testset "sizecheck_block" begin
+    have = Dolang.sizecheck_block(ff)
     want = quote
         expected_size = Dolang._output_size(2, V)
         if size(out) != expected_size
@@ -121,7 +121,7 @@ end
     # NOTE: I need to escape the Int here so that it will refer to the exact
     #       same int inside ffd
     @test Dolang.signature(ffd) == :(myfun(::$(Int),V,p))
-    @test Dolang.signature!(ffd) == :(myfun!(out,::$(Int),V,p))
+    @test Dolang.signature!(ffd) == :(myfun!(::$(Int),out,V,p))
 end
 
 @testset "compiling functions" begin
@@ -203,7 +203,7 @@ end
         end
     end))
 
-    want_d! = Dolang._filter_lines!(:(function myfun!(out,::($Int),V,p)
+    want_d! = Dolang._filter_lines!(:(function myfun!(::($Int),out,V,p)
         begin
             expected_size = Dolang._output_size(2, V)
             if size(out) != expected_size
