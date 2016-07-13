@@ -145,14 +145,15 @@ Let's take it once piece at a time:
 - `DERIVATIVE` has the form `::Type{Dolang.Der{N}}`, where `N` is meant to
 specify the order(s) of the derivative to be evaluated. This allows you to use
 the same function name, but control which order of derivative is evaluated by
-passing `Der{N}` as the first argument to `ff.funname`
+passing `Der{N}` as the first argument to `ff.funname`. If `N == 0`, this
+section of the signature is skipped.
 - `DISPATCH` has the form `::Type{ff.dispatch}` where `ff.dispatch` should be
 a Julia `DataType`. This is used to create many methods for same function (i.e.
 mulitple versions of the function with the same name), but have them be
 distinguishable to the Julia compiler. See example usage to see how it works.
 By default `ff.dispatch` is set to `Dolang.SkipArg`. When
-`ff.dispatch == SkipArg` when this is encountered, the compiler completely
-skips the `[DISPATCH]` section of the signature
+`ff.dispatch == SkipArg`, the compiler completely skips the `[DISPATCH]`
+section of the signature
 - `arg_names(ff)...` is simply the name of the arguments from `ff.args`. If
 `ff.args` is a `Vector` (more specifically a `Dolang.FlatArgs`), then this will
 be `[:V]`. If `ff.args` is some `Associative` structure, then this will be the
