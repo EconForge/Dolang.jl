@@ -2,9 +2,45 @@
 # Base Types #
 # ---------- #
 
-immutable VariableNotAllowed <: Exception
-    eq::Expr
+immutable UnknownSymbolError <: Exception
     bad_var::Symbol
+    eq::Expr
+    shifts::Set{Int}
+end
+
+function Base.showerror(io::IO, v::UnknownSymbolError)
+    if !isempty(v.shifts)
+        bad_exprs = [:($(v.bad_var)($_)) for _ in v.shifts]
+        bad_str = join(bad_exprs, ", ", " and ")
+        print(io, "Unknown symbol(s) $(bad_str) found in equation $(v.eq). ")
+    else
+        print(io, "Unknown symbol $(v.bad_var) found in equation $(v.eq). ")
+    end
+    print(io, "Try adding $(v.bad_var) to the list of args")
+end
+
+immutable VariableNotAllowedError <: Exception
+    bad_var::Symbol
+    eq::Expr
+    shifts::Set{Int}
+end
+
+function Base.showerror(io::IO, v::VariableNotAllowedError)
+    bad_exprs = [:($(v.bad_var)($_)) for _ in v.shifts]
+    bad_str = join(bad_exprs, ", ", " and ")
+    print(io, "Invalid symbol(s) $(bad_str) found in equation $(v.eq). ")
+    print(io, "Try adding $(v.bad_var) to the list of args")
+end
+
+immutable DefinitionNotAllowedError <: Exception
+    var::Symbol
+    def::Expr
+    shift::Int
+end
+
+function Base.showerror(io::IO, d::DefinitionNotAllowedError)
+    print(io, "Invalid definition found for $(d.var) = $(d.def). ")
+    print(io, "Cannot apply at shift $(d.shift) given argument restrictions")
 end
 
 typealias FlatArgs Vector{Tuple{Symbol,Int}}
@@ -53,9 +89,9 @@ is_time_shift(ex::Expr) = ex.head == :call &&
 function time_shift(s::Symbol, args::Vector{Symbol}, defs::Associative=Dict(),
                     shift::Int=0)
 
-    # if `s` is a function arg then return parsed, shifted version of s
+    # if `s` is a function arg then return shifted version of s
     if s in args
-        return _parse((s, shift))
+        return :($s($(shift)))
     end
 
     # if it is a def, recursively substitute it
@@ -64,7 +100,7 @@ function time_shift(s::Symbol, args::Vector{Symbol}, defs::Associative=Dict(),
     end
 
     # any other symbols just gets parsed
-    return _parse(s)
+    return s
 end
 
 # let numbers through
@@ -72,8 +108,8 @@ time_shift(x::Number, args...) = x
 
 function time_shift(ex::Expr, args::Vector{Symbol}, defs::Associative=Dict(),
                     shift::Int=0)
-    # no shift, just return the parsed argument
-    shift == 0 && return _parse(ex)
+    # no shift, just return the argument
+    shift == 0 && return ex
 
     # need to pattern match here to make sure we don't normalize function names
     @match ex begin
@@ -149,6 +185,13 @@ end
 # FunctionFactory #
 # --------------- #
 
+function _check_known(allowed::Associative, v::Symbol, ex::Expr,
+                      shifts::Set{Int}=Set{Int}())
+    haskey(allowed, v) && return
+    throw(UnknownSymbolError(v, ex, shifts))
+end
+
+
 immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
     eqs::Vector{Expr}
     args::T1
@@ -192,21 +235,22 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         for (_def, _ex) in defs
             times = incidence[_def]
 
-            def_incidence = IncidenceTable()
-
-            # compute incidence of each shift
+            # compute incidence of each shift and make sure it is valid
             for t in times
+                def_incidence = IncidenceTable()
                 visit!(def_incidence, _ex, 1, t)
-            end
 
-            # make sure appearance of each variable is allowed
-            for (v, _set) in def_incidence.by_var
-                _set ⊈ allowed[v] && error("invalid def")
-            end
+                for (v, _set) in def_incidence.by_var
+                    # make sure appearance of each variable is allowed
+                    _check_known(allowed, v, _ex, Set(t))
+                    if _set ⊈ allowed[v]
+                        throw(DefinitionNotAllowedError(_def, _ex, t))
+                    end
+                end
 
-            # construct shifted version of the definition
-            for t in times
-                def_map[_parse((_def, t))] = time_shift(_ex, a_names, defs, t)
+                # construct shifted version of the definition and add to map
+                k = _parse((_def, t))
+                def_map[k] = _parse(time_shift(_ex, a_names, defs, t))
             end
 
             # Add these times to allowed map for `_def` so we can do equation
@@ -218,7 +262,11 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         # do equation validation
         for (i, _dict) in incidence.t
             for (v, _set) in _dict
-                _set ⊈ allowed[v] && throw(VariableNotAllowed(eqs[i], v))
+                _check_known(allowed, v, eqs[i])
+                if _set ⊈ allowed[v]
+                    shifts = setdiff(_set, allowed[v])
+                    throw(VariableNotAllowedError(v, eqs[i], shifts))
+                end
             end
         end
 
@@ -250,31 +298,5 @@ function FunctionFactory{T4}(::Type{T4}, eqs::Vector{Expr}, args::ArgType,
     FunctionFactory(eqs, args, params, targets, defs, funname, T4)
 end
 
-_valid_symbols(x::Union{FlatArgs,FlatParams}) = x
-
-_valid_symbols(x::Union{GroupedArgs}) =
-    vcat([_valid_symbols(v) for (k, v) in x]...)::FlatArgs
-
-_valid_symbols(x::Union{GroupedParams}) =
-    vcat([_valid_symbols(v) for (k, v) in x]...)::FlatParams
-
-_valid_variables(ff::FunctionFactory) = _valid_symbols(ff.args)
-
-_valid_variables_raw(ff::FunctionFactory) = _valid_variables_raw(ff.args)
-
-_valid_params(ff::FunctionFactory) = _valid_symbols(ff.params)
-
-_valid_symbols(ff::FunctionFactory) =
-    vcat(_valid_params(ff), _valid_variables(ff))
-
-function is_valid(ff::FunctionFactory)
-    # go through each equation
-    for i in 1:length(ff.eqs)
-
-        # and make sure only allowed symbols appear in incidence table
-        eq_table = ff.incidence[i]
-
-        for (v, dates) in eq_table
-        end
-    end
-end
+=={T<:Union{IncidenceTable,FunctionFactory}}(x1::T, x2::T) =
+    all([getfield(x1, _) == getfield(x2, _) for _ in fieldnames(x1)])

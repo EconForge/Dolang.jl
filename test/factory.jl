@@ -13,7 +13,7 @@ end
 @testset "allowed_dates" begin
     out = OrderedDict()
     Dolang.allowed_dates!(flat_args, out)
-    @test out == OrderedDict(:a=>Set([0]), :b=>Set([1]), :c=>Set([-1]))
+    @test out == OrderedDict(:a=>Set(0), :b=>Set(1), :c=>Set(-1))
 
     @test out == Dolang.allowed_dates(flat_args)
     @test out == Dolang.allowed_dates(grouped_args)
@@ -40,18 +40,17 @@ end
     ex1 = :(a + x)
     ex2 = :(a(2) + x + b)
 
-    @test _ts(:a, args, defs, 0) == :a_
-    @test _ts(:a, args, defs, 1) == :a__1_
-    @test _ts(:a, args, defs, -10) == :a_m10_
+    @test _ts(:a, args, defs, 0) == :(a(0))
+    @test _ts(:a, args, defs, 1) == :(a(1))
+    @test _ts(:a, args, defs, -10) == :(a(-10))
 
-    # no shift, this gets parsed, hence the `.+`. Same below
-    @test _ts(ex1, args, defs, 0) == :(a_ .+ x_)
-    @test _ts(ex1, args, defs, 1) == :(a__1_ + x_)
-    @test _ts(ex1, args, defs, -10) == :(a_m10_ + x_)
+    @test _ts(ex1, args, defs, 0) == :(a + x)
+    @test _ts(ex1, args, defs, 1) == :(a(1) + x)
+    @test _ts(ex1, args, defs, -10) == :(a(-10) + x)
 
-    @test _ts(ex2, args, defs, 0) == :(a__2_ .+ x_ .+ b_)
-    @test _ts(ex2, args, defs, 1) == :(a__3_ + x_ + b__1_)
-    @test _ts(ex2, args, defs, -10) == :(a_m8_ + x_ + b_m10_)
+    @test _ts(ex2, args, defs, 0) == :(a(2) + x + b)
+    @test _ts(ex2, args, defs, 1) == :(a(3) + x + b(1))
+    @test _ts(ex2, args, defs, -10) == :(a(-8) + x + b(-10))
 end
 
 @testset "subs" begin
@@ -73,9 +72,9 @@ end
     # visiting symbols
     it = Dolang.IncidenceTable()
     Dolang.visit!(it, :x, 1, 0)
-    want_t = OrderedDict(1=>Dict(:x=>Set([0])))
+    want_t = OrderedDict(1=>Dict(:x=>Set(0)))
     @test want_t == it.t
-    @test Dict(:x=>Set([0])) == it.by_var
+    @test Dict(:x=>Set(0)) == it.by_var
 
     Dolang.visit!(it, :x, 1, 1)
     want_t[1][:x] = Set([0, 1])
@@ -84,7 +83,7 @@ end
 
     Dolang.visit!(it, :x, 2, 3)
     want_t[1][:x] = Set([0, 1])
-    want_t[2] = Dict(:x=>Set([3]))
+    want_t[2] = Dict(:x=>Set(3))
     @test want_t == it.t
     @test Dict(:x=>Set([0, 1, 3])) == it.by_var
 
@@ -105,7 +104,7 @@ end
     want_t = deepcopy(it.t)
     want_bv = deepcopy(it.by_var)
 
-    s0 = Set([0])
+    s0 = Set(0)
     Dolang.visit!(it, ex1, 1, 0)
     want_t[1] = Dict(:foo=>s0, :bing=>s0, :bong=>s0)
     want_bv = deepcopy(want_t[1])
@@ -120,7 +119,7 @@ end
     @test want_bv == it.by_var
 
     Dolang.visit!(it, ex3, 3, 0)
-    want_t[3] = Dict(:x=>s0, :foo=>Set([-3]), :bing=>Set([1]))
+    want_t[3] = Dict(:x=>s0, :foo=>Set([-3]), :bing=>Set(1))
     want_bv[:x] = s0
     want_bv[:foo] = Set([-3, 0])
     want_bv[:bing] = Set([0, 1])
@@ -128,7 +127,7 @@ end
     @test want_bv == it.by_var
 
     Dolang.visit!(it, ex3, 4, 1)
-    want_t[4] = Dict(:x=>Set([1]), :foo=>Set([-2]), :bing=>Set([2]))
+    want_t[4] = Dict(:x=>Set(1), :foo=>Set([-2]), :bing=>Set(2))
     want_bv[:x] = Set([0, 1])
     want_bv[:foo] = Set([-3, -2, 0])
     want_bv[:bing] = Set([0, 1, 2])
@@ -137,11 +136,11 @@ end
 
     # using expressions
     it1 = Dolang.IncidenceTable(ex1)
-    want = OrderedDict(1=>Dict(:foo=>Set([0]), :bing=>Set([0]),
-                               :bong=>Set([0])))
+    want = OrderedDict(1=>Dict(:foo=>Set(0), :bing=>Set(0),
+                               :bong=>Set(0)))
     @test it1.t == want
 
-    want = Dict(:foo=>Set([0]), :bing=>Set([0]), :bong=>Set([0]))
+    want = Dict(:foo=>Set(0), :bing=>Set(0), :bong=>Set(0))
     @test it1.by_var == want
 
     # getindex
@@ -150,7 +149,106 @@ end
 end
 
 @testset "Function Factory" begin
-    # TODO: write these tests
+    eqs = [:(foo = log(a)+b/x(-1)), :(bar = c(1)+u*d(1))]
+    args = [(:a, -1), (:a, 0), (:b, 0), (:c, 0), (:c, 1), (:d, 1)]
+    params = [:u]
+    defs = Dict(:x=>:(a/(1-c(1))))
+    targets = [:foo, :bar]
+    funname = :myfun
+    _FF = Dolang.FunctionFactory
+
+    @testset "constructors" begin
+        # inner constructor directly
+        ff1 = _FF{Dolang.FlatArgs,
+                  Dolang.FlatParams,
+                  Dict{Symbol,Expr},
+                  DataType}(eqs, args, params, targets, defs, funname,
+                            Dolang.SkipArg)
+
+        # First outer constructor
+        ff2 = _FF(eqs, args, params, targets, defs, funname, Dolang.SkipArg)
+
+        # kwarg outer constructor -- SkipArg default
+        ff3 = _FF(eqs, args, params, targets=targets, defs=defs,
+                  funname=funname)
+
+        ff4 = _FF(Dolang.SkipArg, eqs, args, params, targets=targets,
+                  defs=defs, funname=funname)
+
+        @test ff2 == ff1
+        @test ff3 == ff1
+        @test ff4 == ff1
+    end
+
+    @testset "constructor behavior" begin
+        _FF = _FF
+        ff = _FF(eqs, args, params, targets=targets, defs=defs, funname=funname)
+
+        @test ff.incidence == Dolang.IncidenceTable(eqs)
+
+        # test that equations were normalized properly
+        norm_eq1 = :(foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_)))
+        norm_eq2 = :(bar_ = c__1_ .+ u_ .* d__1_)
+        norm_eq = [norm_eq1, norm_eq2]
+        @test ff.eqs == norm_eq
+
+        # test that Exceptions are thrown for bad defs
+        bad_defs = Dict(:x=> :(a(2)/(1-c(1))))
+        @test_throws(Dolang.DefinitionNotAllowedError,
+                     _FF(eqs, args, params, targets=targets, defs=bad_defs,
+                         funname=funname))
+
+        # make sure content of the Exception is correct
+        ex = try
+            _FF(eqs, args, params, targets=targets, defs=bad_defs)
+           catch e
+               e
+           end
+
+        @test ex.var == :x
+        @test ex.def == :(a(2)/(1-c(1)))
+        @test ex.shift == -1
+
+        # test that excecptions are thrown for variables appearing at the
+        # wrong time in the equations
+        bad_eqs = vcat(eqs, :(foo = b + a(1)))::Vector{Expr}
+        @test_throws(Dolang.VariableNotAllowedError,
+                     _FF(bad_eqs, args, params, targets=targets, defs=defs,
+                         funname=funname))
+
+        # check content of exception
+        ex = try
+            _FF(bad_eqs, args, params, targets=targets, targets=targets,
+                defs=defs)
+           catch e
+               e
+           end
+
+        @test ex.eq == :(foo = b + a(1))
+        @test ex.bad_var == :a
+        @test ex.shifts == Set(1)
+
+        # test that exceptions are thrown for unknown variables appearing
+        # in the equations
+        bad_eqs = vcat(eqs, :(whoami = a-b))::Vector{Expr}
+        @test_throws(Dolang.UnknownSymbolError,
+                     _FF(bad_eqs, args, params, targets=targets, defs=defs,
+                         funname=funname))
+
+        # check content of exception
+        ex = try
+            _FF(bad_eqs, args, params, targets=targets, targets=targets,
+                defs=defs)
+           catch e
+               e
+           end
+
+        @test ex.eq == :(whoami = a-b)
+        @test ex.bad_var == :whoami
+        @test ex.shifts == Set{Int}()
+
+    end
+
 end
 
 end  # @testset "factory"
