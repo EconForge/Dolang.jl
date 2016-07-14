@@ -14,6 +14,8 @@ function _filter_lines!(ex::Expr)
     ex
 end
 
+_filter_lines(ex::Expr) = _filter_lines!(deepcopy(ex))
+
 "Convert lhs = rhs to rhs - lhs. Used in computation of derivatives"
 _normalize(ex::Expr) =
     ex.head == :(=) ? Expr(:call, :(.-), ex.args[2], ex.args[1]) : ex
@@ -192,8 +194,8 @@ _extra_args(ff::FunctionFactory, d::TDer{0}) =
     ff.dispatch == SkipArg ? Any[] : [:(::$(ff.dispatch))]
 
 _extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
-    ff.dispatch == SkipArg ? Any[:(::TDer{$n})] : [:(::TDer{$n}), :(::$(ff.dispatch))]
-
+    ff.dispatch == SkipArg ? Any[:(::Dolang.TDer{$n})] :
+                                [:(::Dolang.TDer{$n}), :(::$(ff.dispatch))]
 
 "Method signature for non-mutating version of the function"
 function signature{n}(ff::FunctionFactory, d::TDer{n}=Der{0})
@@ -295,8 +297,8 @@ end
 # NOTE: allocations for the hessian are done in in the equation_block because
 #       it requires us to know the number of non-zero hessian terms, which we
 #       only know after we have constructed them.
-allocate_block(ff::FunctionFactory, ::TDer{2}) = Symbol()
-sizecheck_block(ff::FunctionFactory, ::TDer{2}) = Symbol()
+allocate_block(ff::FunctionFactory, ::TDer{2}) = nothing
+sizecheck_block(ff::FunctionFactory, ::TDer{2}) = nothing
 
 function _hessian_exprs(ff::FunctionFactory{FlatArgs})
     # NOTE: I'm starting with the easy version, where I just differentiate

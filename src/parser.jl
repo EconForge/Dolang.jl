@@ -50,7 +50,7 @@ function _parse(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
         f_(a__) => Expr(:call, f, map(_parse, a)...)
 
         # the bottom, just insert numbers and symbols
-        x_Symbol_Number => x
+        x_Symbol_Number => _parse(x)
 
         _ => error("Not sure what I just saw")
     end

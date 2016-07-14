@@ -7,7 +7,7 @@ using Compat: view
 
 import Base: ==
 
-export make_method
+export make_method, Der
 
 include("parser.jl")
 include("factory.jl")

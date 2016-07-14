@@ -224,6 +224,11 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
     function FunctionFactory(eqs, args, params, targets, defs, funname,
                              dispatch)
+
+        # if there are no targets, we normalize equations immediately
+        if isempty(targets)
+            eqs = map(_normalize, eqs)
+        end
         # create incidence table of equations
         incidence = IncidenceTable(eqs)
 
@@ -295,7 +300,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
         # now filter args  and keep only those that actually appear in the
         # equations
-        filter_args(args, incidence)
+        args = filter_args(args, incidence)
 
         new(normalized_eqs, args, params, targets, defs, funname, dispatch,
             incidence)
