@@ -240,21 +240,21 @@ function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
     eqs = ff.eqs
     args = ff.args
     neq = length(ff.eqs)
-    nvar = length(ff.args)
+    nvar = nargs(ff)
     [differentiate(_normalize(eqs[i]), _parse(args[j])) for i=1:neq, j=1:nvar]
 end
 
 _output_size(ff::FunctionFactory, ::TDer{1}) =
-    (length(ff.eqs), length(arg_names(ff)))
+    (length(ff.eqs), nargs(ff))
 
 # Now fill in FunctionFactory API
-function allocate_block(ff::FunctionFactory, ::TDer{1})
-    expected_size = _output_size(ff, Der{1})
+function allocate_block{n}(ff::FunctionFactory, d::TDer{n})
+    expected_size = _output_size(ff, d)
     :(out = Array(Float64, $(expected_size)))
 end
 
-function sizecheck_block(ff::FunctionFactory, ::TDer{1})
-    expected_size = _output_size(ff, Der{1})
+function sizecheck_block{n}(ff::FunctionFactory, d::TDer{n})
+    expected_size = _output_size(ff, d)
     ex = quote
         if size(out) != $expected_size
             msg = "Expected out to be size $($(expected_size)), found $(size(out))"
@@ -266,7 +266,6 @@ function sizecheck_block(ff::FunctionFactory, ::TDer{1})
 end
 
 function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{1})
-    # TODO: don't hard code to Float64
     expr_mat = _jacobian_expr_mat(ff)
     neq = size(expr_mat, 1)
     nvar = size(expr_mat, 2)
@@ -288,6 +287,128 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{1})
     out.args = expr_args
     out
 end
+
+# ----------------- #
+# Second derivative #
+# ----------------- #
+
+# NOTE: allocations for the hessian are done in in the equation_block because
+#       it requires us to know the number of non-zero hessian terms, which we
+#       only know after we have constructed them.
+allocate_block(ff::FunctionFactory, ::TDer{2}) = Symbol()
+sizecheck_block(ff::FunctionFactory, ::TDer{2}) = Symbol()
+
+function _hessian_exprs(ff::FunctionFactory{FlatArgs})
+    # NOTE: I'm starting with the easy version, where I just differentiate
+    #       with respect to all arguments in the order they were given. It
+    #       would be better if I went though `ff.incidence.by_var` and only
+    #       made columns for variables that appear in the equations
+    neq = length(ff.eqs)
+    nvar = nargs(ff)
+
+    # To do this we use linear indexing tricks to access `out` and `expr_mat`.
+    # Note the offset on the index to expr_args also (needed because allocating)
+    # is the first expression in the block
+    terms = Array(Tuple{Int,Tuple{Int,Int},Expr},0)
+    for i_eq in 1:neq
+        ex = _normalize(ff.eqs[i_eq])
+
+        for i_v1 in 1:nvar
+            v1 = _parse(ff.args[i_v1])
+            diff_v1 = differentiate(ex, v1)
+
+            for i_v2 in i_v1:nvar
+                v2 = _parse(ff.args[i_v2])
+                deriv = differentiate(diff_v1, v2)
+
+                if deriv != 0
+                    # ix = sub2ind((nvar, nvar), i_v1, i_v2)
+                    push!(terms, (i_eq, (i_v1, i_v2), deriv))
+                end
+            end
+        end
+    end
+
+    return terms
+end
+
+# Ordering of hessian is H[eq, (v1,v2)]
+function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{2})
+    exprs = _hessian_exprs(ff)
+    n_expr = length(exprs)
+    nvar = nargs(ff)
+
+    n_terms = 0
+    for e in exprs
+        # if indices are the same, term is for (v[i], v[i]), so it only appears
+        # one time. Otherwise, we need to account for symmetry and have two
+        # terms
+        n_terms += e[2][1] == e[2][2] ? 1 : 2
+    end
+
+    # create expressions that define `_val_i`, which holds the numerical value
+    # associated with the `i`th expression
+    val_exprs = [Expr(:(=), Symbol("_val_$(i)"), exprs[i][3]) for i in 1:n_expr]
+    vals = Expr(:block)
+    vals.args = val_exprs
+
+    # create expressions that fill in the correct elements of i, j, v based
+    # on the data in `vals` and the indices in `exprs`
+    pop_exprs = Array(Expr, n_terms)
+    ix = 0
+    for i_expr in 1:n_expr
+        i_eq, (i_v1, i_v2), _ = exprs[i_expr]
+
+        # we definitely need to fill the `i_eq, (i_v1, i_v2)` element
+        ix += 1
+
+        # value of j
+        j = sub2ind((nvar, nvar), i_v1, i_v2)
+        pop_exprs[ix] = Expr(:block,
+            :(setindex!(i, $(ix), $(i_eq))),
+            :(setindex!(j, $(ix), $(j))),
+            :(setindex!(v, $(ix), $(Symbol("_val_$(i_expr)"))))
+        )
+
+        if i_v1 != i_v2
+            # here we also need to fill the symmetric off diagonal element
+            ix += 1
+            j2 = sub2ind((nvar, nvar), i_v2, i_v1)
+            pop_exprs[ix] = Expr(:block,
+                :(setindex!(i, $(ix), $(i_eq))),
+                :(setindex!(j, $(ix), $(j2))),
+                :(setindex!(v, $(ix), $(Symbol("_val_$(i_expr)"))))
+            )
+        end
+    end
+
+    # gather these assignments into a block
+    populate = Expr(:block)
+    populate.args = pop_exprs
+
+    # finally construct the whole blocks
+    out = quote
+        i = Array(Int, $(n_terms))
+        j = Array(Int, $(n_terms))
+        v = Array(Float64, $(n_terms))
+
+        # include vals
+        $vals
+
+        # populate i, j, v with vals
+        $populate
+
+        # construct sparse matrix from i, j, v and return it
+        return sparse(i, j, v, $(length(ff.eqs)), $(nvar*nvar))
+    end
+
+    _filter_lines!(out)
+
+end
+
+# we don't support non-allocating method for Hessians
+_build_function!(ff::FunctionFactory, ::TDer{2}) =
+    error("Non-allocating Hessians not supported")
 
 # -------------------------- #
 # Putting functions together #
@@ -311,13 +432,15 @@ end
 # -------- #
 # User API #
 # -------- #
+make_method(ff::FunctionFactory; mutating::Bool=true, allocating::Bool=true) =
+    make_method(Der{0}, ff; mutating=mutating, allocating=allocating)
 
-function make_method(ff::FunctionFactory; mutating::Bool=true,
-                     allocating::Bool=true)
+function make_method{n}(d::TDer{n}, ff::FunctionFactory; mutating::Bool=true,
+                        allocating::Bool=true)
 
     out = Expr(:block)
-    mutating && push!(out.args, _build_function!(ff))
-    allocating && push!(out.args, _build_function(ff))
+    mutating && push!(out.args, _build_function!(ff, d))
+    allocating && push!(out.args, _build_function(ff, d))
     out
 end
 
@@ -347,4 +470,18 @@ function make_method{T}(::Type{T}, eqs::Vector{Expr},
                          targets=targets, defs=defs, funname=funname)
 
     make_method(ff; mutating=mutating, allocating=allocating)
+end
+
+function make_method{T,n}(d::TDer{n}, ::Type{T}, eqs::Vector{Expr},
+                          arguments::ArgType,
+                          params::ParamType;
+                          targets::Vector{Symbol}=Symbol[],
+                          defs::Associative=Dict(),
+                          funname::Symbol=:anonymous,
+                          mutating::Bool=true,
+                          allocating::Bool=true)
+    ff = FunctionFactory(T, eqs, arguments, params,
+                         targets=targets, defs=defs, funname=funname)
+
+    make_method(d, ff; mutating=mutating, allocating=allocating)
 end

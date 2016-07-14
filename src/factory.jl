@@ -309,3 +309,11 @@ end
 
 =={T<:Union{IncidenceTable,FunctionFactory}}(x1::T, x2::T) =
     all([getfield(x1, _) == getfield(x2, _) for _ in fieldnames(x1)])
+
+nargs{T<:FlatArgs}(ff::FunctionFactory{T}) = length(ff.args)
+nargs{T<:GroupedArgs}(ff::FunctionFactory{T}) =
+    sum([length(v) for (_, v) in ff.args])::Int
+
+nparams{T1,T2<:FlatParams}(ff::FunctionFactory{T1,T2}) = length(ff.param)
+nparams{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
+    sum([length(v) for (_, v) in ff.params])::Int
