@@ -365,9 +365,9 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{2})
         # value of j
         j = sub2ind((nvar, nvar), i_v1, i_v2)
         pop_exprs[ix] = Expr(:block,
-            :(setindex!(i, $(ix), $(i_eq))),
-            :(setindex!(j, $(ix), $(j))),
-            :(setindex!(v, $(ix), $(Symbol("_val_$(i_expr)"))))
+            :(setindex!(i, $(i_eq), $(ix))),
+            :(setindex!(j, $(j), $(ix))),
+            :(setindex!(v, $(Symbol("_val_$(i_expr)")), $(ix)))
         )
 
         if i_v1 != i_v2
@@ -375,9 +375,9 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{2})
             ix += 1
             j2 = sub2ind((nvar, nvar), i_v2, i_v1)
             pop_exprs[ix] = Expr(:block,
-                :(setindex!(i, $(ix), $(i_eq))),
-                :(setindex!(j, $(ix), $(j2))),
-                :(setindex!(v, $(ix), $(Symbol("_val_$(i_expr)"))))
+                :(setindex!(i, $(i_eq), $(ix))),
+                :(setindex!(j, $(j2), $(ix))),
+                :(setindex!(v, $(Symbol("_val_$(i_expr)")), $(ix)))
             )
         end
     end

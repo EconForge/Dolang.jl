@@ -142,11 +142,12 @@ subs(ex::Expr, d::Associative) = Expr(ex.head, [subs(_, d) for _ in ex.args]...)
 Maps from equation number to a Dict: variable -> Set(time_periods)
 """
 immutable IncidenceTable
-    t::OrderedDict{Int,Dict{Symbol,Set{Int}}}
+    by_eq::Dict{Int,Dict{Symbol,Set{Int}}}
     by_var::Dict{Symbol,Set{Int}}
+    by_date::Dict{Int,Set{Symbol}}
 end
 
-IncidenceTable() = IncidenceTable(OrderedDict(), Dict())
+IncidenceTable() = IncidenceTable(Dict(), Dict(), Dict())
 
 function IncidenceTable(eqs::Vector{Expr})
     # create incidence
@@ -163,16 +164,19 @@ function IncidenceTable(eq::Expr)
     it
 end
 
-Base.getindex(it::IncidenceTable, i::Int) = it.t[i]
+Base.getindex(it::IncidenceTable, i::Int) = it.by_date[i]
 Base.getindex(it::IncidenceTable, s::Symbol) = it.by_var[s]
 
 function visit!(it::IncidenceTable, s::Symbol, n::Int, shift::Int)
-    for_eq = get!(it.t, n, Dict{Symbol,Set{Int}}())
+    for_eq = get!(it.by_eq, n, Dict{Symbol,Set{Int}}())
     for_sym = get!(for_eq, s, Set{Int}())
     push!(for_sym, shift)
 
     # update by_var
     push!(get!(it.by_var, s, Set{Int}()), shift)
+
+    # upate by_date
+    push!(get!(it.by_date, shift, Set{Symbol}()), s)
 
     nothing
 end
@@ -188,6 +192,16 @@ function visit!(it::IncidenceTable, ex::Expr, n::Int, shift::Int)
     nothing
 end
 
+"Filter the args so that it only includes elements that appear in equations"
+filter_args!(args::FlatArgs, incidence::IncidenceTable) =
+    filter!(x -> x[2] in incidence[x[1]], args)
+
+filter_args!(args::GroupedArgs, incidence::IncidenceTable) =
+    map(x -> filter_args!(x[2], incidence), args)
+
+filter_args(args::ArgType, incidence::IncidenceTable) =
+    filter_args!(deepcopy(args), incidence)
+
 # --------------- #
 # FunctionFactory #
 # --------------- #
@@ -197,7 +211,6 @@ function _check_known(allowed::Associative, v::Symbol, ex::Expr,
     haskey(allowed, v) && return
     throw(UnknownSymbolError(v, ex, shifts))
 end
-
 
 immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
     eqs::Vector{Expr}
@@ -267,7 +280,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         end
 
         # do equation validation
-        for (i, _dict) in incidence.t
+        for (i, _dict) in incidence.by_eq
             for (v, _set) in _dict
                 _check_known(allowed, v, eqs[i])
                 if _set ⊈ allowed[v]
@@ -279,6 +292,10 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
         # now normalize the equations and make subs
         normalized_eqs = [subs(_parse(eq, targets=targets), def_map) for eq in eqs]
+
+        # now filter args  and keep only those that actually appear in the
+        # equations
+        filter_args(args, incidence)
 
         new(normalized_eqs, args, params, targets, defs, funname, dispatch,
             incidence)
@@ -308,7 +325,7 @@ function FunctionFactory{T4}(::Type{T4}, eqs::Vector{Expr}, args::ArgType,
 end
 
 =={T<:Union{IncidenceTable,FunctionFactory}}(x1::T, x2::T) =
-    all([getfield(x1, _) == getfield(x2, _) for _ in fieldnames(x1)])
+    all(_ -> getfield(x1, _) == getfield(x2, _), fieldnames(x1))
 
 nargs{T<:FlatArgs}(ff::FunctionFactory{T}) = length(ff.args)
 nargs{T<:GroupedArgs}(ff::FunctionFactory{T}) =
