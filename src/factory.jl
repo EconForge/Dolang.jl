@@ -181,7 +181,8 @@ function visit!(it::IncidenceTable, s::Symbol, n::Int, shift::Int)
     nothing
 end
 
-visit!(it::IncidenceTable, s::Number, n::Int, shift::Int) = nothing
+# don't worry about anything else
+visit!(it::IncidenceTable, s::Any, n::Int, shift::Int) = nothing
 
 function visit!(it::IncidenceTable, ex::Expr, n::Int, shift::Int)
     @match ex begin
@@ -301,6 +302,26 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         # now filter args  and keep only those that actually appear in the
         # equations
         args = filter_args(args, incidence)
+
+        # also sort so order is all (_, 1) variables, then (_, 0), then (_, -1)
+        sort!(args, by=x->x[2], rev=true)
+
+        # TODO: filter incidence
+        # filter incidence so all parameters are removed
+        for p in params
+            # remove from by_var
+            haskey(incidence.by_var, p) && delete!(incidence.by_var, p)
+
+            # remove from by_eq
+            for (_, d) in incidence.by_eq
+                haskey(d, p) && delete!(d, p)
+            end
+        end
+
+        # remove from by_date
+        for (_, _set) in incidence.by_date
+            filter!(x-> !(in(x, params)), _set)
+        end
 
         new(normalized_eqs, args, params, targets, defs, funname, dispatch,
             incidence)
