@@ -283,8 +283,6 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{1})
         expr_args[ix] = :(out[$(ix)] = $(expr_mat[ix]))
     end
 
-    expr_args[end] = :(return out)
-
     out = Expr(:block)
     out.args = expr_args
     out
