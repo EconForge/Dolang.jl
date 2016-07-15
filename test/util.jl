@@ -59,6 +59,12 @@
     @test isa(foo, Matrix{Int})
     @test size(foo) == (3,4)
 
+    @testset "_to_expr" begin
+        @test Dolang._to_expr("foo") == Expr(:block, :foo)
+        @test Dolang._to_expr(100) == Expr(:block, 100)
+        @test Dolang._to_expr(:bar) == Expr(:block, :bar)
+        @test Dolang._to_expr(:(x+y)) == :(x+y)
+    end
 
 
 end  # @testset "util"

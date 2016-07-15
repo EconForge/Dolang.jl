@@ -130,9 +130,32 @@ function time_shift(ex::Expr, args::Vector{Symbol}, defs::Associative=Dict(),
     end
 end
 
-subs(s::Symbol, d::Associative) = get(d, s, s)
-subs(x::Number, d::Associative) = x
-subs(ex::Expr, d::Associative) = Expr(ex.head, [subs(_, d) for _ in ex.args]...)
+subs(s::Symbol, d::Associative) = haskey(d, s) ? (d[s], true) : (s, false)
+subs(x::Number, d::Associative) = (x, false)
+function subs(ex::Expr, d::Associative)
+    out_args = Array(Any, length(ex.args))
+    changed = false
+    for (i, arg) in enumerate(ex.args)
+        new_arg, arg_changed = subs(arg, d)
+        out_args[i] = new_arg
+        changed = changed || arg_changed
+    end
+    out = Expr(ex.head)
+    out.args = out_args
+    out, changed
+end
+
+recursive_subs(x::Union{Symbol,Number}, d::Associative) = subs(x, d)[1]
+
+function recursive_subs(ex::Expr, d::Associative)
+    max_it = length(d) + 1
+    max_it == 1 && return ex
+    for i in 1:max_it
+        ex, changed = subs(ex, d)
+        !changed && return ex
+    end
+    error("Could not resolve expression recursively.")
+end
 
 # -------------- #
 # IncidenceTable #
@@ -167,7 +190,13 @@ end
 Base.getindex(it::IncidenceTable, i::Int) = it.by_date[i]
 Base.getindex(it::IncidenceTable, s::Symbol) = it.by_var[s]
 
-function visit!(it::IncidenceTable, s::Symbol, n::Int, shift::Int)
+function visit!(it::IncidenceTable, s::Symbol, n::Int, shift::Int,
+                skip::Vector{Symbol}=Symbol[])
+
+    if s in skip
+        return nothing
+    end
+
     for_eq = get!(it.by_eq, n, Dict{Symbol,Set{Int}}())
     for_sym = get!(for_eq, s, Set{Int}())
     push!(for_sym, shift)
@@ -182,23 +211,38 @@ function visit!(it::IncidenceTable, s::Symbol, n::Int, shift::Int)
 end
 
 # don't worry about anything else
-visit!(it::IncidenceTable, s::Any, n::Int, shift::Int) = nothing
+function visit!(it::IncidenceTable, s::Any, n::Int, shift::Int,
+                skip::Vector{Symbol}=Symbol[])
+    nothing
+end
 
-function visit!(it::IncidenceTable, ex::Expr, n::Int, shift::Int)
+function visit!(it::IncidenceTable, ex::Expr, n::Int, shift::Int,
+                skip::Vector{Symbol}=Symbol[])
     @match ex begin
-        var_(i_Integer) => visit!(it, var, n, i+shift)
-        f_(args__) => [visit!(it, _, n, shift) for _ in args]
-        _ => [visit!(it, _, n, shift) for _ in ex.args]
+        var_(i_Integer) => visit!(it, var, n, i+shift, skip)
+        f_(args__) => [visit!(it, _, n, shift, skip) for _ in args]
+        _ => [visit!(it, _, n, shift, skip) for _ in ex.args]
     end
     nothing
 end
 
 "Filter the args so that it only includes elements that appear in equations"
 filter_args!(args::FlatArgs, incidence::IncidenceTable) =
-    filter!(x -> x[2] in incidence[x[1]], args)
+    filter!(args) do x
+        haskey(incidence.by_var, x[1]) && x[2] in incidence[x[1]]
+    end
 
-filter_args!(args::GroupedArgs, incidence::IncidenceTable) =
-    map(x -> filter_args!(x[2], incidence), args)
+function filter_args!{T<:GroupedArgs}(args::T, incidence::IncidenceTable)
+    return args
+
+    # TODO: below is the code that handles this, but I don't think we want
+    #       to remove things in the grouped version...
+    out = T()
+    for (k, v) in args
+        out[k] = filter_args!(v, incidence)
+    end
+    out
+end
 
 filter_args(args::ArgType, incidence::IncidenceTable) =
     filter_args!(deepcopy(args), incidence)
@@ -206,6 +250,11 @@ filter_args(args::ArgType, incidence::IncidenceTable) =
 # --------------- #
 # FunctionFactory #
 # --------------- #
+
+sort_args!(args::FlatArgs) = sort!(args, by=x->x[2], rev=true)
+
+# no sorting needed
+sort_args!(args::GroupedArgs) = args
 
 function _check_known(allowed::Associative, v::Symbol, ex::Expr,
                       shifts::Set{Int}=Set{Int}())
@@ -246,8 +295,10 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
                 allowed[p] = s0
             end
 
+            # NOTE: targets might also be in args, so we can't just set
+            #       allowed[t]. we need to push onto a set if one exists
             for t in targets
-                allowed[t] = s0
+                push!(get!(allowed, t, Set(0)), 0)
             end
         end
 
@@ -256,15 +307,27 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         def_map = Dict{Symbol,Expr}()
         a_names = collect(keys(allowed_args))
 
+        _flat_params = FlatParams(params)
+
         # make sure the _used_ definitions are all valid. If they are, add
         # them to the def_map
         for (_def, _ex) in defs
+            if !haskey(incidence.by_var, _def)
+                # if the definition never shows up, just move on :)
+                continue
+            end
+
             times = incidence[_def]
+
+            # recursively resolve this defintion so we get down to args, params
+            # and targets
+            _ex = recursive_subs(_ex, defs)
 
             # compute incidence of each shift and make sure it is valid
             for t in times
                 def_incidence = IncidenceTable()
-                visit!(def_incidence, _ex, 1, t)
+
+                visit!(def_incidence, _ex, 1, t, _flat_params)
 
                 for (v, _set) in def_incidence.by_var
                     # make sure appearance of each variable is allowed
@@ -297,16 +360,16 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         end
 
         # now normalize the equations and make subs
-        normalized_eqs = [subs(_parse(eq, targets=targets), def_map) for eq in eqs]
+        _f(x) = _to_expr(recursive_subs(_parse(x, targets=targets), def_map))
+        normalized_eqs = [_f(eq) for eq in eqs]
 
         # now filter args  and keep only those that actually appear in the
         # equations
         args = filter_args(args, incidence)
 
         # also sort so order is all (_, 1) variables, then (_, 0), then (_, -1)
-        sort!(args, by=x->x[2], rev=true)
+        sort_args!(args)
 
-        # TODO: filter incidence
         # filter incidence so all parameters are removed
         for p in params
             # remove from by_var
