@@ -306,7 +306,7 @@ function _hessian_exprs(ff::FunctionFactory{FlatArgs})
     # To do this we use linear indexing tricks to access `out` and `expr_mat`.
     # Note the offset on the index to expr_args also (needed because allocating)
     # is the first expression in the block
-    terms = Array(Tuple{Int,Tuple{Int,Int},Expr},0)
+    terms = Array(Tuple{Int,Tuple{Int,Int},Union{Expr,Symbol,Int}},0)
     for i_eq in 1:neq
         ex = _normalize(ff.eqs[i_eq])
 
