@@ -190,9 +190,6 @@ param_names{T1,T2<:FlatParams}(::FunctionFactory{T1,T2}) = [:p]
 param_names{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
     collect(keys(ff.params))::Vector{Symbol}
 
-_extra_args(ff::FunctionFactory, d::TDer{0}) =
-    ff.dispatch == SkipArg ? Any[] : [:(::$(ff.dispatch))]
-
 _extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
     ff.dispatch == SkipArg ? Any[:(::Dolang.TDer{$n})] :
                                 [:(::Dolang.TDer{$n}), :(::$(ff.dispatch))]
@@ -407,27 +404,46 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{2})
 end
 
 # we don't support non-allocating method for Hessians
-_build_function!(ff::FunctionFactory, ::TDer{2}) =
+build_function!(ff::FunctionFactory, ::TDer{2}) =
     error("Non-allocating Hessians not supported")
 
 # -------------------------- #
 # Putting functions together #
 # -------------------------- #
 
+func_body{n}(ff::FunctionFactory, d::TDer{n}) =
+    Expr(:block, allocate_block(ff, d), body_block(ff, d))
+
+func_body!{n}(ff::FunctionFactory, d::TDer{n}) =
+    Expr(:block, sizecheck_block(ff, d), body_block(ff, d))
+
+function _build_function{n}(ff::FunctionFactory, d::TDer{n},
+                            sig_func::Function, body_func::Function)
+    Expr(:function, sig_func(ff, d), body_func(ff, d))
+end
+
+function _build_function(ff::FunctionFactory, d::TDer{0}, sig_func::Function,
+                         body_func::Function)
+    body = body_func(ff, d)
+    sig = sig_func(ff, d)
+    no_der_sig = deepcopy(sig)
+    splice!(no_der_sig.args, 2)
+    Expr(:block,
+         Expr(:function, sig, body),
+         Expr(:function, no_der_sig, body)
+         )
+end
+
 # NOTE: we could easily allocate and then call the mutating version, but we
 #       don't do that because then we get overhead for allocating _and_
 #       for checking the size of out
 "Build allocating version of the method"
-function _build_function{n}(ff::FunctionFactory, d::TDer{n}=Der{0})
-    func_body = Expr(:block, allocate_block(ff, d), body_block(ff, d))
-    Expr(:function, signature(ff, d), func_body)
-end
+build_function{n}(ff::FunctionFactory, d::TDer{n}) =
+    _build_function(ff, d, signature, func_body)
 
 "Build non-allocating version of the method"
-function _build_function!{n}(ff::FunctionFactory, d::TDer{n}=Der{0})
-    func_body = Expr(:block, sizecheck_block(ff, d), body_block(ff, d))
-    Expr(:function, signature!(ff, d), func_body)
-end
+build_function!{n}(ff::FunctionFactory, d::TDer{n}) =
+    _build_function(ff, d, signature!, func_body!)
 
 # -------- #
 # User API #
@@ -439,8 +455,8 @@ function make_method{n}(d::TDer{n}, ff::FunctionFactory; mutating::Bool=true,
                         allocating::Bool=true)
 
     out = Expr(:block)
-    mutating && push!(out.args, _build_function!(ff, d))
-    allocating && push!(out.args, _build_function(ff, d))
+    mutating && push!(out.args, build_function!(ff, d))
+    allocating && push!(out.args, build_function(ff, d))
     out
 end
 
