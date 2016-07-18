@@ -197,11 +197,6 @@ filter_args(args::ArgType, incidence::IncidenceTable) =
 # FunctionFactory #
 # --------------- #
 
-sort_args!(args::FlatArgs) = sort!(args, by=x->x[2], rev=true)
-
-# no sorting needed
-sort_args!(args::GroupedArgs) = args
-
 function _check_known(allowed::Associative, v::Symbol, ex::Expr,
                       shifts::Set{Int}=Set{Int}())
     haskey(allowed, v) && return
@@ -236,7 +231,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
         # now params and targets (they can only ever appear at 0)
         let
-            s0 = Set(0)
+            s0 = Set(0)  # in `let` block so s0 never appears
             for p in param_names(params)
                 allowed[p] = s0
             end
@@ -316,9 +311,6 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         # now filter args  and keep only those that actually appear in the
         # equations
         args = filter_args(args, incidence)
-
-        # also sort so order is all (_, 1) variables, then (_, 0), then (_, -1)
-        sort_args!(args)
 
         # filter incidence so all parameters are removed
         for p in params
