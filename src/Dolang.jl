@@ -1,6 +1,5 @@
 module Dolang
 
-using MacroTools
 using DataStructures
 using Calculus
 using Compat: view
