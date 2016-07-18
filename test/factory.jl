@@ -40,17 +40,17 @@ end
     ex1 = :(a + x)
     ex2 = :(a(2) + x + b)
 
-    @test _ts(:a, args, defs, 0) == :(a(0))
-    @test _ts(:a, args, defs, 1) == :(a(1))
-    @test _ts(:a, args, defs, -10) == :(a(-10))
+    @test _ts(:a, args, 0, defs) == :(a(0))
+    @test _ts(:a, args, 1, defs) == :(a(1))
+    @test _ts(:a, args, -10, defs) == :(a(-10))
 
-    @test _ts(ex1, args, defs, 0) == :(a + x)
-    @test _ts(ex1, args, defs, 1) == :(a(1) + x)
-    @test _ts(ex1, args, defs, -10) == :(a(-10) + x)
+    @test _ts(ex1, args, 0, defs) == :(a + x)
+    @test _ts(ex1, args, 1, defs) == :(a(1) + x)
+    @test _ts(ex1, args, -10, defs) == :(a(-10) + x)
 
-    @test _ts(ex2, args, defs, 0) == :(a(2) + x + b)
-    @test _ts(ex2, args, defs, 1) == :(a(3) + x + b(1))
-    @test _ts(ex2, args, defs, -10) == :(a(-8) + x + b(-10))
+    @test _ts(ex2, args, 0, defs) == :(a(2) + x + b)
+    @test _ts(ex2, args, 1, defs) == :(a(3) + x + b(1))
+    @test _ts(ex2, args, -10, defs) == :(a(-8) + x + b(-10))
 end
 
 @testset " recursive_subs()" begin
@@ -187,8 +187,8 @@ end
         ff = _FF(eqs, args, params, targets=targets, defs=defs, funname=funname)
 
         # test that equations were normalized properly
-        norm_eq1 = :(foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_)))
-        norm_eq2 = :(bar_ = c__1_ .+ u_ .* d__1_)
+        norm_eq1 = :(_foo_ = log(_a_) .+ _b_ ./ (_a_m1_ ./ (1 .- _c_)))
+        norm_eq2 = :(_bar_ = _c__1_ .+ _u_ .* _d__1_)
         norm_eq = [norm_eq1, norm_eq2]
         @test ff.eqs == norm_eq
 

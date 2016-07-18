@@ -17,11 +17,11 @@ end
 _filter_lines(ex::Expr) = _filter_lines!(deepcopy(ex))
 
 "Convert lhs = rhs to rhs - lhs. Used in computation of derivatives"
-_normalize(ex::Expr) =
+_rhs_only(ex::Expr) =
     ex.head == :(=) ? Expr(:call, :(.-), ex.args[2], ex.args[1]) : ex
 
 function _unpack_expr(names::Vector, rhs::Symbol)
-    _args = [:($(_parse(names[i])) = Dolang._unpack_var($rhs, $i))
+    _args = [:($(normalize(names[i])) = Dolang._unpack_var($rhs, $i))
              for i in 1:length(names)]
     out = Expr(:block); out.args = _args; out
 end
@@ -113,7 +113,7 @@ function equation_block(ff::FunctionFactory, ::TDer{0}=Der{0})
     else
         # otherwise, need to parse the targets, evaluate them, and then set
         # elements of out equal to the targets
-        parsed_targets = map(_parse, ff.targets)
+        parsed_targets = map(normalize, ff.targets)
         assignments = map((rhs, i) -> _assign_var_expr(:out, rhs, i),
                           parsed_targets, 1:n_expr)
         func_block.args = vcat(ff.eqs, assignments)
@@ -245,7 +245,7 @@ function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
 
     non_zero = 0
     for i_eq = 1:neq
-        eq = _normalize(ff.eqs[i_eq])
+        eq = _rhs_only(ff.eqs[i_eq])
         eq_incidence = ff.incidence.by_eq[i_eq]
 
         for i_var in 1:nvar
@@ -253,7 +253,7 @@ function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
 
             if haskey(eq_incidence, v) && in(shift, eq_incidence[v])
                 non_zero += 1
-                exprs[i_eq, i_var] = differentiate(eq, _parse((v, shift)))
+                exprs[i_eq, i_var] = differentiate(eq, normalize((v, shift)))
             end
         end
     end
@@ -332,20 +332,20 @@ function _hessian_exprs(ff::FunctionFactory{FlatArgs})
     # is the first expression in the block
     terms = Array(Tuple{Int,Tuple{Int,Int},Union{Expr,Symbol,Int}},0)
     for i_eq in 1:neq
-        ex = _normalize(ff.eqs[i_eq])
+        ex = _rhs_only(ff.eqs[i_eq])
         eq_incidence = ff.incidence.by_eq[i_eq]
 
         for i_v1 in 1:nvar
             v1, shift1 = ff.args[i_v1]
 
             if haskey(eq_incidence, v1) && in(shift1, eq_incidence[v1])
-                diff_v1 = differentiate(ex, _parse((v1, shift1)))
+                diff_v1 = differentiate(ex, normalize((v1, shift1)))
 
                 for i_v2 in i_v1:nvar
                     v2, shift2 = ff.args[i_v2]
 
                     if haskey(eq_incidence, v2) && in(shift2, eq_incidence[v2])
-                        deriv = differentiate(diff_v1, _parse((v2, shift2)))
+                        deriv = differentiate(diff_v1, normalize((v2, shift2)))
 
                         # might still be zero if terms were independent
                         if deriv != 0

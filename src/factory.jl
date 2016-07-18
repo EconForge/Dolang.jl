@@ -89,80 +89,6 @@ param_names(p::GroupedParams) = param_names(FlatParams(p))
 # helper functions #
 # ---------------- #
 
-function time_shift(s::Symbol, args::Vector{Symbol}, defs::Associative=Dict(),
-                    shift::Int=0)
-
-    # if `s` is a function arg then return shifted version of s
-    if s in args
-        return :($s($(shift)))
-    end
-
-    # if it is a def, recursively substitute it
-    if haskey(defs, s)
-        return time_shift(defs[s], args, defs, shift)
-    end
-
-    # any other symbols just gets parsed
-    return s
-end
-
-# let numbers through
-time_shift(x::Number, args...) = x
-
-function time_shift(ex::Expr, args::Vector{Symbol}, defs::Associative=Dict(),
-                    shift::Int=0)
-    # no shift, just return the argument
-    shift == 0 && return ex
-
-    # need to pattern match here to make sure we don't normalize function names
-    if is_time_shift(ex)
-        var = ex.args[1]
-        i = ex.args[2]
-        return time_shift(var, args, defs, shift+i)
-    end
-
-    # if it is some kind of function call, shift arguments
-    if ex.head == :call
-        out = Expr(:call, ex.args[1])
-        for arg in ex.args[2:end]
-            push!(out.args, time_shift(arg, args, defs, shift))
-        end
-        return out
-    end
-
-    # otherwise just shift all args, but retain expr head
-    out = Expr(ex.head)
-    out.args = [time_shift(_, args, defs, shift) for _ in ex.args]
-    return out
-end
-
-subs(s::Symbol, d::Associative) = haskey(d, s) ? (d[s], true) : (s, false)
-subs(x::Number, d::Associative) = (x, false)
-function subs(ex::Expr, d::Associative)
-    out_args = Array(Any, length(ex.args))
-    changed = false
-    for (i, arg) in enumerate(ex.args)
-        new_arg, arg_changed = subs(arg, d)
-        out_args[i] = new_arg
-        changed = changed || arg_changed
-    end
-    out = Expr(ex.head)
-    out.args = out_args
-    out, changed
-end
-
-recursive_subs(x::Union{Symbol,Number}, d::Associative) = subs(x, d)[1]
-
-function recursive_subs(ex::Expr, d::Associative)
-    max_it = length(d) + 1
-    max_it == 1 && return ex
-    for i in 1:max_it
-        ex, changed = subs(ex, d)
-        !changed && return ex
-    end
-    error("Could not resolve expression recursively.")
-end
-
 # -------------- #
 # IncidenceTable #
 # -------------- #
@@ -297,7 +223,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
         # if there are no targets, we normalize equations immediately
         if isempty(targets)
-            eqs = map(_normalize, eqs)
+            eqs = map(_rhs_only, eqs)
         end
         # create incidence table of equations
         incidence = IncidenceTable(eqs)
@@ -322,7 +248,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
             end
         end
 
-        # This maps from the _parsed_ name to the _parsed_ expression that
+        # This maps from the normalized_ name to the normalized_ expression that
         # should be substituted for the parsed name
         def_map = Dict{Symbol,Expr}()
         a_names = collect(keys(allowed_args))
@@ -358,8 +284,8 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
                 end
 
                 # construct shifted version of the definition and add to map
-                k = _parse((_def, t))
-                def_map[k] = _parse(time_shift(_ex, a_names, defs, t))
+                k = normalize((_def, t))
+                def_map[k] = normalize(time_shift(_ex, a_names, t, defs))
 
                 # also add this definition to incidence
                 visit!(incidence, _ex, typemax(Int), t, _flat_params)
@@ -384,7 +310,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         end
 
         # now normalize the equations and make subs
-        _f(x) = _to_expr(recursive_subs(_parse(x, targets=targets), def_map))
+        _f(x) = _to_expr(recursive_subs(normalize(x, targets=targets), def_map))
         normalized_eqs = [_f(eq) for eq in eqs]
 
         # now filter args  and keep only those that actually appear in the
