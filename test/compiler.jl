@@ -28,7 +28,7 @@ ffd = Dolang.FunctionFactory(Int, eqs, args, params, targets=targets,
 # TODO: test grouped argument style
 
 
-@testset "_unpack_expr" begin
+@testset " _unpack_expr" begin
     nms = [:a, :b, :c]
     have = Dolang._unpack_expr(nms, :V)
     @test have.head == :block
@@ -52,12 +52,13 @@ ffd = Dolang.FunctionFactory(Int, eqs, args, params, targets=targets,
     @test have2.args[1] == :(d_ = Dolang._unpack_var(y, 1))
 end
 
-@testset "_unpack_.+?\(::FunctionFactory\)" begin
-    @test Dolang.arg_block(ff, :V) == Dolang._unpack_expr(args, :V)
+@testset " _unpack_.+?\(::FunctionFactory\)" begin
+    ordered_args = [(:c, 1), (:d, 1), (:a, 0), (:b, 0), (:c, 0), (:a, -1)]
+    @test Dolang.arg_block(ff, :V) == Dolang._unpack_expr(ordered_args, :V)
     @test Dolang.param_block(ff, :p) == Dolang._unpack_expr(params, :p)
 end
 
-@testset "_assign_var_expr" begin
+@testset " _assign_var_expr" begin
     want = :(Dolang._assign_var(out, $Inf, 1))
     @test Dolang._assign_var_expr(:out, Inf, 1) == want
 
@@ -65,7 +66,7 @@ end
     @test Dolang._assign_var_expr(:z__m_1, 0, :foo) == want
 end
 
-@testset "equation_block" begin
+@testset " equation_block" begin
     have = Dolang.equation_block(ff)
     @test have.head == :block
     @test length(have.args) == 4
@@ -85,13 +86,13 @@ end
     @test have.args[2] == :(Dolang._assign_var(out, $ex2, 2))
 end
 
-@testset "allocate_block" begin
+@testset " allocate_block" begin
     have = Dolang.allocate_block(ff)
     want = :(out = Dolang._allocate_out(eltype(V), 2, V))
     @test have == want
 end
 
-@testset "sizecheck_block" begin
+@testset " sizecheck_block" begin
     have = Dolang.sizecheck_block(ff)
     want = quote
         expected_size = Dolang._output_size(2, V)
@@ -106,149 +107,261 @@ end
     @test have == want
 end
 
-@testset "(arg|param)_names" begin
+@testset " (arg|param)_names" begin
     @test [:V] == @inferred Dolang.arg_names(ff)
     @test [:p] == @inferred Dolang.param_names(ff)
 end
 
-@testset "signature!?" begin
-    @test Dolang.signature(ff) == :(myfun(V,p))
-    @test Dolang.signature!(ff) == :(myfun!(out,V,p))
+@testset " signature!?" begin
+    @test Dolang.signature(ff) == :(myfun(::Dolang.TDer{0},V,p))
+    @test Dolang.signature!(ff) == :(myfun!(::Dolang.TDer{0},out,V,p))
 
-    @test Dolang.signature(ffnt) == :(myfun(V,p))
-    @test Dolang.signature!(ffnt) == :(myfun!(out,V,p))
+    @test Dolang.signature(ffnt) == :(myfun(::Dolang.TDer{0},V,p))
+    @test Dolang.signature!(ffnt) == :(myfun!(::Dolang.TDer{0},out,V,p))
 
     # NOTE: I need to escape the Int here so that it will refer to the exact
     #       same int inside ffd
-    @test Dolang.signature(ffd) == :(myfun(::$(Int),V,p))
-    @test Dolang.signature!(ffd) == :(myfun!(::$(Int),out,V,p))
+    @test Dolang.signature(ffd) == :(myfun(::Dolang.TDer{0},::$(Int),V,p))
+    @test Dolang.signature!(ffd) == :(myfun!(::Dolang.TDer{0},::$(Int),out,V,p))
 end
 
-@testset "compiling functions" begin
-    want = Dolang._filter_lines!(:(function myfun(V,p)
-        out = Dolang._allocate_out(eltype(V),2,V)
-        begin
+@testset " compiling functions" begin
+    want = Dolang._filter_lines!(:(begin
+        function myfun(::Dolang.TDer{0},V,p)
+            out = Dolang._allocate_out(eltype(V),2,V)
             begin
-                u_ = Dolang._unpack_var(p,1)
+                begin
+                    u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    c__1_ = Dolang._unpack_var(V,1)
+                    d__1_ = Dolang._unpack_var(V,2)
+                    a_ = Dolang._unpack_var(V,3)
+                    b_ = Dolang._unpack_var(V,4)
+                    c_ = Dolang._unpack_var(V,5)
+                    a_m1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
+                    bar_ = c__1_ .+ u_ .* d__1_
+                    Dolang._assign_var(out,foo_,1)
+                    Dolang._assign_var(out,bar_,2)
+                end
+                return out
             end
+        end
+        function myfun(V,p)
+            out = Dolang._allocate_out(eltype(V),2,V)
             begin
-                a_m1_ = Dolang._unpack_var(V,1)
-                a_ = Dolang._unpack_var(V,2)
-                b_ = Dolang._unpack_var(V,3)
-                c_ = Dolang._unpack_var(V,4)
-                c__1_ = Dolang._unpack_var(V,5)
-                d__1_ = Dolang._unpack_var(V,6)
+                begin
+                    u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    c__1_ = Dolang._unpack_var(V,1)
+                    d__1_ = Dolang._unpack_var(V,2)
+                    a_ = Dolang._unpack_var(V,3)
+                    b_ = Dolang._unpack_var(V,4)
+                    c_ = Dolang._unpack_var(V,5)
+                    a_m1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
+                    bar_ = c__1_ .+ u_ .* d__1_
+                    Dolang._assign_var(out,foo_,1)
+                    Dolang._assign_var(out,bar_,2)
+                end
+                return out
             end
-            begin
-                foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
-                bar_ = c__1_ .+ u_ .* d__1_
-                Dolang._assign_var(out,foo_,1)
-                Dolang._assign_var(out,bar_,2)
-            end
-            return out
         end
     end))
 
-    want! = Dolang._filter_lines!(:(function myfun!(out,V,p)
-        begin
-            expected_size = Dolang._output_size(2, V)
-            if size(out) != expected_size
-                msg = "Expected out to be size $(expected_size), found $(size(out))"
-                throw(DimensionMismatch(msg))
+    want! = Dolang._filter_lines!(:(begin
+        function myfun!(::Dolang.TDer{0},out,V,p)
+            begin
+                expected_size = Dolang._output_size(2, V)
+                if size(out) != expected_size
+                    msg = "Expected out to be size $(expected_size), found $(size(out))"
+                    throw(DimensionMismatch(msg))
+                end
+            end
+            begin
+                begin
+                    u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    c__1_ = Dolang._unpack_var(V,1)
+                    d__1_ = Dolang._unpack_var(V,2)
+                    a_ = Dolang._unpack_var(V,3)
+                    b_ = Dolang._unpack_var(V,4)
+                    c_ = Dolang._unpack_var(V,5)
+                    a_m1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
+                    bar_ = c__1_ .+ u_ .* d__1_
+                    Dolang._assign_var(out,foo_,1)
+                    Dolang._assign_var(out,bar_,2)
+                end
+                return out
             end
         end
-        begin
+        function myfun!(out,V,p)
             begin
-                u_ = Dolang._unpack_var(p,1)
-            end
-            begin
-                a_m1_ = Dolang._unpack_var(V,1)
-                a_ = Dolang._unpack_var(V,2)
-                b_ = Dolang._unpack_var(V,3)
-                c_ = Dolang._unpack_var(V,4)
-                c__1_ = Dolang._unpack_var(V,5)
-                d__1_ = Dolang._unpack_var(V,6)
+                expected_size = Dolang._output_size(2, V)
+                if size(out) != expected_size
+                    msg = "Expected out to be size $(expected_size), found $(size(out))"
+                    throw(DimensionMismatch(msg))
+                end
             end
             begin
-                foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
-                bar_ = c__1_ .+ u_ .* d__1_
-                Dolang._assign_var(out,foo_,1)
-                Dolang._assign_var(out,bar_,2)
+                begin
+                    u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    c__1_ = Dolang._unpack_var(V,1)
+                    d__1_ = Dolang._unpack_var(V,2)
+                    a_ = Dolang._unpack_var(V,3)
+                    b_ = Dolang._unpack_var(V,4)
+                    c_ = Dolang._unpack_var(V,5)
+                    a_m1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
+                    bar_ = c__1_ .+ u_ .* d__1_
+                    Dolang._assign_var(out,foo_,1)
+                    Dolang._assign_var(out,bar_,2)
+                end
+                return out
             end
-            return out
-        end
-    end))
-
-    want_d = Dolang._filter_lines!(:(function myfun(::$(Int),V,p)
-        out = Dolang._allocate_out(eltype(V),2,V)
-        begin
-            begin
-                u_ = Dolang._unpack_var(p,1)
-            end
-            begin
-                a_m1_ = Dolang._unpack_var(V,1)
-                a_ = Dolang._unpack_var(V,2)
-                b_ = Dolang._unpack_var(V,3)
-                c_ = Dolang._unpack_var(V,4)
-                c__1_ = Dolang._unpack_var(V,5)
-                d__1_ = Dolang._unpack_var(V,6)
-            end
-            begin
-                foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
-                bar_ = c__1_ .+ u_ .* d__1_
-                Dolang._assign_var(out,foo_,1)
-                Dolang._assign_var(out,bar_,2)
-            end
-            return out
-        end
-    end))
-
-    want_d! = Dolang._filter_lines!(:(function myfun!(::($Int),out,V,p)
-        begin
-            expected_size = Dolang._output_size(2, V)
-            if size(out) != expected_size
-                msg = "Expected out to be size $(expected_size), found $(size(out))"
-                throw(DimensionMismatch(msg))
-            end
-        end
-        begin
-            begin
-                u_ = Dolang._unpack_var(p,1)
-            end
-            begin
-                a_m1_ = Dolang._unpack_var(V,1)
-                a_ = Dolang._unpack_var(V,2)
-                b_ = Dolang._unpack_var(V,3)
-                c_ = Dolang._unpack_var(V,4)
-                c__1_ = Dolang._unpack_var(V,5)
-                d__1_ = Dolang._unpack_var(V,6)
-            end
-            begin
-                foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
-                bar_ = c__1_ .+ u_ .* d__1_
-                Dolang._assign_var(out,foo_,1)
-                Dolang._assign_var(out,bar_,2)
-            end
-            return out
         end
     end))
 
+    want_d = Dolang._filter_lines!(:(begin
+        function myfun(::Dolang.TDer{0},::$(Int),V,p)
+            out = Dolang._allocate_out(eltype(V),2,V)
+            begin
+                begin
+                    u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    c__1_ = Dolang._unpack_var(V,1)
+                    d__1_ = Dolang._unpack_var(V,2)
+                    a_ = Dolang._unpack_var(V,3)
+                    b_ = Dolang._unpack_var(V,4)
+                    c_ = Dolang._unpack_var(V,5)
+                    a_m1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
+                    bar_ = c__1_ .+ u_ .* d__1_
+                    Dolang._assign_var(out,foo_,1)
+                    Dolang._assign_var(out,bar_,2)
+                end
+                return out
+            end
+        end
+        function myfun(::$(Int),V,p)
+            out = Dolang._allocate_out(eltype(V),2,V)
+            begin
+                begin
+                    u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    c__1_ = Dolang._unpack_var(V,1)
+                    d__1_ = Dolang._unpack_var(V,2)
+                    a_ = Dolang._unpack_var(V,3)
+                    b_ = Dolang._unpack_var(V,4)
+                    c_ = Dolang._unpack_var(V,5)
+                    a_m1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
+                    bar_ = c__1_ .+ u_ .* d__1_
+                    Dolang._assign_var(out,foo_,1)
+                    Dolang._assign_var(out,bar_,2)
+                end
+                return out
+            end
+        end
+    end))
 
-    @testset "_build_function!?" begin
-        have = Dolang._build_function(ff)
-        have! = Dolang._build_function!(ff)
+    want_d! = Dolang._filter_lines!(:(begin
+        function myfun!(::Dolang.TDer{0},::($Int),out,V,p)
+            begin
+                expected_size = Dolang._output_size(2, V)
+                if size(out) != expected_size
+                    msg = "Expected out to be size $(expected_size), found $(size(out))"
+                    throw(DimensionMismatch(msg))
+                end
+            end
+            begin
+                begin
+                    u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    c__1_ = Dolang._unpack_var(V,1)
+                    d__1_ = Dolang._unpack_var(V,2)
+                    a_ = Dolang._unpack_var(V,3)
+                    b_ = Dolang._unpack_var(V,4)
+                    c_ = Dolang._unpack_var(V,5)
+                    a_m1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
+                    bar_ = c__1_ .+ u_ .* d__1_
+                    Dolang._assign_var(out,foo_,1)
+                    Dolang._assign_var(out,bar_,2)
+                end
+                return out
+            end
+        end
+        function myfun!(::($Int),out,V,p)
+            begin
+                expected_size = Dolang._output_size(2, V)
+                if size(out) != expected_size
+                    msg = "Expected out to be size $(expected_size), found $(size(out))"
+                    throw(DimensionMismatch(msg))
+                end
+            end
+            begin
+                begin
+                    u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    c__1_ = Dolang._unpack_var(V,1)
+                    d__1_ = Dolang._unpack_var(V,2)
+                    a_ = Dolang._unpack_var(V,3)
+                    b_ = Dolang._unpack_var(V,4)
+                    c_ = Dolang._unpack_var(V,5)
+                    a_m1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_))
+                    bar_ = c__1_ .+ u_ .* d__1_
+                    Dolang._assign_var(out,foo_,1)
+                    Dolang._assign_var(out,bar_,2)
+                end
+                return out
+            end
+        end
+    end))
+
+
+    @testset "  _build_function!?" begin
+        have = Dolang.build_function(ff, Der{0})
+        have! = Dolang.build_function!(ff, Der{0})
 
         @test have == want
         @test have! == want!
 
-        have_d = Dolang._build_function(ffd)
-        have_d! = Dolang._build_function!(ffd)
+        have_d = Dolang.build_function(ffd, Der{0})
+        have_d! = Dolang.build_function!(ffd, Der{0})
 
         @test have_d == want_d
         @test have_d! == want_d!
     end
 
-    @testset "make_method" begin
+    @testset "  make_method" begin
         @test make_method(ff) == Expr(:block, want!, want)
         @test make_method(ff; mutating=false) == Expr(:block, want)
         @test make_method(ff; allocating=false) == Expr(:block, want!)

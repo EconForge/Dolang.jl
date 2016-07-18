@@ -236,11 +236,28 @@ function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
     #       with respect to all arguments in the order they were given. It
     #       would be better if I went though `ff.incidence.by_var` and only
     #       made columns for variables that appear in the equations
-    eqs = ff.eqs
     args = ff.args
     neq = length(ff.eqs)
     nvar = nargs(ff)
-    [differentiate(_normalize(eqs[i]), _parse(args[j])) for i=1:neq, j=1:nvar]
+
+    exprs = Array(Union{Symbol,Expr,Number}, neq, nvar)
+    fill!(exprs, 0)
+
+    non_zero = 0
+    for i_eq = 1:neq
+        eq = _normalize(ff.eqs[i_eq])
+        eq_incidence = ff.incidence.by_eq[i_eq]
+
+        for i_var in 1:nvar
+            v, shift = args[i_var]
+
+            if haskey(eq_incidence, v) && in(shift, eq_incidence[v])
+                non_zero += 1
+                exprs[i_eq, i_var] = differentiate(eq, _parse((v, shift)))
+            end
+        end
+    end
+    exprs, non_zero
 end
 
 _output_size(ff::FunctionFactory, ::TDer{1}) =
@@ -249,7 +266,7 @@ _output_size(ff::FunctionFactory, ::TDer{1}) =
 # Now fill in FunctionFactory API
 function allocate_block{n}(ff::FunctionFactory, d::TDer{n})
     expected_size = _output_size(ff, d)
-    :(out = Array(Float64, $(expected_size)))
+    :(out = zeros(Float64, $(expected_size)))
 end
 
 function sizecheck_block{n}(ff::FunctionFactory, d::TDer{n})
@@ -259,25 +276,32 @@ function sizecheck_block{n}(ff::FunctionFactory, d::TDer{n})
             msg = "Expected out to be size $($(expected_size)), found $(size(out))"
             throw(DimensionMismatch(msg))
         end
+        # populate with zeros, because we assume everything is zeroed and
+        # only fill in non-zero elements
+        fill!(zero(eltype), out)
     end
     _filter_lines!(ex)
     ex
 end
 
 function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{1})
-    expr_mat = _jacobian_expr_mat(ff)
+    expr_mat, non_zero = _jacobian_expr_mat(ff)
     neq = size(expr_mat, 1)
     nvar = size(expr_mat, 2)
 
     # construct expressions that define the body of this function.
     # we need neq*nvar of them
-    expr_args = Array(Expr, length(expr_mat))
+    expr_args = Array(Expr, non_zero)
 
     # To do this we use linear indexing tricks to access `out` and `expr_mat`.
     # Note the offset on the index to expr_args also (needed because allocating)
     # is the first expression in the block
-    for ix in eachindex(expr_mat)
-        expr_args[ix] = :(out[$(ix)] = $(expr_mat[ix]))
+    ix = 0
+    for ii in eachindex(expr_mat)
+        if expr_mat[ii] != 0
+            ix += 1
+            expr_args[ix] = :(out[$(ii)] = $(expr_mat[ii]))
+        end
     end
 
     out = Expr(:block)
@@ -309,18 +333,25 @@ function _hessian_exprs(ff::FunctionFactory{FlatArgs})
     terms = Array(Tuple{Int,Tuple{Int,Int},Union{Expr,Symbol,Int}},0)
     for i_eq in 1:neq
         ex = _normalize(ff.eqs[i_eq])
+        eq_incidence = ff.incidence.by_eq[i_eq]
 
         for i_v1 in 1:nvar
-            v1 = _parse(ff.args[i_v1])
-            diff_v1 = differentiate(ex, v1)
+            v1, shift1 = ff.args[i_v1]
 
-            for i_v2 in i_v1:nvar
-                v2 = _parse(ff.args[i_v2])
-                deriv = differentiate(diff_v1, v2)
+            if haskey(eq_incidence, v1) && in(shift1, eq_incidence[v1])
+                diff_v1 = differentiate(ex, _parse((v1, shift1)))
 
-                if deriv != 0
-                    # ix = sub2ind((nvar, nvar), i_v1, i_v2)
-                    push!(terms, (i_eq, (i_v1, i_v2), deriv))
+                for i_v2 in i_v1:nvar
+                    v2, shift2 = ff.args[i_v2]
+
+                    if haskey(eq_incidence, v2) && in(shift2, eq_incidence[v2])
+                        deriv = differentiate(diff_v1, _parse((v2, shift2)))
+
+                        # might still be zero if terms were independent
+                        if deriv != 0
+                            push!(terms, (i_eq, (i_v1, i_v2), deriv))
+                        end
+                    end
                 end
             end
         end

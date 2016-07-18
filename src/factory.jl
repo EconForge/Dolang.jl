@@ -89,10 +89,6 @@ param_names(p::GroupedParams) = param_names(FlatParams(p))
 # helper functions #
 # ---------------- #
 
-is_time_shift(ex::Expr) = ex.head == :call &&
-                          length(ex.args) == 2 &&
-                          isa(ex.args[2], Integer)
-
 function time_shift(s::Symbol, args::Vector{Symbol}, defs::Associative=Dict(),
                     shift::Int=0)
 
@@ -119,15 +115,25 @@ function time_shift(ex::Expr, args::Vector{Symbol}, defs::Associative=Dict(),
     shift == 0 && return ex
 
     # need to pattern match here to make sure we don't normalize function names
-    @match ex begin
-        var_(i_Integer) => return time_shift(var, args, defs, shift+i)
-        f_(foo__) => begin
-            out = Expr(:call, f)
-            append!(out.args, [time_shift(_, args, defs, shift) for _ in foo])
-            out
-        end
-        _ => Expr(ex.head, [time_shift(_, args, defs, shift) for _ in ex.args]...)
+    if is_time_shift(ex)
+        var = ex.args[1]
+        i = ex.args[2]
+        return time_shift(var, args, defs, shift+i)
     end
+
+    # if it is some kind of function call, shift arguments
+    if ex.head == :call
+        out = Expr(:call, ex.args[1])
+        for arg in ex.args[2:end]
+            push!(out.args, time_shift(arg, args, defs, shift))
+        end
+        return out
+    end
+
+    # otherwise just shift all args, but retain expr head
+    out = Expr(ex.head)
+    out.args = [time_shift(_, args, defs, shift) for _ in ex.args]
+    return out
 end
 
 subs(s::Symbol, d::Associative) = haskey(d, s) ? (d[s], true) : (s, false)
@@ -218,10 +224,24 @@ end
 
 function visit!(it::IncidenceTable, ex::Expr, n::Int, shift::Int,
                 skip::Vector{Symbol}=Symbol[])
-    @match ex begin
-        var_(i_Integer) => visit!(it, var, n, i+shift, skip)
-        f_(args__) => [visit!(it, _, n, shift, skip) for _ in args]
-        _ => [visit!(it, _, n, shift, skip) for _ in ex.args]
+    if is_time_shift(ex)
+        var = ex.args[1]
+        i = ex.args[2]
+        visit!(it, var, n, i+shift, skip)
+        return nothing
+    end
+
+    # don't visit the function name
+    if ex.head == :call
+        for _ in ex.args[2:end]
+            visit!(it, _, n, shift, skip)
+        end
+        return nothing
+    end
+
+    # Otherwise just visit everything
+    for _ in ex.args
+        visit!(it, _, n, shift, skip)
     end
     nothing
 end
@@ -340,6 +360,9 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
                 # construct shifted version of the definition and add to map
                 k = _parse((_def, t))
                 def_map[k] = _parse(time_shift(_ex, a_names, defs, t))
+
+                # also add this definition to incidence
+                visit!(incidence, _ex, typemax(Int), t, _flat_params)
             end
 
             # Add these times to allowed map for `_def` so we can do equation
@@ -350,6 +373,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
         # do equation validation
         for (i, _dict) in incidence.by_eq
+            i == typemax(Int) && continue # we've already validated defs
             for (v, _set) in _dict
                 _check_known(allowed, v, eqs[i])
                 if _set ⊈ allowed[v]

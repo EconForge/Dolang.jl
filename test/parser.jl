@@ -1,18 +1,18 @@
 @testset "Dolang.call_expr" begin
-    @test Dolang.call_expr(:x, 0) == :x
-    @test Dolang.call_expr(:x, 1) == :x__1
-    @test Dolang.call_expr(:x, -1) == :x_m1
-    @test Dolang.call_expr(:x, -100) == :x_m100
+    @test Dolang.call_expr(:x, 0) == :x_
+    @test Dolang.call_expr(:x, 1) == :x__1_
+    @test Dolang.call_expr(:x, -1) == :x_m1_
+    @test Dolang.call_expr(:x, -100) == :x_m100_
 
-    @test Dolang.call_expr("x", 0) == :x
-    @test Dolang.call_expr("x", 1) == :x__1
-    @test Dolang.call_expr("x", -1) == :x_m1
-    @test Dolang.call_expr("x", -100) == :x_m100
+    @test Dolang.call_expr("x", 0) == :x_
+    @test Dolang.call_expr("x", 1) == :x__1_
+    @test Dolang.call_expr("x", -1) == :x_m1_
+    @test Dolang.call_expr("x", -100) == :x_m100_
 
-    @test Dolang.call_expr((:x, 0)) == :x
-    @test Dolang.call_expr((:x, 1)) == :x__1
-    @test Dolang.call_expr((:x, -1)) == :x_m1
-    @test Dolang.call_expr((:x, -100)) == :x_m100
+    @test Dolang.call_expr((:x, 0)) == :x_
+    @test Dolang.call_expr((:x, 1)) == :x__1_
+    @test Dolang.call_expr((:x, -1)) == :x_m1_
+    @test Dolang.call_expr((:x, -100)) == :x_m100_
 end
 
 @testset "Dolang.eq_expr" begin

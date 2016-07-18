@@ -1,7 +1,6 @@
 module Dolang
 
-using MacroTools
-using DataStructures: OrderedDict
+using DataStructures
 using Calculus
 using Compat: view
 

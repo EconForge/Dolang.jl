@@ -5,12 +5,12 @@ const grouped_args = Dict(:x=>[(:a, 0), (:c, -1)], :y=>[(:b, 1)])
 const flat_params = [:beta, :delta]
 const grouped_params = Dict(:p => [:beta, :delta])
 
-@testset "convert Grouped" begin
+@testset " convert Grouped" begin
     @test sort(Dolang.FlatArgs(grouped_args), by=_->_[1]) == flat_args
     @test sort(Dolang.FlatParams(grouped_params)) == flat_params
 end
 
-@testset "allowed_dates" begin
+@testset " allowed_dates" begin
     out = OrderedDict()
     Dolang.allowed_dates!(flat_args, out)
     @test out == OrderedDict(:a=>Set(0), :b=>Set(1), :c=>Set(-1))
@@ -19,12 +19,12 @@ end
     @test out == Dolang.allowed_dates(grouped_args)
 end
 
-@testset "param_names" begin
+@testset " param_names" begin
     @test Dolang.param_names(flat_params) == flat_params
     @test Dolang.param_names(grouped_params) == flat_params
 end
 
-@testset "is_time_shift" begin
+@testset " is_time_shift" begin
     @test Dolang.is_time_shift(:(sin(1)))
     @test Dolang.is_time_shift(:(x(2)))
     @test !Dolang.is_time_shift(:(a(b)))
@@ -32,7 +32,7 @@ end
     @test Dolang.is_time_shift(:(a(1)))
 end
 
-@testset "time_shift" begin
+@testset " time_shift" begin
     #TODO: write tests with defs
     _ts = Dolang.time_shift
     defs = Dict()
@@ -53,17 +53,17 @@ end
     @test _ts(ex2, args, defs, -10) == :(a(-8) + x + b(-10))
 end
 
-@testset "subs" begin
+@testset " recursive_subs()" begin
     d = Dict(:monty=> :python, :run=>:faster, :eat=>:more)
-    @test Dolang.subs(:monty, d) == :python
-    @test Dolang.subs(:Monty, d) == :Monty
-    @test Dolang.subs(1.0, d) == 1.0
+    @test Dolang.recursive_subs(:monty, d) == :python
+    @test Dolang.recursive_subs(:Monty, d) == :Monty
+    @test Dolang.recursive_subs(1.0, d) == 1.0
 
     want = :(python(faster + more, eats))
-    @test Dolang.subs(:(monty(run + eat, eats)), d) == want
+    @test Dolang.recursive_subs(:(monty(run + eat, eats)), d) == want
 end
 
-@testset "IncidenceTable" begin
+@testset " IncidenceTable" begin
     ex1 = :(foo = bing + bong)
     ex2 = :(cowboy = yee - haw! + foo)
     ex3 = :(x = foo(-3) + bing(1))
@@ -148,7 +148,7 @@ end
     @test it[:foo] == it.by_var[:foo]
 end
 
-@testset "Function Factory" begin
+@testset " Function Factory" begin
     # TODO: test grouped argument style
 
     eqs = [:(foo = log(a)+b/x(-1)), :(bar = c(1)+u*d(1))]
@@ -159,7 +159,7 @@ end
     funname = :myfun
     _FF = Dolang.FunctionFactory
 
-    @testset "constructors" begin
+    @testset "  constructors" begin
         # inner constructor directly
         ff1 = _FF{Dolang.FlatArgs,
                   Dolang.FlatParams,
@@ -182,11 +182,9 @@ end
         @test ff4 == ff1
     end
 
-    @testset "constructor behavior" begin
+    @testset "  constructor behavior" begin
         _FF = _FF
         ff = _FF(eqs, args, params, targets=targets, defs=defs, funname=funname)
-
-        @test ff.incidence == Dolang.IncidenceTable(eqs)
 
         # test that equations were normalized properly
         norm_eq1 = :(foo_ = log(a_) .+ b_ ./ (a_m1_ ./ (1 .- c_)))
