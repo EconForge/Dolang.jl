@@ -18,7 +18,7 @@ _filter_lines(ex::Expr) = _filter_lines!(deepcopy(ex))
 
 "Convert lhs = rhs to rhs - lhs. Used in computation of derivatives"
 _rhs_only(ex::Expr) =
-    ex.head == :(=) ? Expr(:call, :(.-), ex.args[2], ex.args[1]) : ex
+    ex.head == :(=) ? Expr(:call, :(-), ex.args[2], ex.args[1]) : ex
 
 function _unpack_expr(names::Vector, rhs::Symbol)
     _args = [:($(normalize(names[i])) = Dolang._unpack_var($rhs, $i))
@@ -219,17 +219,6 @@ end
 # ---------------- #
 
 # first we need a couple of helper methods
-
-# our parsed expressions have `.+` instead of +. This is kosher here beacuse
-# we know all varaibles represent scalars. Calculus.jl can't make this
-# assumption, so they don't offer derivative rules for broadcasting arithmetic.
-# I'm being un-cool here and adding methods to their function. I shouldn't do
-# this, but we are still in proof of concept stages so I'm friggin' doin' it!
-for (dotfunsym, funsym) in [(:.+, :+), (:.-, :-), (:.*, :*),
-                            (:./, :/), (:.^, :^)]
-    @eval Calculus.differentiate(::SymbolParameter{$(Meta.quot(dotfunsym))}, args, wrt) =
-        differentiate(SymbolParameter{$(Meta.quot(funsym))}(), args, wrt)
-end
 
 function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
     # NOTE: I'm starting with the easy version, where I just differentiate
