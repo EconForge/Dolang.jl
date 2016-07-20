@@ -13,7 +13,7 @@ else
 end
 
 tests = length(ARGS) > 0 ? ARGS : [
-                                   "parser",
+                                   "symbolic",
                                    "factory",
                                    "compiler",
                                    "util",
