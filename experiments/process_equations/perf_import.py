@@ -18,9 +18,9 @@ def timeit(msg):
     t2 = time.time()
     print('{}: {:.4f} s'.format(msg, t2-t1))
 
-
+#
 # with timeit("Conversion mod -> json"):
-    # from dolo.compiler.import_dynare import import_dynare
+#     from dolo.compiler.import_dynare import import_dynare
 #     model = import_dynare("/home/pablo/Downloads/EA_QUEST3.mod", output_type='json')
 #     txt = json.dumps(model)
 #     model['calibration']
@@ -94,3 +94,21 @@ with timeit("Compute Jacobian and Hessian (symengine)"):
             hesline.append(hesline2)
         jac.append(line)
         hes.append(hesline)
+
+
+
+
+
+
+
+
+from dolo import *
+model = yaml_import("/home/pablo/Programming/econforge/dolo/examples/models/rbc_dynare.yaml")
+
+from dolo.algos.dynare.perturbations import solve_decision_rule
+modeldynare_modfiles
+
+dr = solve_decision_rule(model)
+
+dr.keys()
+dr['g_a']
