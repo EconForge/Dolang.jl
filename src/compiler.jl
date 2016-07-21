@@ -288,8 +288,7 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{1})
     ix = 0
     for ii in eachindex(expr_mat)
         if expr_mat[ii] != 0
-            ix += 1
-            expr_args[ix] = :(out[$(ii)] = $(expr_mat[ii]))
+            expr_args[ix+=1] = :(out[$(ii)] = $(expr_mat[ii]))
         end
     end
 
@@ -319,7 +318,7 @@ function _hessian_exprs(ff::FunctionFactory{FlatArgs})
     # To do this we use linear indexing tricks to access `out` and `expr_mat`.
     # Note the offset on the index to expr_args also (needed because allocating)
     # is the first expression in the block
-    terms = Array(Tuple{Int,Tuple{Int,Int},Union{Expr,Symbol,Int}},0)
+    terms = Array(Tuple{Int,Tuple{Int,Int},Union{Expr,Symbol,Number}},0)
     for i_eq in 1:neq
         ex = _rhs_only(ff.eqs[i_eq])
         eq_incidence = ff.incidence.by_eq[i_eq]
