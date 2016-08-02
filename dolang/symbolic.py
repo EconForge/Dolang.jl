@@ -4,7 +4,7 @@ Expression = ast.Expr
 from dolang.language import functions
 from typing import Tuple, List
 
-from dolang.parser import parse_string
+# from dolang.parser import parse_string
 
 def stringify_variable(arg: Tuple[str, int]) -> str:
     s = arg[0]
@@ -21,10 +21,10 @@ def stringify_parameter(p: str) -> str:
 
 def stringify(arg) -> str:
     if isinstance(arg, str):
-        return normalize_parameter(arg)
+        return stringify_parameter(arg)
     elif isinstance(arg, tuple):
         if len(arg)==2 and isinstance(arg[0],str) and isinstance(arg[0],int):
-            return normalize_variable(arg)
+            return stringify_variable(arg)
     raise Exception("Unknown canonical form: {}".format(arg))
 
 ###
@@ -106,7 +106,6 @@ from ast import NodeTransformer, Name, UnaryOp, UAdd, USub, Load, Call
 class ExpressionNormalizer(NodeTransformer):
 
     # replaces calls to variables by time subscripts
-
     def __init__(self, variables=None):
 
         self.variables = variables if variables is not None else []
