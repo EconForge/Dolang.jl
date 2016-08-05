@@ -110,12 +110,7 @@ function normalize(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[
         # :(100_E_LYGAP_ - _outputgap_). Here Julia knows `100_E_LYGAP_` is
         # `100 * _E_LYGAP_`, but symengine treats that whole thing as a
         # single symbol. My current solution is to just swap the order of the
-        # `*`, but that will cause problems if ex.args[2] < 0 (because we
-        # will end up with something like `x * -4` and SymEngine will not like
-        # to see two operators next to one another.)
-        # NOTE: I think the easiest thing to do is to see if the SymEngine guys
-        #       are ok with special casing `op - Symbol` to be `op (-Symbol)`
-        #       I would only have to change things in parser.cpp
+        # `*`
         if ex.args[1] == :(*) && length(ex.args) == 3 && isa(ex.args[2], Number)
             return Expr(:call, :(*), normalize(ex.args[3]), ex.args[2])
         end
