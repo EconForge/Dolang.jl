@@ -1,7 +1,8 @@
 module Dolang
 
 using DataStructures
-using Calculus
+using SymEngine
+
 using Compat: view, String
 
 import Base: ==
