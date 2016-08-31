@@ -398,5 +398,10 @@ end
     =#
 end
 
+@testset "derivative code runs" begin
+    @test (Dolang.build_function(ff, Der{1}); true)
+    @test (Dolang.build_function(ff, Der{2}); true)
+end  # @testset "derivative code runs"
+
 
 end  # @testset "compiler"

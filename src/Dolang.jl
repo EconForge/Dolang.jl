@@ -1,7 +1,25 @@
 module Dolang
 
 using DataStructures
-using SymEngine
+
+const HAVE_SYMENGINE = try
+    import SymEngine;
+    true
+catch
+    false
+end::Bool
+
+if HAVE_SYMENGINE && false
+    import SymEngine
+    deriv(eq::SymEngine.Basic, x) = SymEngine.diff(eq, x)
+    prep_deriv(eq) = SymEngine.Basic(eq)
+    println("have SymEngine")
+else
+    import Calculus
+    deriv(eq, x) = Calculus.differentiate(eq, x)
+    prep_deriv(eq) = eq
+    println("Have Calculus")
+end
 
 using Compat: view, String
 
