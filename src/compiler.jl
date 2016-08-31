@@ -18,7 +18,7 @@ _filter_lines(ex::Expr) = _filter_lines!(deepcopy(ex))
 
 "Convert lhs = rhs to rhs - lhs. Used in computation of derivatives"
 _rhs_only(ex::Expr) =
-    ex.head == :(=) ? Expr(:call, :(.-), ex.args[2], ex.args[1]) : ex
+    ex.head == :(=) ? Expr(:call, :(-), ex.args[2], ex.args[1]) : ex
 
 function _unpack_expr(names::Vector, rhs::Symbol)
     _args = [:($(normalize(names[i])) = Dolang._unpack_var($rhs, $i))
@@ -220,17 +220,6 @@ end
 
 # first we need a couple of helper methods
 
-# our parsed expressions have `.+` instead of +. This is kosher here beacuse
-# we know all varaibles represent scalars. Calculus.jl can't make this
-# assumption, so they don't offer derivative rules for broadcasting arithmetic.
-# I'm being un-cool here and adding methods to their function. I shouldn't do
-# this, but we are still in proof of concept stages so I'm friggin' doin' it!
-for (dotfunsym, funsym) in [(:.+, :+), (:.-, :-), (:.*, :*),
-                            (:./, :/), (:.^, :^)]
-    @eval Calculus.differentiate(::SymbolParameter{$(Meta.quot(dotfunsym))}, args, wrt) =
-        differentiate(SymbolParameter{$(Meta.quot(funsym))}(), args, wrt)
-end
-
 function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
     # NOTE: I'm starting with the easy version, where I just differentiate
     #       with respect to all arguments in the order they were given. It
@@ -246,6 +235,7 @@ function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
     non_zero = 0
     for i_eq = 1:neq
         eq = _rhs_only(ff.eqs[i_eq])
+        eq_prepped = prep_deriv(eq)
         eq_incidence = ff.incidence.by_eq[i_eq]
 
         for i_var in 1:nvar
@@ -253,7 +243,7 @@ function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
 
             if haskey(eq_incidence, v) && in(shift, eq_incidence[v])
                 non_zero += 1
-                exprs[i_eq, i_var] = differentiate(eq, normalize((v, shift)))
+                exprs[i_eq, i_var] = deriv(eq_prepped, normalize((v, shift)))
             end
         end
     end
@@ -299,8 +289,7 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{1})
     ix = 0
     for ii in eachindex(expr_mat)
         if expr_mat[ii] != 0
-            ix += 1
-            expr_args[ix] = :(out[$(ii)] = $(expr_mat[ii]))
+            expr_args[ix+=1] = :(out[$(ii)] = $(expr_mat[ii]))
         end
     end
 
@@ -330,26 +319,27 @@ function _hessian_exprs(ff::FunctionFactory{FlatArgs})
     # To do this we use linear indexing tricks to access `out` and `expr_mat`.
     # Note the offset on the index to expr_args also (needed because allocating)
     # is the first expression in the block
-    terms = Array(Tuple{Int,Tuple{Int,Int},Union{Expr,Symbol,Int}},0)
+    terms = Array(Tuple{Int,Tuple{Int,Int},Union{Expr,Symbol,Number}},0)
     for i_eq in 1:neq
         ex = _rhs_only(ff.eqs[i_eq])
+        eq_prepped = prep_deriv(ex)
         eq_incidence = ff.incidence.by_eq[i_eq]
 
         for i_v1 in 1:nvar
             v1, shift1 = ff.args[i_v1]
 
             if haskey(eq_incidence, v1) && in(shift1, eq_incidence[v1])
-                diff_v1 = differentiate(ex, normalize((v1, shift1)))
+                diff_v1 = deriv(eq_prepped, normalize((v1, shift1)))
 
                 for i_v2 in i_v1:nvar
                     v2, shift2 = ff.args[i_v2]
 
                     if haskey(eq_incidence, v2) && in(shift2, eq_incidence[v2])
-                        deriv = differentiate(diff_v1, normalize((v2, shift2)))
+                        diff_v1v2 = deriv(diff_v1, normalize((v2, shift2)))
 
                         # might still be zero if terms were independent
-                        if deriv != 0
-                            push!(terms, (i_eq, (i_v1, i_v2), deriv))
+                        if diff_v1v2 != 0
+                            push!(terms, (i_eq, (i_v1, i_v2), diff_v1v2))
                         end
                     end
                 end

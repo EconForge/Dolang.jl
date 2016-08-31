@@ -19,8 +19,8 @@ end
 
 @testset "Dolang.eq_expr" begin
     ex = :(z = x + y(1))
-    @test Dolang.eq_expr(ex) == :(_x_ .+ _y__1_ .- _z_)
-    @test Dolang.eq_expr(ex, [:z]) == :(_z_ = _x_ .+ _y__1_)
+    @test Dolang.eq_expr(ex) == :(_x_ + _y__1_ - _z_)
+    @test Dolang.eq_expr(ex, [:z]) == :(_z_ = _x_ + _y__1_)
 end
 
 @testset "Dolang.normalize" begin
@@ -70,10 +70,10 @@ end
         end
 
         @testset "arithmetic" begin
-            @test Dolang.normalize(:(a(1) + b + c(2) + d(-1))) == :(((_a__1_ .+ _b_) .+ _c__2_) .+ _d_m1_)
-            @test Dolang.normalize(:(a(1) * b * c(2) * d(-1))) == :(((_a__1_ .* _b_) .* _c__2_) .* _d_m1_)
-            @test Dolang.normalize(:(a(1) - b - c(2) - d(-1))) == :(((_a__1_ .- _b_) .- _c__2_) .- _d_m1_)
-            @test Dolang.normalize(:(a(1) ^ b)) == :(_a__1_ .^ _b_)
+            @test Dolang.normalize(:(a(1) + b + c(2) + d(-1))) == :(((_a__1_ + _b_) + _c__2_) + _d_m1_)
+            @test Dolang.normalize(:(a(1) * b * c(2) * d(-1))) == :(((_a__1_ * _b_) * _c__2_) * _d_m1_)
+            @test Dolang.normalize(:(a(1) - b - c(2) - d(-1))) == :(((_a__1_ - _b_) - _c__2_) - _d_m1_)
+            @test Dolang.normalize(:(a(1) ^ b)) == :(_a__1_ ^ _b_)
         end
 
         @testset "throws errors when unsupported" begin
@@ -83,7 +83,7 @@ end
 
     @testset "Expr(:(=), ...)" begin
         @testset "without targets" begin
-            @test Dolang.normalize(:(x = y)) == :(_y_ .- _x_)
+            @test Dolang.normalize(:(x = y)) == :(_y_ - _x_)
         end
 
         @testset "with targets" begin

@@ -106,15 +106,24 @@ function normalize(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[
             return normalize(ex.args[1], ex.args[2])
         end
 
+        # TODO: SymEngine will also choke with things like
+        # :(100_E_LYGAP_ - _outputgap_). Here Julia knows `100_E_LYGAP_` is
+        # `100 * _E_LYGAP_`, but symengine treats that whole thing as a
+        # single symbol. My current solution is to just swap the order of the
+        # `*`
+        if ex.args[1] == :(*) && length(ex.args) == 3 && isa(ex.args[2], Number)
+            return Expr(:call, :(*), normalize(ex.args[3]), ex.args[2])
+        end
+
         if ex.args[1] in (:+, :*)
             return call_plus_times_expr(ex)
         end
 
         if ex.args[1] in _arith_symbols
             if length(ex.args) == 2 # sometimes - might appear alone
-                return Expr(:call, _dot_names[ex.args[1]], normalize(ex.args[2]))
+                return Expr(:call, ex.args[1], normalize(ex.args[2]))
             end
-            return Expr(:call, _dot_names[ex.args[1]], normalize(ex.args[2]), normalize(ex.args[3]))
+            return Expr(:call, ex.args[1], normalize(ex.args[2]), normalize(ex.args[3]))
         end
 
         # otherwise it is just some random function call
@@ -317,21 +326,15 @@ end
 # Utilities #
 # --------- #
 
-const _dot_names = Dict{Symbol,Symbol}(:+ => :.+,
-                                       :- => :.-,
-                                       :* => :.*,
-                                       :/ => :./,
-                                       :^ => :.^,)
 const _arith_symbols = (:+, :-, :*, :^, :/)
 
 function call_plus_times_expr(ex::Expr)
-    dot_func = _dot_names[ex.args[1]]
-
+    fun = ex.args[1]
     if length(ex.args) == 3
-        return Expr(:call, dot_func, normalize(ex.args[2]), normalize(ex.args[3]))
+        return Expr(:call, fun, normalize(ex.args[2]), normalize(ex.args[3]))
     else
         call_plus_times_expr(Expr(:call, ex.args[1],
-                                  Expr(:call, dot_func, ex.args[2], ex.args[3]),
+                                  Expr(:call, fun, ex.args[2], ex.args[3]),
                                   ex.args[4:end]...))
     end
 end
@@ -340,7 +343,7 @@ end
 function eq_expr(ex::Expr, targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
     # translate lhs = rhs to rhs - lhs
     if isempty(targets)
-      return Expr(:call, :(.-), normalize(ex.args[2]), normalize(ex.args[1]))
+      return Expr(:call, :(-), normalize(ex.args[2]), normalize(ex.args[1]))
     end
 
     # ensure lhs is in targets
