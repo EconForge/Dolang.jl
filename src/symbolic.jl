@@ -1,6 +1,7 @@
 # ---------------- #
 # Public interface #
 # ---------------- #
+import Base.normalize
 
 # normalize
 # ---------
@@ -232,6 +233,50 @@ function time_shift(ex::Expr, args::Vector{Symbol}, shift::Int=0,
     # otherwise just shift all args, but retain expr head
     out = Expr(ex.head)
     out.args = [time_shift(_, args, shift, defs) for _ in ex.args]
+    return out
+end
+
+# steady state
+# ------------
+"""
+```julia
+steady_state(x::Symbol, args::Vector{Symbol})
+```
+
+Return the steady state version of the Symbol `x` (essentially x(0))
+"""
+steady_state(x::Any, args::Vector{Symbol}) = x
+
+"""
+```julia
+steady_state(ex::Expr, args::Vector{Symbol})
+```
+
+Return the steady state version of `ex`, where all symbols in `args`
+always appear at time 0
+"""
+function steady_state(ex::Expr, args::Vector{Symbol})
+    if is_time_shift(ex)
+        var = ex.args[1]
+        if var in args
+            return var
+        else
+            return ex
+        end
+    end
+
+    # if it is some kind of function call, steady_state arguments
+    if ex.head == :call
+        out = Expr(:call, ex.args[1])
+        for arg in ex.args[2:end]
+            push!(out.args, steady_state(arg, args))
+        end
+        return out
+    end
+
+     # otherwise just steady_state all args, but retain expr head
+    out = Expr(ex.head)
+    out.args = [steady_state(_, args) for _ in ex.args]
     return out
 end
 
