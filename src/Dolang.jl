@@ -21,6 +21,11 @@ else
     prep_deriv(eq) = eq
 end
 
+const ARITH_SYMBOLS = Set([:+, :-, :*, :/, :^])
+const DOLANG_FUNCTIONS = Set([:sin, :cos, :tan, :exp, :log, :log10])
+push!(DOLANG_FUNCTIONS, ARITH_SYMBOLS...)
+
+
 using Compat: view, String
 
 import Base: ==
@@ -40,5 +45,6 @@ include("symbolic.jl")
 include("factory.jl")
 include("util.jl")
 include("compiler.jl")
+include("printing.jl")
 
 end  # module
