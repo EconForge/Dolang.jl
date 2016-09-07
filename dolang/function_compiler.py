@@ -1,11 +1,10 @@
-import numpy
 import ast
+from dolang.symbolic import stringify, normalize
 
 ################################
 
-from .symbolic_old import eval_scalar, StandardizeDatesSimple, std_tsymbol
-from .symbolic_old import match
-from .symbolic_old import timeshift
+from .symbolic import eval_scalar
+from .pattern import match
 
 class CountNames(ast.NodeVisitor):
 
@@ -98,6 +97,102 @@ def get_deps(incidence, var, visited=None):
 
     return resp
 
+
+class standard_function:
+
+    epsilon = 1e-8
+
+    def __init__(self, fun, n_output):
+
+        # fun is a vectorized, non-allocating function
+        self.fun = fun
+        self.n_output = n_output
+
+    def __call__(self, *args, diff=False, out=None):
+
+        non_core_dims = [ a.shape[:-1] for a in args]
+        core_dims = [a.shape[-1:] for a in args]
+
+        non_core_ndims = [len(e) for e in non_core_dims]
+
+        if (max(non_core_ndims) == 0):
+            # we have only vectors, deal wwith it directly
+            if not diff:
+                if out is None:
+                     out = numpy.zeros(self.n_output)
+                self.fun(*(args+(out,)))
+                return out
+
+            else:
+                def ff(*aa):
+                    return self.__call__(*aa, diff=False)
+                n_ignore = 1 # number of arguments that we don't differentiate
+                res = eval_with_diff(ff, args[:-n_ignore], args[-n_ignore:], epsilon=1e-8)
+                return res
+
+
+        else:
+
+            if not diff:
+                K = max( non_core_ndims )
+                ind = non_core_ndims.index( K )
+                biggest_non_core_dim = non_core_dims[ind]
+                biggest_non_core_dims = non_core_ndims[ind]
+                new_args = []
+                for i,arg in enumerate(args):
+                    coredim = non_core_dims[i]
+                    n_None = K-len(coredim)
+                    n_Ellipsis = arg.ndim
+                    newind = ((None,)*n_None) +(slice(None,None,None),)*n_Ellipsis
+                    new_args.append(arg[newind])
+
+                new_args = tuple(new_args)
+                if out is None:
+                    out = numpy.zeros( biggest_non_core_dim + (self.n_output,) )
+
+                self.fun(*(new_args + (out,)))
+                return out
+
+            else:
+                # older implementation
+                return self.__vecdiff__(*args, diff=True, out=out)
+
+    def __vecdiff__(self,*args, diff=False, out=None):
+
+
+        fun = self.fun
+        epsilon = self.epsilon
+
+        sizes = [e.shape[0] for e in args if e.ndim==2]
+        assert(len(set(sizes))==1)
+        N = sizes[0]
+
+        if out is None:
+            out = numpy.zeros((N,self.n_output))
+
+        fun( *( list(args) + [out] ) )
+
+        if not diff:
+            return out
+        else:
+            l_dout = []
+            for i, a in enumerate(args[:-1]):
+                # TODO: by default, we don't diffferentiate w.r.t. the last
+                # argument. Reconsider.
+                pargs = list(args)
+                dout = numpy.zeros((N, self.n_output, a.shape[1]))
+                for j in range( a.shape[1] ):
+                    xx = a.copy()
+                    xx[:,j] += epsilon
+                    pargs[i] = xx
+                    fun(*( list(pargs) + [dout[:,:,j]]))
+                    dout[:,:,j] -= out
+                    dout[:,:,j] /= epsilon
+                l_dout.append(dout)
+            return [out] + l_dout
+
+
+
 from ast import Name, Sub, Store, Assign, Subscript, Load, Index, Num, Call
 from collections import OrderedDict
 
@@ -109,15 +204,15 @@ def compile_function_ast(equations, symbols, arg_names, output_names=None, funna
         if an[0] != 'parameters':
             t = an[1]
             arguments[an[2]] = [(s,t) for s in symbols[an[0]]]
-    # arguments = [ [ (s,t) for s in symbols[sg]] for sg,t in arg_names if sg != 'parameters']
-    parameters = [(s,0) for s in symbols['parameters']]
+    # arguments = [ [ (s,t) for s in symbols[sg]] for sg,t in arg_names if sg != 'constants']
+    constants = [(s,0) for s in symbols['parameters']]
     targets = output_names
     if targets is not None:
         targets = [(s,targets[1]) for s in symbols[targets[0]]]
 
-    mod = make_function(equations, arguments, parameters, definitions=definitions, targets=targets, rhs_only=rhs_only, funname=funname)
+    mod = make_method(equations, arguments, constants, definitions=definitions, targets=targets, rhs_only=rhs_only, funname=funname)
 
-    from .codegen import to_source
+    # from .codegen import to_source
     # import dolo.config
     # if dolo.config.debug:
     #     print(to_source(mod))
@@ -155,7 +250,11 @@ def compile_function_ast(equations, symbols, arg_names, output_names=None, funna
     return [f,None]
 
 
-def make_method(equations, arguments, parameters, targets=None, rhs_only=False, definitions={}, funname='anonymous'):
+
+from dolang.symbolic import list_variables
+from dolang.symbolic import time_shift
+
+def make_method(equations, arguments, constants, targets=None, rhs_only=False, definitions={}, funname='anonymous'):
 
     compat = lambda s: s.replace("^", "**").replace('==','=').replace('=','==')
     equations = [compat(eq) for eq in equations]
@@ -166,29 +265,28 @@ def make_method(equations, arguments, parameters, targets=None, rhs_only=False, 
     ## replace = by ==
     known_variables = [a[0] for a in sum(arguments.values(), [])]
     known_definitions = [a for a in definitions.keys()]
-    known_parameters = [a[0] for a in parameters]
+    known_constants = [a[0] for a in constants]
     all_variables = known_variables + known_definitions
     known_functions = []
     known_constants = []
 
     if targets is not None:
         all_variables.extend([o[0] for o in targets])
-        targets = [std_tsymbol(o) for o in targets]
+        targets = [stringify(o) for o in targets]
     else:
         targets = ['_out_{}'.format(n) for n in range(len(equations))]
 
-    all_symbols = all_variables + known_parameters
+    all_symbols = all_variables # + known_constants
 
     equations = [parse(eq) for eq in equations]
     definitions = {k: parse(v) for k, v in definitions.items()}
 
     defs_incidence = {}
     for sym, val in definitions.items():
-        cn = CountNames(known_definitions, [], [])
-        cn.visit(val)
-        defs_incidence[(sym, 0)] = cn.variables
+        lvars = list_variables(val, vars=known_definitions)
+        defs_incidence[(sym, 0)] = [v for v in lvars if v[0] in known_definitions]
     # return defs_incidence
-    from .codegen import to_source
+
     equations_incidence = {}
     to_be_defined = set([])
     for i, eq in enumerate(equations):
@@ -203,14 +301,11 @@ def make_method(equations, arguments, parameters, targets=None, rhs_only=False, 
         deps.extend(ndeps)
     deps = [d for d in unique(deps)]
 
-    sds = StandardizeDatesSimple(all_symbols)
-
     new_definitions = OrderedDict()
     for k in deps:
         val = definitions[k[0]]
-        nval = timeshift(val, all_variables, k[1])  # function to print
-        # dprint(val)
-        new_definitions[std_tsymbol(k)] = sds.visit(nval)
+        nval = time_shift(val, k[1], all_variables)
+        new_definitions[stringify(k)] = normalize(nval, variables=all_symbols)
 
     new_equations = []
 
@@ -225,7 +320,7 @@ def make_method(equations, arguments, parameters, targets=None, rhs_only=False, 
                 val = ast.BinOp(left=rhs, op=Sub(), right=lhs)
         else:
             val = eq
-        new_equations.append(sds.visit(val))
+        new_equations.append(normalize(val, variables=all_symbols))
 
 
 
@@ -233,13 +328,13 @@ def make_method(equations, arguments, parameters, targets=None, rhs_only=False, 
     preamble = []
     for i,(arg_group_name,arg_group) in enumerate(arguments.items()):
         for pos,t in enumerate(arg_group):
-            sym = std_tsymbol(t)
+            sym = stringify(t)
             rhs = Subscript(value=Name(id=arg_group_name, ctx=Load()), slice=Index(Num(pos)), ctx=Load())
             val = Assign(targets=[Name(id=sym, ctx=Store())], value=rhs)
             preamble.append(val)
 
-    for pos,p in enumerate(parameters):
-        sym = std_tsymbol(p)
+    for pos,p in enumerate(constants):
+        sym = stringify(p)
         rhs = Subscript(value=Name(id='p', ctx=Load()), slice=Index(Num(pos)), ctx=Load())
         val = Assign(targets=[Name(id=sym, ctx=Store())], value=rhs)
         preamble.append(val)

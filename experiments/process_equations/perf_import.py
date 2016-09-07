@@ -107,6 +107,9 @@ with timeit("Compute Jacobian and Hessian (symengine)"):
 
 
 
+
+
+
 from dolo import *
 model = yaml_import("/home/pablo/Programming/econforge/dolo/examples/models/rbc_dynare.yaml")
 

@@ -1,7 +1,8 @@
 import ast
 Expression = ast.Expr
 
-from dolang.language import functions
+from dolang.language import functions as functions_dict
+functions = list(functions_dict.keys())
 from typing import Tuple, List
 
 # from dolang.parser import parse_string
@@ -23,7 +24,7 @@ def stringify(arg) -> str:
     if isinstance(arg, str):
         return stringify_parameter(arg)
     elif isinstance(arg, tuple):
-        if len(arg)==2 and isinstance(arg[0],str) and isinstance(arg[0],int):
+        if len(arg)==2 and isinstance(arg[0],str) and isinstance(arg[1],int):
             return stringify_variable(arg)
     raise Exception("Unknown canonical form: {}".format(arg))
 
@@ -66,7 +67,7 @@ def steady_state(expr: Expression, vars: List[str]) -> Expression:
 
 def list_variables(expr: Expression, funs: List[str]=None, vars: List[str]=None) -> List[Tuple[str,int]]:
     if funs is None: funs=[]
-    if vars is None: vars = []
+    if vars is None: vars=[]
     l = ListSymbols(known_functions=functions+funs, known_variables=vars)
     l.visit(expr)
     if l.problems:
@@ -99,6 +100,8 @@ def list_symbols(expr: Expression, funs: List[str]=None, vars: List[str]=None) -
 
 
 
+from dolang.language import functions as functions_dict
+
 
 
 from ast import NodeTransformer, Name, UnaryOp, UAdd, USub, Load, Call
@@ -106,18 +109,25 @@ from ast import NodeTransformer, Name, UnaryOp, UAdd, USub, Load, Call
 class ExpressionNormalizer(NodeTransformer):
 
     # replaces calls to variables by time subscripts
-    def __init__(self, variables=None):
+
+    def __init__(self, variables=None, functions=None):
 
         self.variables = variables if variables is not None else []
+        if functions is None:
+            self.functions = [e for e in functions_dict.keys()]
+        else:
+            self.functions = functions
         # self.variables = tvariables # ???
 
     def visit_Name(self, node):
 
         name = node.id
+        # if name self.functions:
+        #     return node
         if name in self.variables:
-            return Name(id=stringify_variable((name,0)),ctx=Load())
+            return Name(id=stringify_variable((name,0)), ctx=Load())
         else:
-            return node
+            return Name(id=stringify_parameter(name), ctx=Load())
 
     def visit_Call(self, node):
 
@@ -128,8 +138,6 @@ class ExpressionNormalizer(NodeTransformer):
             try:
                 date = eval_scalar(args)
             except:
-                print(to_source(args))
-                print(ast.dump(args))
                 raise Exception("Unrecognized subscript.")
             newname = stringify_variable((name, date))
             if newname is not None:
@@ -174,172 +182,7 @@ class TimeShiftTransformer(ast.NodeTransformer):
             else:
                 date = args.n
             if self.shift =='S':
-                return ast.pa
-def stringify_variable(arg: Tuple[str, int]) -> str:
-    s = arg[0]
-    date = arg[1]
-    if date == 0:
-        return '{}__'.format(s)
-    elif date <= 0:
-        return '{}__m{}_'.format(s, str(-date))
-    elif date >= 0:
-        return '{}__{}_'.format(s, str(date))
-
-def stringify_parameter(p: str) -> str:
-    return '{}_'.format(p)
-
-def stringify(arg) -> str:
-    if isinstance(arg, str):
-        return normalize_parameter(arg)
-    elif isinstance(arg, tuple):
-        if len(arg)==2 and isinstance(arg[0],str) and isinstance(arg[0],int):
-            return normalize_variable(arg)
-    raise Exception("Unknown canonical form: {}".format(arg))
-
-###
-
-def destringify_variable(s: str) -> Tuple[str, int]:
-    raise Exception("Not implemented.")
-
-def destringify_parameter(s: str) -> Tuple[str, int]:
-    raise Exception("Not implemented.")
-
-def destringify(s: str):
-    raise Exception("Not implemented.")
-
-###
-
-def normalize(expr: Expression, variables: List[str])->Expression:
-    import copy
-    en = ExpressionNormalizer(variables=variables)
-    return en.visit(copy.deepcopy(expr))
-
-# shift timing in equations
-# time_shift(:(a+b(1)+c),1,[:b,:c]) == :(a+b(2)+c(1))
-def time_shift(expr: Expression, n, vars: List[str]) -> Expression:
-    import copy
-    eexpr = copy.deepcopy(expr)
-    return TimeShiftTransformer(shift=n, variables=vars).visit(eexpr)
-
-#
-def steady_state(expr: Expression, vars: List[str]) -> Expression:
-    import copy
-    eexpr = copy.deepcopy(expr)
-    return TimeShiftTransformer(shift='S', variables=vars).visit(eexpr)
-
-
-# list variables
-# list_variables(:(a+b(1)+c), [:b,:c,:d]) == [(:b,1),(:c,0)]
-#
-
-
-def list_variables(expr: Expression, funs: List[str]=None, vars: List[str]=None) -> List[Tuple[str,int]]:
-    if funs is None: funs=[]
-    if vars is None: vars = []
-    l = ListSymbols(known_functions=functions+funs, known_variables=vars)
-    l.visit(expr)
-    if l.problems:
-        e = Exception('Symbolic error.')
-        e.problems = l.problems
-    return [v[0] for v in l.variables]
-
-def list_symbols(expr: Expression, funs: List[str]=None, vars: List[str]=None) -> List[Tuple[str,int]]:
-    if funs is None: funs=[]
-    l = ListSymbols(known_functions=functions+funs, known_variables=vars)
-    l.visit(expr)
-    if l.problems:
-        e = Exception('Symbolic error.')
-        e.problems = l.problems
-    head = lambda v: [i[0] for i in v]
-    d = {
-        'variables': head(l.variables),
-        'constants': head(l.constants),
-        'functions': head(l.functions)
-    }
-    return d
-
-
-
-#
-# # substitute expression
-# # subs(:(a + b), :b, :(c+d(1)) == :(a+c+d(1))
-# #
-# subs(expr: Expression, symbol: Symbol, sexpr: Expression) -> Expression
-#
-#
-
-
-
-from ast import NodeTransformer, Name, UnaryOp, UAdd, USub, Load, Call
-
-class ExpressionNormalizer(NodeTransformer):
-
-    # replaces calls to variables by time subscripts
-
-    def __init__(self, variables=None):
-
-        self.variables = variables if variables is not None else []
-        # self.variables = tvariables # ???
-
-    def visit_Name(self, node):
-
-        name = node.id
-        if name in self.variables:
-            return Name(id=stringify_variable((name,0)),ctx=Load())
-        else:
-            return node
-
-    def visit_Call(self, node):
-
-        name = node.func.id
-        args = node.args[0]
-
-        if name in self.variables:
-            try:
-                date = eval_scalar(args)
-            except:
-                print(to_source(args))
-                print(ast.dump(args))
-                raise Exception("Unrecognized subscript.")
-            newname = stringify_variable((name, date))
-            if newname is not None:
-                return Name(newname, Load())
-        else:
-            return Call(func=node.func, args=[self.visit(e) for e in node.args], keywords=[])
-
-
-class TimeShiftTransformer(ast.NodeTransformer):
-
-    def __init__(self, shift=0, variables=None):
-
-        self.variables = variables if variables is not None else []
-        self.shift = shift
-
-    def visit_Name(self, node):
-        name = node.id
-        if name in self.variables:
-            if self.shift==0 or self.shift=='S':
-                return ast.parse(name).body[0].value
-            else:
-                return ast.parse('{}({})'.format(name,self.shift)).body[0].value
-        else:
-             return node
-
-    def visit_Call(self, node):
-
-        name = node.func.id
-        args = node.args[0]
-
-        if name in self.variables:
-            if isinstance(args, UnaryOp):
-                # we have s(+1)
-                if (isinstance(args.op, UAdd)):
-                    args = args.operand
-                    date = args.n
-                elif (isinstance(args.op, USub)):
-                    args = args.operand
-                    date = -args.n
-                else:rse('{}'.format(name)).body[0].value
+                return ast.parse('{}'.format(name)).body[0].value
             else:
                 new_date = date+self.shift
                 if new_date != 0:
@@ -400,7 +243,7 @@ class ListSymbols(ast.NodeVisitor):
         n = 0
         name = name.id
         if name in self.known_variables:
-            self.variables.append( (name, colno))
+            self.variables.append( ((name,0), colno))
         elif name in self.known_functions:
             self.problems.append([name, colno, 'function_not_called' ])
         else:
