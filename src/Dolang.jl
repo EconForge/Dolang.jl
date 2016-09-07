@@ -9,16 +9,16 @@ catch
     false
 end::Bool
 
-if HAVE_SYMENGINE && false
+if HAVE_SYMENGINE
     import SymEngine
     deriv(eq::SymEngine.Basic, x) = SymEngine.diff(eq, x)
     prep_deriv(eq) = SymEngine.Basic(eq)
-    println("have SymEngine")
 else
     import Calculus
+    warn("Using Calculus.jl for symbolic differentiation. This will be slower",
+         " than SymEngine.jl\n. To use SymEngine call Pkg.add(\"SymeEngine\")")
     deriv(eq, x) = Calculus.differentiate(eq, x)
     prep_deriv(eq) = eq
-    println("Have Calculus")
 end
 
 using Compat: view, String

@@ -246,7 +246,10 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         # This maps from the normalized_ name to the normalized_ expression that
         # should be substituted for the parsed name
         def_map = Dict{Symbol,Expr}()
-        a_names = collect(keys(allowed_args))
+        a_names = Set(keys(allowed_args))
+
+        # build this empty set once and pass to time_shift below
+        funcs = Set{Symbol}()
 
         _flat_params = FlatParams(params)
 
@@ -280,7 +283,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
                 # construct shifted version of the definition and add to map
                 k = normalize((_def, t))
-                def_map[k] = normalize(time_shift(_ex, a_names, t, defs))
+                def_map[k] = normalize(time_shift(_ex, t, a_names, funcs, defs))
 
                 # also add this definition to incidence
                 visit!(incidence, _ex, typemax(Int), t, _flat_params)

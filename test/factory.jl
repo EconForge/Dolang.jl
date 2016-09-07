@@ -32,27 +32,6 @@ end
     @test Dolang.is_time_shift(:(a(1)))
 end
 
-@testset " time_shift" begin
-    #TODO: write tests with defs
-    _ts = Dolang.time_shift
-    defs = Dict()
-    args = Symbol[_[1] for _ in flat_args]
-    ex1 = :(a + x)
-    ex2 = :(a(2) + x + b)
-
-    @test _ts(:a, args, 0, defs) == :(a(0))
-    @test _ts(:a, args, 1, defs) == :(a(1))
-    @test _ts(:a, args, -10, defs) == :(a(-10))
-
-    @test _ts(ex1, args, 0, defs) == :(a + x)
-    @test _ts(ex1, args, 1, defs) == :(a(1) + x)
-    @test _ts(ex1, args, -10, defs) == :(a(-10) + x)
-
-    @test _ts(ex2, args, 0, defs) == :(a(2) + x + b)
-    @test _ts(ex2, args, 1, defs) == :(a(3) + x + b(1))
-    @test _ts(ex2, args, -10, defs) == :(a(-8) + x + b(-10))
-end
-
 @testset " recursive_subs()" begin
     d = Dict(:monty=> :python, :run=>:faster, :eat=>:more)
     @test Dolang.recursive_subs(:monty, d) == :python
