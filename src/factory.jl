@@ -104,7 +104,7 @@ end
 
 IncidenceTable() = IncidenceTable(Dict(), Dict(), Dict())
 
-function IncidenceTable(eqs::Vector{Expr})
+function IncidenceTable(eqs::AbstractVector)
     # create incidence
     it = IncidenceTable()
     for (i, eq) in enumerate(eqs)
