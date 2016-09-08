@@ -32,16 +32,6 @@ end
     @test Dolang.is_time_shift(:(a(1)))
 end
 
-@testset " recursive_subs()" begin
-    d = Dict(:monty=> :python, :run=>:faster, :eat=>:more)
-    @test Dolang.recursive_subs(:monty, d) == :python
-    @test Dolang.recursive_subs(:Monty, d) == :Monty
-    @test Dolang.recursive_subs(1.0, d) == 1.0
-
-    want = :(python(faster + more, eats))
-    @test Dolang.recursive_subs(:(monty(run + eat, eats)), d) == want
-end
-
 @testset " IncidenceTable" begin
     ex1 = :(foo = bing + bong)
     ex2 = :(cowboy = yee - haw! + foo)

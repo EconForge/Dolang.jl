@@ -190,25 +190,35 @@ end
     @test out[:parameters] == Set{Symbol}([:a, :c])
 end
 
-@testset " recursive_subs()" begin
+@testset " csubs()" begin
     d = Dict(:monty=> :python, :run=>:faster, :eat=>:more)
-    @test Dolang.recursive_subs(:monty, d) == :python
-    @test Dolang.recursive_subs(:Monty, d) == :Monty
-    @test Dolang.recursive_subs(1.0, d) == 1.0
+    @test Dolang.csubs(:monty, d) == :python
+    @test Dolang.csubs(:Monty, d) == :Monty
+    @test Dolang.csubs(1.0, d) == 1.0
 
     want = :(python(faster + more, eats))
-    @test Dolang.recursive_subs(:(monty(run + eat, eats)), d) == want
+    @test Dolang.csubs(:(monty(run + eat, eats)), d) == want
 
     d = Dict(:b => :(c + d(1)))
     ex = :(a + b + b(1))
-    want = :(a + (c + d(1)) + (c(1) + d(2)))
-    @test Dolang.recursive_subs(ex, d) == want
+    want = :(a + (c + d(1)) + b(1))
+    @test Dolang.csubs(ex, d) == want
 
-    # case where subs and recursive_subs aren't the same
+    d = Dict((:b, 0) => :(c + d(1)))
+    ex = :(a + b + b(1))
+    want = :(a + (c + d(1)) + b(1))
+    @test Dolang.csubs(ex, d) == want
+
+    d = Dict((:b, 0) => :(c + d(1)), (:b, 1) => :(c(1) + d(2)))
+    ex = :(a + b + b(1))
+    want = :(a + (c + d(1)) + (c(1) + d(2)))
+    @test Dolang.csubs(ex, d) == want
+
+    # case where subs and csubs aren't the same
     ex = :(a + b)
     d = Dict(:b => :(c/a), :c => :(2a))
     @test Dolang.subs(ex, d) == :(a + c/a)
-    @test Dolang.recursive_subs(ex, d) == :(a + (2a)/a)
+    @test Dolang.csubs(ex, d) == :(a + (2a)/a)
 
 end
 

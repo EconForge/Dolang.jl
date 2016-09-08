@@ -1,7 +1,6 @@
-# ---------------- #
-# Public interface #
-# ---------------- #
-import Base.normalize
+# ----- #
+# types #
+# ----- #
 
 immutable NormalizeError <: Exception
     ex::Expr
@@ -425,20 +424,20 @@ end
 # list_variables #
 # -------------- #
 
-function list_variables(ex::Expr;
-                      functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
-                      variables::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
-    syms = list_symbols(ex; functions=functions, variables=variables)
-    out = Set{Symbol}()
-    for (k, v) in syms
-        for _ in v
-            isa(_, Symbol) ? push!(out, _) :
-            isa(_, Tuple{Symbol,Int}) ? push!(out, _[1]):
-            error("not sure what happened here")
-        end
-    end
-    out
-end
+# function list_variables(ex::Expr;
+#                       functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
+#                       variables::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
+#     syms = list_symbols(ex; functions=functions, variables=variables)
+#     out = Set{Symbol}()
+#     for (k, v) in syms
+#         for _ in v
+#             isa(_, Symbol) ? push!(out, _) :
+#             isa(_, Tuple{Symbol,Int}) ? push!(out, _[1]):
+#             error("not sure what happened here")
+#         end
+#     end
+#     out
+# end
 
 # ---- #
 # subs #
@@ -450,30 +449,37 @@ is the result of trying to do the sub and `did_change` is a bool specifying
 whether or not any substitutions happened. This is used to know when to break
 out of a recursion.
 =#
-_subs(s::Symbol, d::Associative) = haskey(d, s) ? (d[s], true) : (s, false)
-_subs(x::Number, d::Associative) = (x, false)
-function _subs(ex::Expr, d::Associative)
+function _subs(s::Symbol, d::Associative, a...)
+    haskey(d, s) && return (d[s], true)
+
+    # also check for canonical form (s, 0)
+    haskey(d, (s, 0)) && return (d[(s, 0)], true)
+
+    (s, false)
+end
+
+_subs(x::Number, d::Associative, a...) = (x, false)
+
+function _subs(ex::Expr, d::Associative,
+               variables::Set{Symbol},
+               funcs::Set{Symbol})
     if is_time_shift(ex)
         var = ex.args[1]
         shift = ex.args[2]
-        if haskey(d, var)
-            new_ex = d[var]
-
-            # TODO: This heuristic is wrong...
-            # we are inside a shifted definition -- everything in sight is a
-            # variable
-            vars = list_variables(new_ex)
-            push!(vars, var)
-
-            return _subs(time_shift(new_ex, shift, vars, Set{Symbol}(), d), d)
+        if haskey(d, (var, shift))
+            new_ex = d[(var, shift)]
+            return new_ex, true
         end
+
+        # d doesn't have a key in canonical form, so just return here
+        return ex, false
     end
 
     out_args = Array(Any, length(ex.args))
     changed = false
 
     for (i, arg) in enumerate(ex.args)
-        new_arg, arg_changed = _subs(arg, d)
+        new_arg, arg_changed = _subs(arg, d, variables, funcs)
         out_args[i] = new_arg
         changed = changed || arg_changed
     end
@@ -485,37 +491,77 @@ end
 
 """
 ```julia
-subs(ex::Union{Expr,Symbol,Number}, from::Symbol, to::Union{Symbol,Expr,Number})
+subs(ex::Union{Expr,Symbol,Number}, from, to::Union{Symbol,Expr,Number})
 ```
 
-Apply a substituion where all occurances of `from` in `ex` are replaced by `to`
+Apply a substituion where all occurances of `from` in `ex` are replaced by `to`.
+
+Note that to replace something like `x(1)` `from` must be the canonical form
+for that expression: `(:x, 1)`
 """
-function subs(ex::Union{Expr,Symbol,Number}, from::Symbol,
-              to::Union{Symbol,Expr,Number})
-    _subs(ex, Dict(from=>to))[1]
+function subs(ex::Union{Expr,Symbol,Number}, from,
+              to::Union{Symbol,Expr,Number},
+              variables::Set{Symbol},
+              funcs::Set{Symbol})
+    _subs(ex, Dict(from=>to), variables, funcs)[1]
 end
 
 """
 ```julia
-subs(ex::Union{Expr,Symbol,Number}, d::Associative)
+subs(ex::Union{Expr,Symbol,Number}, d::Associative,
+     variables::Set{Symbol},
+     funcs::Set{Symbol})
 ```
 
 Apply substituions to `ex` so that all keys in `d` are replaced by their values
+
+Note that the keys of `d` should be the canonical form of variables you wish to
+substitute. For example, to replace `x(1)` with `b/c` you need to have the
+entry `(:x, 1) => :(b/c)` in `d`.
+
+The one exception to this rule is that a key `:k` is treated the same as `(:k,
+0)`.
 """
-subs(ex::Union{Expr,Symbol,Number}, d::Associative) = _subs(ex, d)[1]
+function subs(ex::Union{Expr,Symbol,Number}, d::Associative,
+              variables::Set{Symbol},
+              funcs::Set{Symbol})
+    _subs(ex, d, variables, funcs)[1]
+end
 
 """
 ```julia
-recursive_subs(x::Union{Symbol,Number}, d::Associative)
+subs(ex::Union{Expr,Symbol,Number}, d::Associative;
+     variables::Set{Symbol},
+     functions::Set{Symbol})
+```
+
+Verison of `subs` where `variables` and `functions` are keyword arguments with
+default values
+"""
+function subs(ex::Union{Expr,Symbol,Number}, d::Associative;
+              variables::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}(),
+              functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
+    subs(ex, d, Set(variables), Set(functions))
+end
+
+"""
+```julia
+csubs(x::Union{Symbol,Number}, d::Associative)
 ```
 
 If `x` is a key in `d`, return the assocaited value. Otherwise return `x`
 """
-recursive_subs(x::Union{Symbol,Number}, d::Associative) = _subs(x, d)[1]
+function csubs(x::Union{Symbol,Number}, d::Associative,
+               variables::Set{Symbol},
+               funcs::Set{Symbol})
+    _subs(x, d, variables, funcs)[1]
+end
 
 """
 ```julia
-recursive_subs(ex::Expr, d::Associative)
+csubs(ex::Expr, d::Associative,
+      variables::Set{Symbol}=Set{Symbol}(),
+      funcs::Set{Symbol}=Set{Symbol}())
 ```
 
 Recursively apply substitutions to `ex` such that all items that are a key
@@ -529,21 +575,37 @@ all be fully resolved here.
 ex = :(a + b)
 d = Dict(:b => :(c/a), :c => :(2a))
 subs(ex, d)  # returns :(a + c / a)
-recursive_subs(ex, d)  # returns :(a + (2a) / a)
+csubs(ex, d)  # returns :(a + (2a) / a)
 ```
 """
-function recursive_subs(ex::Expr, d::Associative)
+function csubs(ex::Expr, d::Associative,
+               variables::Set{Symbol},
+               funcs::Set{Symbol})
     max_it = length(d) + 1
     max_it == 1 && return ex
 
     for i in 1:max_it
-        ex, changed = _subs(ex, d)
+        ex, changed = _subs(ex, d, variables, funcs)
         !changed && return ex
     end
 
     error("Could not resolve expression recursively.")
 end
 
+"""
+```julia
+csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
+      variables::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}(),
+      functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
+```
+
+Verison of `csubs` where `variables` and `functions` are keyword arguments.
+"""
+function csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
+               variables::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}(),
+               functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
+    csubs(ex, d, Set(variables), Set(functions))
+end
 
 # --------- #
 # Utilities #

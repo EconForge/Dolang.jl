@@ -28,10 +28,10 @@ push!(DOLANG_FUNCTIONS, ARITH_SYMBOLS...)
 
 using Compat: view, String
 
-import Base: ==
+import Base: ==, normalize
 
 export make_method, Der, FunctionFactory, normalize, is_time_shift, time_shift,
-       subs, recursive_subs
+       subs, csubs
 
 # come convenience methods
 _replace_star_star(s::AbstractString) = replace(s, "**", "^")

@@ -265,7 +265,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
             # recursively resolve this defintion so we get down to args, params
             # and targets
-            _ex = recursive_subs(_ex, defs)
+            _ex = csubs(_ex, defs)
 
             # compute incidence of each shift and make sure it is valid
             for t in times
@@ -308,7 +308,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         end
 
         # now normalize the equations and make subs
-        _f(x) = _to_expr(recursive_subs(normalize(x, targets=targets), def_map))
+        _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))
         normalized_eqs = [_f(eq) for eq in eqs]
 
         # now filter args  and keep only those that actually appear in the
