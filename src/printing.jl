@@ -106,9 +106,26 @@ function _latex!(io::IO, ex::Expr)
                 print(io, f)
                 _latex!(io, ex.args[2])
             elseif length(ex.args) == 3
-                _latex!(io, ex.args[2])
-                print(io, f)
-                _latex!(io, ex.args[3])
+
+                if f == :^
+                    print(io, "\\left(")
+                    _latex!(io, ex.args[2])
+                    print(io, "\\right)")
+                    print(io, f)
+                    print(io, "{")
+                    _latex!(io, ex.args[3])
+                    print(io, "}")
+                elseif f == :/
+                    print(io, "\\frac{")
+                    _latex!(io, ex.args[2])
+                    print(io, "}{")
+                    _latex!(io, ex.args[3])
+                    print(io, "}")
+                else
+                    _latex!(io, ex.args[2])
+                    print(io, f)
+                    _latex!(io, ex.args[3])
+                end
 
             elseif length(ex.args) > 3  # chained + or *
                 for arg in ex.args[2:end-1]
