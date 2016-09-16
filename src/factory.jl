@@ -104,7 +104,7 @@ end
 
 IncidenceTable() = IncidenceTable(Dict(), Dict(), Dict())
 
-function IncidenceTable(eqs::Vector{Expr})
+function IncidenceTable(eqs::AbstractVector)
     # create incidence
     it = IncidenceTable()
     for (i, eq) in enumerate(eqs)
@@ -246,7 +246,10 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         # This maps from the normalized_ name to the normalized_ expression that
         # should be substituted for the parsed name
         def_map = Dict{Symbol,Expr}()
-        a_names = collect(keys(allowed_args))
+        a_names = Set(keys(allowed_args))
+
+        # build this empty set once and pass to time_shift below
+        funcs = Set{Symbol}()
 
         _flat_params = FlatParams(params)
 
@@ -262,7 +265,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
             # recursively resolve this defintion so we get down to args, params
             # and targets
-            _ex = recursive_subs(_ex, defs)
+            _ex = csubs(_ex, defs)
 
             # compute incidence of each shift and make sure it is valid
             for t in times
@@ -280,7 +283,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
                 # construct shifted version of the definition and add to map
                 k = normalize((_def, t))
-                def_map[k] = normalize(time_shift(_ex, a_names, t, defs))
+                def_map[k] = normalize(time_shift(_ex, t, a_names, funcs, defs))
 
                 # also add this definition to incidence
                 visit!(incidence, _ex, typemax(Int), t, _flat_params)
@@ -305,7 +308,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         end
 
         # now normalize the equations and make subs
-        _f(x) = _to_expr(recursive_subs(normalize(x, targets=targets), def_map))
+        _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))
         normalized_eqs = [_f(eq) for eq in eqs]
 
         # now filter args  and keep only those that actually appear in the

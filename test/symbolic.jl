@@ -1,22 +1,5 @@
 @testset "symbolic" begin
 
-@testset "Dolang.normalize(::Union{Symbol,String}, Integer)" begin
-    @test Dolang.normalize(:x, 0) == :_x_
-    @test Dolang.normalize(:x, 1) == :_x__1_
-    @test Dolang.normalize(:x, -1) == :_x_m1_
-    @test Dolang.normalize(:x, -100) == :_x_m100_
-
-    @test Dolang.normalize("x", 0) == :_x_
-    @test Dolang.normalize("x", 1) == :_x__1_
-    @test Dolang.normalize("x", -1) == :_x_m1_
-    @test Dolang.normalize("x", -100) == :_x_m100_
-
-    @test Dolang.normalize((:x, 0)) == :_x_
-    @test Dolang.normalize((:x, 1)) == :_x__1_
-    @test Dolang.normalize((:x, -1)) == :_x_m1_
-    @test Dolang.normalize((:x, -100)) == :_x_m100_
-end
-
 @testset "Dolang.eq_expr" begin
     ex = :(z = x + y(1))
     @test Dolang.eq_expr(ex) == :(_x_ + _y__1_ - _z_)
@@ -24,6 +7,23 @@ end
 end
 
 @testset "Dolang.normalize" begin
+    @testset "Dolang.normalize(::Union{Symbol,String}, Integer)" begin
+        @test Dolang.normalize(:x, 0) == :_x_
+        @test Dolang.normalize(:x, 1) == :_x__1_
+        @test Dolang.normalize(:x, -1) == :_x_m1_
+        @test Dolang.normalize(:x, -100) == :_x_m100_
+
+        @test Dolang.normalize("x", 0) == :_x_
+        @test Dolang.normalize("x", 1) == :_x__1_
+        @test Dolang.normalize("x", -1) == :_x_m1_
+        @test Dolang.normalize("x", -100) == :_x_m100_
+
+        @test Dolang.normalize((:x, 0)) == :_x_
+        @test Dolang.normalize((:x, 1)) == :_x__1_
+        @test Dolang.normalize((:x, -1)) == :_x_m1_
+        @test Dolang.normalize((:x, -100)) == :_x_m100_
+    end
+
     @testset "numbers" begin
         for T in (Float16, Float32, Float64, Int8, Int16, Int32, Int64)
             x = rand(T)
@@ -98,6 +98,128 @@ end
         @test Dolang.normalize((:x, -1)) == :_x_m1_
         @test Dolang.normalize((:x, -100)) == :_x_m100_
     end
+end
+
+@testset "Dolang.time_shift" begin
+    defs = Dict(:a=>:(b(-1)/c))
+    vars = [:c]
+    funcs = [:foobar]
+    for shift in [-1, 0, 1]
+        have = Dolang.time_shift(:(a+b(1) + c), shift)
+        @test have == :(a+b($(shift+1)) + c)
+
+        # with variables
+        have = Dolang.time_shift(:(a+b(1) + c), shift, variables=vars)
+        @test have == :(a+b($(shift+1)) + c($shift))
+
+        # with defs
+        have = Dolang.time_shift(:(a+b(1) + c), shift, defs=defs)
+        @test have == :(b($(shift-1))/c + b($(shift+1)) + c)
+
+        # with defs + variables
+        have = Dolang.time_shift(:(a+b(1) + c), shift,
+                                 defs=defs, variables=vars)
+        @test have == :(b($(shift-1))/c($(shift)) + b($(shift+1)) + c($(shift)))
+
+        # unknown function
+        @test_throws Dolang.UnknownFunctionError Dolang.time_shift(:(a+b(1) + foobar(c)), shift)
+
+        # with functions
+        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, functions=funcs)
+        @test have == :(a+b($(shift+1)) + foobar(c))
+
+        # functions + defs
+        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift,
+                                 defs=defs, functions=funcs)
+        @test have == :(b($(shift-1))/c + b($(shift+1)) + foobar(c))
+
+        # functions + variables
+        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift,
+                                 variables=vars, functions=funcs)
+        @test have == :(a+b($(shift+1)) + foobar(c($shift)))
+
+        # functions + variables + defs
+        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift,
+                                 variables=vars, functions=funcs,
+                                 defs=defs)
+        want = :(b($(shift-1))/c($(shift)) + b($(shift+1)) + foobar(c($(shift))))
+        @test have == want
+
+    end
+end
+
+@testset "Dolang.steady_state" begin
+    @test Dolang.steady_state(:(a+b(1) + c)) == :(a+b+c)
+
+    # with defs
+    have = Dolang.steady_state(:(a+b(1) + c), defs=Dict(:a=>:(b(-1)/c)))
+    @test have == :(b/c+b+c)
+
+    # unknown function
+    @test_throws Dolang.UnknownFunctionError Dolang.steady_state(:(a+b(1)+c+foobar(c)))
+
+    # now let function be ok
+    want = Dolang.steady_state(:(a+b(1) + foobar(c)), functions=[:foobar])
+    @test want == :(a+b+foobar(c))
+end
+
+@testset "Dolang.list_symbols" begin
+    out = Dolang.list_symbols(:(a+b(1)+c))
+    want = Set{Tuple{Symbol,Int}}(); push!(want, (:b, 1))
+    @test haskey(out, :variables)
+    @test out[:variables] == want
+    @test haskey(out, :parameters)
+    @test out[:parameters] == Set{Symbol}([:a, :c])
+
+    out = Dolang.list_symbols(:(a+b(1)+c), variables=[:c])
+    want = Set{Tuple{Symbol,Int}}(); push!(want, (:b, 1)); push!(want, (:c, 0))
+    @test haskey(out, :variables)
+    @test out[:variables] == want
+    @test haskey(out, :parameters)
+    @test out[:parameters] == Set{Symbol}([:a])
+
+    # Unknown function
+    @test_throws Dolang.UnknownFunctionError Dolang.list_symbols(:(a+b(1)+c+foobar(c)))
+
+    # now let the function be ok
+    out = Dolang.list_symbols(:(a+b(1)+c + foobar(c)), functions=[:foobar])
+    want = Set{Tuple{Symbol,Int}}(); push!(want, (:b, 1))
+    @test haskey(out, :variables)
+    @test out[:variables] == want
+    @test haskey(out, :parameters)
+    @test out[:parameters] == Set{Symbol}([:a, :c])
+end
+
+@testset " csubs()" begin
+    d = Dict(:monty=> :python, :run=>:faster, :eat=>:more)
+    @test Dolang.csubs(:monty, d) == :python
+    @test Dolang.csubs(:Monty, d) == :Monty
+    @test Dolang.csubs(1.0, d) == 1.0
+
+    want = :(python(faster + more, eats))
+    @test Dolang.csubs(:(monty(run + eat, eats)), d) == want
+
+    d = Dict(:b => :(c + d(1)))
+    ex = :(a + b + b(1))
+    want = :(a + (c + d(1)) + b(1))
+    @test Dolang.csubs(ex, d) == want
+
+    d = Dict((:b, 0) => :(c + d(1)))
+    ex = :(a + b + b(1))
+    want = :(a + (c + d(1)) + b(1))
+    @test Dolang.csubs(ex, d) == want
+
+    d = Dict((:b, 0) => :(c + d(1)), (:b, 1) => :(c(1) + d(2)))
+    ex = :(a + b + b(1))
+    want = :(a + (c + d(1)) + (c(1) + d(2)))
+    @test Dolang.csubs(ex, d) == want
+
+    # case where subs and csubs aren't the same
+    ex = :(a + b)
+    d = Dict(:b => :(c/a), :c => :(2a))
+    @test Dolang.subs(ex, d) == :(a + c/a)
+    @test Dolang.csubs(ex, d) == :(a + (2a)/a)
+
 end
 
 end  # @testset "symbolic"
