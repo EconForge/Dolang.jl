@@ -18,7 +18,7 @@ def stringify_variable(arg: Tuple[str, int]) -> str:
         return '{}__{}_'.format(s, str(date))
 
 def stringify_parameter(p: str) -> str:
-    return '{}_'.format(p)
+    return '{}'.format(p)
 
 def stringify(arg) -> str:
     if isinstance(arg, str):
@@ -41,20 +41,20 @@ def destringify(s: str):
 
 ###
 
-def normalize(expr: Expression, variables: List[str])->Expression:
+def normalize(expr: Expression, variables: List[str] = [])->Expression:
     import copy
     en = ExpressionNormalizer(variables=variables)
     return en.visit(copy.deepcopy(expr))
 
 # shift timing in equations
 # time_shift(:(a+b(1)+c),1,[:b,:c]) == :(a+b(2)+c(1))
-def time_shift(expr: Expression, n, vars: List[str]) -> Expression:
+def time_shift(expr: Expression, n, vars: List[str] = []) -> Expression:
     import copy
     eexpr = copy.deepcopy(expr)
     return TimeShiftTransformer(shift=n, variables=vars).visit(eexpr)
 
 #
-def steady_state(expr: Expression, vars: List[str]) -> Expression:
+def steady_state(expr: Expression, vars: List[str] = []) -> Expression:
     import copy
     eexpr = copy.deepcopy(expr)
     return TimeShiftTransformer(shift='S', variables=vars).visit(eexpr)
@@ -66,6 +66,7 @@ def steady_state(expr: Expression, vars: List[str]) -> Expression:
 
 
 def list_variables(expr: Expression, funs: List[str]=None, vars: List[str]=None) -> List[Tuple[str,int]]:
+
     if funs is None: funs=[]
     if vars is None: vars=[]
     l = ListSymbols(known_functions=functions+funs, known_variables=vars)
@@ -73,6 +74,7 @@ def list_variables(expr: Expression, funs: List[str]=None, vars: List[str]=None)
     if l.problems:
         e = Exception('Symbolic error.')
         e.problems = l.problems
+        raise e
     return [v[0] for v in l.variables]
 
 def list_symbols(expr: Expression, funs: List[str]=None, vars: List[str]=None) -> List[Tuple[str,int]]:
@@ -82,6 +84,7 @@ def list_symbols(expr: Expression, funs: List[str]=None, vars: List[str]=None) -
     if l.problems:
         e = Exception('Symbolic error.')
         e.problems = l.problems
+        raise e
     head = lambda v: [i[0] for i in v]
     d = {
         'variables': head(l.variables),
@@ -134,7 +137,7 @@ class ExpressionNormalizer(NodeTransformer):
         name = node.func.id
         args = node.args[0]
 
-        if name in self.variables:
+        if name in self.variables or name not in self.functions:
             try:
                 date = eval_scalar(args)
             except:
@@ -227,15 +230,15 @@ class ListSymbols(ast.NodeVisitor):
             [self.visit(e) for e in call.args]
         else:
             try:
-                assert(len(call.args)==1)
+                assert(len(call.args) == 1)
                 n = int(eval_scalar(call.args[0]))
-                self.variables.append(((name,n),colno))
+                self.variables.append(((name, n), colno))
             except:
-                if name in self.known_variables:
-                    self.problems.append([name,0,colno,'incorrect subscript'])
+                if name in self.known_variables + [vv[0][0] for vv in self.variables]:
+                    self.problems.append([name, 0, colno, 'incorrect subscript'])
                 else:
-                    self.problems.append([name,0,colno,'unknown_function'])
-                [self.visit(e) for e in call.args]
+                    self.problems.append([name, 0, colno, 'unknown_function'])
+                # [self.visit(e) for e in call.args]
 
     def visit_Name(self, name):
         # colno = name.colno
@@ -243,8 +246,8 @@ class ListSymbols(ast.NodeVisitor):
         n = 0
         name = name.id
         if name in self.known_variables:
-            self.variables.append( ((name,0), colno))
+            self.variables.append(((name, 0), colno))
         elif name in self.known_functions:
-            self.problems.append([name, colno, 'function_not_called' ])
+            self.problems.append([name, colno, 'function_not_called'])
         else:
-            self.constants.append( (name, colno) )
+            self.constants.append((name, colno))

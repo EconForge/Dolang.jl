@@ -1,4 +1,3 @@
-import numpy
 import math
 
 functions = {
@@ -13,5 +12,5 @@ functions = {
 }
 
 constants = {
-    'pi': math.pi
+    'pi': math.pi,
 }

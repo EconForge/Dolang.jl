@@ -1,4 +1,5 @@
 def test_make_method_list_of_lists():
+    from dolang.parser import parse_string
     from dolang.codegen import to_source
     from dolang.function_compiler import make_method
     #style 1: list of lists
@@ -12,6 +13,7 @@ def test_make_method_list_of_lists():
     print(to_source(fun))
 
 def test_make_method_dictionary():
+    from dolang.parser import parse_string
     from dolang.codegen import to_source
     from dolang.function_compiler import make_method
     # style 2: OrderedDict
@@ -32,6 +34,7 @@ def test_make_method_dictionary():
 #     print(to_source(fun3))
 
 def test_make_method_definitions():
+    from dolang.parser import parse_string
     from dolang.codegen import to_source
     from dolang.function_compiler import make_method
     # with definitions
@@ -47,6 +50,7 @@ def test_make_method_definitions():
     print(to_source(fun))
 
 def test_make_method_elaborate_definitions():
+    from dolang.parser import parse_string
     from dolang.codegen import to_source
     from dolang.function_compiler import make_method
     # with elaborate definitions
