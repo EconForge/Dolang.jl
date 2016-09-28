@@ -104,18 +104,18 @@ end
 
 IncidenceTable() = IncidenceTable(Dict(), Dict(), Dict())
 
-function IncidenceTable(eqs::AbstractVector)
+function IncidenceTable(eqs::AbstractVector, skip::Vector{Symbol}=Symbol[])
     # create incidence
     it = IncidenceTable()
     for (i, eq) in enumerate(eqs)
-        visit!(it, eq, i, 0)
+        visit!(it, eq, i, 0, skip)
     end
     it
 end
 
-function IncidenceTable(eq::Expr)
+function IncidenceTable(eq::Expr, skip::Vector{Symbol}=Symbol[])
     it = IncidenceTable()
-    visit!(it, eq, 1, 0)
+    visit!(it, eq, 1, 0, skip)
     it
 end
 
@@ -220,38 +220,52 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         if isempty(targets)
             eqs = map(_rhs_only, eqs)
         end
+
+        # Need FlatParams so `visit!` and `IncidenceTable` skip them when
+        # visiting expressions
+        _flat_params = FlatParams(params)
+
         # create incidence table of equations
-        incidence = IncidenceTable(eqs)
+        incidence = IncidenceTable(eqs, _flat_params)
 
         # construct table of dates each arg, param, target is allowed
         # start with args
         allowed_args = allowed_dates(args)
-
         allowed = copy(allowed_args)
 
         # now params and targets (they can only ever appear at 0)
-        let
-            s0 = Set(0)  # in `let` block so s0 never appears
-            for p in param_names(params)
-                allowed[p] = s0
-            end
+        s0 = Set(0)
+        for p in param_names(params)
+            allowed[p] = s0
+        end
 
-            # NOTE: targets might also be in args, so we can't just set
-            #       allowed[t]. we need to push onto a set if one exists
-            for t in targets
-                push!(get!(allowed, t, Set(0)), 0)
-            end
+        # NOTE: targets might also be in args, so we can't just set
+        #       allowed[t]. we need to push onto a set if one exists
+        for t in targets
+            push!(get!(allowed, t, Set(0)), 0)
         end
 
         # This maps from the normalized_ name to the normalized_ expression that
         # should be substituted for the parsed name
         def_map = Dict{Symbol,Expr}()
-        a_names = Set(keys(allowed_args))
+        arg_nms = Set(keys(allowed_args))
 
         # build this empty set once and pass to time_shift below
         funcs = Set{Symbol}()
 
-        _flat_params = FlatParams(params)
+        # add all definitions at time 0 allowed (for when we have definitions
+        # depend on one another)
+        for _def in keys(defs)
+            allowed[_def] = Set([0])
+        end
+
+        # NOTE: we need to make the keys of definitions have the form
+        #       (def, shift)::Tuple{Symbol,Int} in order for csubs to work
+        #       properly below
+        norm_defs = OrderedDict{Tuple{Symbol,Int},Any}()
+        for (_def, _ex) in defs
+            norm_defs[(_def, 0)] = _ex
+        end
 
         # make sure the _used_ definitions are all valid. If they are, add
         # them to the def_map
@@ -264,8 +278,8 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
             times = incidence[_def]
 
             # recursively resolve this defintion so we get down to args, params
-            # and targets
-            _ex = csubs(_ex, defs)
+            # and targets.
+            _ex = csubs(_ex, norm_defs)
 
             # compute incidence of each shift and make sure it is valid
             for t in times
@@ -283,7 +297,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
                 # construct shifted version of the definition and add to map
                 k = normalize((_def, t))
-                def_map[k] = normalize(time_shift(_ex, t, a_names, funcs, defs))
+                def_map[k] = normalize(time_shift(_ex, t, arg_nms, funcs, defs))
 
                 # also add this definition to incidence
                 visit!(incidence, _ex, typemax(Int), t, _flat_params)
@@ -291,7 +305,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
             # Add these times to allowed map for `_def` so we can do equation
             # validation next
-            allowed[_def] = Set(times)
+            push!(allowed[_def], times...)
 
         end
 
@@ -314,22 +328,6 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         # now filter args  and keep only those that actually appear in the
         # equations
         args = filter_args(args, incidence)
-
-        # filter incidence so all parameters are removed
-        for p in params
-            # remove from by_var
-            haskey(incidence.by_var, p) && delete!(incidence.by_var, p)
-
-            # remove from by_eq
-            for (_, d) in incidence.by_eq
-                haskey(d, p) && delete!(d, p)
-            end
-        end
-
-        # remove from by_date
-        for (_, _set) in incidence.by_date
-            filter!(x-> !(in(x, params)), _set)
-        end
 
         new(normalized_eqs, args, params, targets, defs, funname, dispatch,
             incidence)

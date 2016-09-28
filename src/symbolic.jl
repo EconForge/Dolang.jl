@@ -218,8 +218,13 @@ function time_shift(ex::Expr, shift::Integer,
     if is_time_shift(ex)
         var = ex.args[1]
         i = ex.args[2]
-        # make sure `var` is the the Set
-        push!(variables, var)
+
+        # if we found a definition, move to resolving it
+        if haskey(defs, var)
+            time_shift(defs[var], shift+i, variables, functions, defs)
+        end
+
+        # variables = Symbol[variables; var]
         return time_shift(var, shift+i, variables, functions, defs)
     end
 
