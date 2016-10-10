@@ -345,7 +345,6 @@ def compile_function_ast(equations, symbols, arg_names, output_names=None, funna
     # if dolo.config.debug:
     #     print(to_source(mod))
     from .codegen import to_source
-    print(to_source(mod))
 
     if vectorize:
         from numba import float64, void
