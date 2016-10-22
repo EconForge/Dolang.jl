@@ -5,13 +5,17 @@ const latex_subs = let
     repl_latex = Base.REPLCompletions.latex_symbols
     unicode = Dict([(v, k) for (k, v) in repl_latex])
     tex_name = Dict([(strip(k, '\\'), k) for (k, v) in repl_latex])
-    pop!(tex_name, "c")  # for some reason this sneaks in...
+    poppers = ["c", "k"]
+    for p in poppers
+        pop!(tex_name, p)
+    end
     merge(unicode, tex_name)
 end
 
 function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
     # split the symbol into parts
     v_string = string(v)
+    v_string = strip(v_string, '_')  # undo Dolang normalization
     parts = split(v_string, "_")
 
     # first part is the variable name, plus any overbar, dot, or star
@@ -95,7 +99,7 @@ _latex!(io::IO, x::Number) = print(io, string(x))
 
 function _latex!(io::IO, ex::Expr)
     if is_time_shift(ex)
-        print(io, latex(ex.args[1], ex.args[2]))
+        _latex!(io, ex.args[1], ex.args[2])
         return
     end
 
@@ -121,6 +125,10 @@ function _latex!(io::IO, ex::Expr)
                     print(io, "}{")
                     _latex!(io, ex.args[3])
                     print(io, "}")
+                elseif f == :*
+                    _latex!(io, ex.args[2])
+                    print(io, " ")
+                    _latex!(io, ex.args[3])
                 else
                     _latex!(io, ex.args[2])
                     print(io, f)
@@ -138,11 +146,11 @@ function _latex!(io::IO, ex::Expr)
         end
 
         # not arith
-        print(io, "\\text{$f}(")
+        print(io, "\\text{$f}\\left(")
         for arg in ex.args[2:end]
             _latex!(io, arg)
         end
-        print(io, ")")
+        print(io, "\\right)")
         return
     end
 
