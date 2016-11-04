@@ -243,7 +243,8 @@ function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
 
             if haskey(eq_incidence, v) && in(shift, eq_incidence[v])
                 non_zero += 1
-                exprs[i_eq, i_var] = deriv(eq_prepped, normalize((v, shift)))
+                my_deriv = deriv(eq_prepped, normalize((v, shift)))
+                exprs[i_eq, i_var] = post_deriv(my_deriv)
             end
         end
     end
@@ -339,7 +340,7 @@ function _hessian_exprs(ff::FunctionFactory{FlatArgs})
 
                         # might still be zero if terms were independent
                         if diff_v1v2 != 0
-                            push!(terms, (i_eq, (i_v1, i_v2), diff_v1v2))
+                            push!(terms, (i_eq, (i_v1, i_v2), post_deriv(diff_v1v2)))
                         end
                     end
                 end

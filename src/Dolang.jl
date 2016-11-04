@@ -12,13 +12,15 @@ end::Bool
 if HAVE_SYMENGINE
     import SymEngine
     deriv(eq::SymEngine.Basic, x) = SymEngine.diff(eq, x)
-    prep_deriv(eq) = SymEngine.Basic(eq)
+    @inline prep_deriv(eq) = SymEngine.Basic(eq)
+    @inline post_deriv(eq) = SymEngine.walk_expression(eq)
 else
     import Calculus
     warn("Using Calculus.jl for symbolic differentiation. This will be slower",
          " than SymEngine.jl\n. To use SymEngine call Pkg.add(\"SymeEngine\")")
     deriv(eq, x) = Calculus.differentiate(eq, x)
-    prep_deriv(eq) = eq
+    @inline prep_deriv(eq) = eq
+    @inline post_deriv(eq) = eq
 end
 
 const ARITH_SYMBOLS = Set([:+, :-, :*, :/, :^])
