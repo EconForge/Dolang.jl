@@ -6,6 +6,8 @@ _is_not_line(x) = true
 _is_not_line(::LineNumberNode) = false
 _is_not_line(ex::Expr) = ex.head != :line
 
+const DISPATCH_ARG = gensym(:dispatch)
+
 _filter_lines!(x) = x
 
 function _filter_lines!(ex::Expr)
@@ -192,7 +194,8 @@ param_names{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
 
 _extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
     ff.dispatch == SkipArg ? Any[:(::Dolang.TDer{$n})] :
-                                [:(::Dolang.TDer{$n}), :(::$(ff.dispatch))]
+                                [:(::Dolang.TDer{$n}),
+                                 :($(DISPATCH_ARG)::$(ff.dispatch))]
 
 "Method signature for non-mutating version of the function"
 function signature{n}(ff::FunctionFactory, d::TDer{n}=Der{0})
@@ -466,6 +469,39 @@ build_function{n}(ff::FunctionFactory, d::TDer{n}) =
 "Build non-allocating version of the method"
 build_function!{n}(ff::FunctionFactory, d::TDer{n}) =
     _build_function(ff, d, signature!, func_body!)
+
+function build_vectorized_function(ff::FunctionFactory{FlatArgs}, d::TDer{0})
+    sig = signature(ff, d)
+    # need to adjust second to last arg to be type AbstractMatrix
+    sig.args[length(sig.args)-1] = :(V::AbstractMatrix)
+    sig
+
+    # use signature to figure out how to call non-vectorized version within the
+    # loop
+    row_i_sig = signature(ff, d)
+    row_i_sig.args[2] = :($(d))
+    row_i_sig.args[length(sig.args)-1] = :(V[_row, :])
+
+    body = Expr(:block,
+        allocate_block(ff, d),
+        :(nrow = size(V, 1)),
+        Expr(:for, :(_row = 1:nrow),
+            Expr(:block,
+            :(out[_row, :] = $(row_i_sig))
+            )
+        ),
+        :(return out)
+    )
+
+    no_der_sig = deepcopy(sig)
+
+    splice!(no_der_sig.args, 2)
+
+    Expr(:block,
+         Expr(:function, sig, body),
+         Expr(:function, no_der_sig, body)
+         )
+end
 
 # -------- #
 # User API #
