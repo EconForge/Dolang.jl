@@ -470,9 +470,7 @@ build_function!{n}(ff::FunctionFactory, d::TDer{n}) =
 # -------- #
 # User API #
 # -------- #
-make_method(ff::FunctionFactory; mutating::Bool=true, allocating::Bool=true) =
-    make_method(Der{0}, ff; mutating=mutating, allocating=allocating)
-
+# This is the main method that does the work.
 function make_method{n}(d::TDer{n}, ff::FunctionFactory; mutating::Bool=true,
                         allocating::Bool=true)
 
@@ -482,44 +480,46 @@ function make_method{n}(d::TDer{n}, ff::FunctionFactory; mutating::Bool=true,
     out
 end
 
+# accept derivative order(s) as keyword argument
+function make_method(ff::FunctionFactory;
+                     mutating::Bool=true,
+                     allocating::Bool=true,
+                     orders=0)
+    out = Expr(:block)
+    for i in orders
+        out_i = make_method(Der{i}, ff; mutating=mutating, allocating=allocating)
+        append!(out.args, out_i.args)
+    end
+    out
+end
+
+# Method without `dispatch` argument and with orders as kwarg
 function make_method(eqs::Vector{Expr},
                      arguments::ArgType,
                      params::ParamType;
                      targets::Vector{Symbol}=Symbol[],
                      defs::Associative=Dict(),
-                     funname::Symbol=:anonymous,
+                     funname::Symbol=gensym(:anonymous),
                      mutating::Bool=true,
-                     allocating::Bool=true)
+                     allocating::Bool=true,
+                     orders=0)
     ff = FunctionFactory(eqs, arguments, params,
                          targets=targets, defs=defs, funname=funname)
 
-    make_method(ff; mutating=mutating, allocating=allocating)
+    make_method(ff; mutating=mutating, allocating=allocating, orders=orders)
 end
 
+# Method with `dispatch` argument and with orders as kwarg
 function make_method{T}(::Type{T}, eqs::Vector{Expr},
                         arguments::ArgType,
                         params::ParamType;
                         targets::Vector{Symbol}=Symbol[],
                         defs::Associative=Dict(),
-                        funname::Symbol=:anonymous,
+                        funname::Symbol=gensym(:anonymous),
                         mutating::Bool=true,
-                        allocating::Bool=true)
+                        allocating::Bool=true, orders=0)
     ff = FunctionFactory(T, eqs, arguments, params,
                          targets=targets, defs=defs, funname=funname)
 
-    make_method(ff; mutating=mutating, allocating=allocating)
-end
-
-function make_method{T,n}(d::TDer{n}, ::Type{T}, eqs::Vector{Expr},
-                          arguments::ArgType,
-                          params::ParamType;
-                          targets::Vector{Symbol}=Symbol[],
-                          defs::Associative=Dict(),
-                          funname::Symbol=:anonymous,
-                          mutating::Bool=true,
-                          allocating::Bool=true)
-    ff = FunctionFactory(T, eqs, arguments, params,
-                         targets=targets, defs=defs, funname=funname)
-
-    make_method(d, ff; mutating=mutating, allocating=allocating)
+    make_method(ff; mutating=mutating, allocating=allocating, orders=orders)
 end
