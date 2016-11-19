@@ -325,10 +325,6 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))
         normalized_eqs = [_f(eq) for eq in eqs]
 
-        # now filter args  and keep only those that actually appear in the
-        # equations
-        args = filter_args(args, incidence)
-
         new(normalized_eqs, args, params, targets, defs, funname, dispatch,
             incidence)
     end

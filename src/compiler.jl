@@ -6,6 +6,8 @@ _is_not_line(x) = true
 _is_not_line(::LineNumberNode) = false
 _is_not_line(ex::Expr) = ex.head != :line
 
+const DISPATCH_ARG = gensym(:dispatch)
+
 _filter_lines!(x) = x
 
 function _filter_lines!(ex::Expr)
@@ -192,7 +194,8 @@ param_names{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
 
 _extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
     ff.dispatch == SkipArg ? Any[:(::Dolang.TDer{$n})] :
-                                [:(::Dolang.TDer{$n}), :(::$(ff.dispatch))]
+                                [:(::Dolang.TDer{$n}),
+                                 :($(DISPATCH_ARG)::$(ff.dispatch))]
 
 "Method signature for non-mutating version of the function"
 function signature{n}(ff::FunctionFactory, d::TDer{n}=Der{0})
@@ -467,12 +470,43 @@ build_function{n}(ff::FunctionFactory, d::TDer{n}) =
 build_function!{n}(ff::FunctionFactory, d::TDer{n}) =
     _build_function(ff, d, signature!, func_body!)
 
+function build_vectorized_function(ff::FunctionFactory{FlatArgs}, d::TDer{0})
+    sig = signature(ff, d)
+    # need to adjust second to last arg to be type AbstractMatrix
+    sig.args[length(sig.args)-1] = :(V::AbstractMatrix)
+    sig
+
+    # use signature to figure out how to call non-vectorized version within the
+    # loop
+    row_i_sig = signature(ff, d)
+    row_i_sig.args[2] = :($(d))
+    row_i_sig.args[length(sig.args)-1] = :(V[_row, :])
+
+    body = Expr(:block,
+        allocate_block(ff, d),
+        :(nrow = size(V, 1)),
+        Expr(:for, :(_row = 1:nrow),
+            Expr(:block,
+            :(out[_row, :] = $(row_i_sig))
+            )
+        ),
+        :(return out)
+    )
+
+    no_der_sig = deepcopy(sig)
+
+    splice!(no_der_sig.args, 2)
+
+    Expr(:block,
+         Expr(:function, sig, body),
+         Expr(:function, no_der_sig, body)
+         )
+end
+
 # -------- #
 # User API #
 # -------- #
-make_method(ff::FunctionFactory; mutating::Bool=true, allocating::Bool=true) =
-    make_method(Der{0}, ff; mutating=mutating, allocating=allocating)
-
+# This is the main method that does the work.
 function make_method{n}(d::TDer{n}, ff::FunctionFactory; mutating::Bool=true,
                         allocating::Bool=true)
 
@@ -482,44 +516,46 @@ function make_method{n}(d::TDer{n}, ff::FunctionFactory; mutating::Bool=true,
     out
 end
 
+# accept derivative order(s) as keyword argument
+function make_method(ff::FunctionFactory;
+                     mutating::Bool=true,
+                     allocating::Bool=true,
+                     orders=0)
+    out = Expr(:block)
+    for i in orders
+        out_i = make_method(Der{i}, ff; mutating=mutating, allocating=allocating)
+        append!(out.args, out_i.args)
+    end
+    out
+end
+
+# Method without `dispatch` argument and with orders as kwarg
 function make_method(eqs::Vector{Expr},
                      arguments::ArgType,
                      params::ParamType;
                      targets::Vector{Symbol}=Symbol[],
                      defs::Associative=Dict(),
-                     funname::Symbol=:anonymous,
+                     funname::Symbol=gensym(:anonymous),
                      mutating::Bool=true,
-                     allocating::Bool=true)
+                     allocating::Bool=true,
+                     orders=0)
     ff = FunctionFactory(eqs, arguments, params,
                          targets=targets, defs=defs, funname=funname)
 
-    make_method(ff; mutating=mutating, allocating=allocating)
+    make_method(ff; mutating=mutating, allocating=allocating, orders=orders)
 end
 
+# Method with `dispatch` argument and with orders as kwarg
 function make_method{T}(::Type{T}, eqs::Vector{Expr},
                         arguments::ArgType,
                         params::ParamType;
                         targets::Vector{Symbol}=Symbol[],
                         defs::Associative=Dict(),
-                        funname::Symbol=:anonymous,
+                        funname::Symbol=gensym(:anonymous),
                         mutating::Bool=true,
-                        allocating::Bool=true)
+                        allocating::Bool=true, orders=0)
     ff = FunctionFactory(T, eqs, arguments, params,
                          targets=targets, defs=defs, funname=funname)
 
-    make_method(ff; mutating=mutating, allocating=allocating)
-end
-
-function make_method{T,n}(d::TDer{n}, ::Type{T}, eqs::Vector{Expr},
-                          arguments::ArgType,
-                          params::ParamType;
-                          targets::Vector{Symbol}=Symbol[],
-                          defs::Associative=Dict(),
-                          funname::Symbol=:anonymous,
-                          mutating::Bool=true,
-                          allocating::Bool=true)
-    ff = FunctionFactory(T, eqs, arguments, params,
-                         targets=targets, defs=defs, funname=funname)
-
-    make_method(d, ff; mutating=mutating, allocating=allocating)
+    make_method(ff; mutating=mutating, allocating=allocating, orders=orders)
 end
