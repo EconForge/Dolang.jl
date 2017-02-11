@@ -17,7 +17,7 @@ if HAVE_SYMENGINE
 else
     import Calculus
     warn("Using Calculus.jl for symbolic differentiation. This will be slower",
-         " than SymEngine.jl\n. To use SymEngine call Pkg.add(\"SymeEngine\")")
+         " than SymEngine.jl\n. To use SymEngine call Pkg.add(\"SymEngine\")")
     deriv(eq, x) = Calculus.differentiate(eq, x)
     @inline prep_deriv(eq) = eq
     @inline post_deriv(eq) = eq
