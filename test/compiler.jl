@@ -288,123 +288,177 @@ end
     end
     ))
 
-    # want_d = Dolang._filter_lines!(:(begin
-    #     function myfun(::Dolang.TDer{0},::$(Int),V::$(AbstractVector),p)
-    #         out = Dolang._allocate_out(eltype(V),2,V)
-    #         begin
-    #             begin
-    #                 _u_ = Dolang._unpack_var(p,1)
-    #             end
-    #             begin
-    #                 _a_m1_ = Dolang._unpack_var(V,1)
-    #                 _a_ = Dolang._unpack_var(V,2)
-    #                 _b_ = Dolang._unpack_var(V,3)
-    #                 _c_ = Dolang._unpack_var(V,4)
-    #                 _c__1_ = Dolang._unpack_var(V,5)
-    #                 _d__1_ = Dolang._unpack_var(V,6)
-    #             end
-    #             begin
-    #                 _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
-    #                 _bar_ = _c__1_ + _u_ * _d__1_
-    #                 Dolang._assign_var(out,_foo_,1)
-    #                 Dolang._assign_var(out,_bar_,2)
-    #             end
-    #             return out
-    #         end
-    #     end
-    #     function myfun(::$(Int),V::$(AbstractVector),p)
-    #         out = Dolang._allocate_out(eltype(V),2,V)
-    #         begin
-    #             begin
-    #                 _u_ = Dolang._unpack_var(p,1)
-    #             end
-    #             begin
-    #                 _a_m1_ = Dolang._unpack_var(V,1)
-    #                 _a_ = Dolang._unpack_var(V,2)
-    #                 _b_ = Dolang._unpack_var(V,3)
-    #                 _c_ = Dolang._unpack_var(V,4)
-    #                 _c__1_ = Dolang._unpack_var(V,5)
-    #                 _d__1_ = Dolang._unpack_var(V,6)
-    #             end
-    #             begin
-    #                 _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
-    #                 _bar_ = _c__1_ + _u_ * _d__1_
-    #                 Dolang._assign_var(out,_foo_,1)
-    #                 Dolang._assign_var(out,_bar_,2)
-    #             end
-    #             return out
-    #         end
-    #     end
-    # end))
+    want_d = Dolang._filter_lines!(:(begin
+        function myfun(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),V::$(AbstractVector),p)
+            out = Dolang._allocate_out(eltype(V),2,V)
+            begin
+                begin
+                    _u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    _a_m1_ = Dolang._unpack_var(V,1)
+                    _a_ = Dolang._unpack_var(V,2)
+                    _b_ = Dolang._unpack_var(V,3)
+                    _c_ = Dolang._unpack_var(V,4)
+                    _c__1_ = Dolang._unpack_var(V,5)
+                    _d__1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _bar_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo_,1)
+                    Dolang._assign_var(out,_bar_,2)
+                end
+                return out
+            end
+        end
+        function myfun($(Dolang.DISPATCH_ARG)::$(Int),V::$(AbstractVector),p)
+            out = Dolang._allocate_out(eltype(V),2,V)
+            begin
+                begin
+                    _u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    _a_m1_ = Dolang._unpack_var(V,1)
+                    _a_ = Dolang._unpack_var(V,2)
+                    _b_ = Dolang._unpack_var(V,3)
+                    _c_ = Dolang._unpack_var(V,4)
+                    _c__1_ = Dolang._unpack_var(V,5)
+                    _d__1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _bar_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo_,1)
+                    Dolang._assign_var(out,_bar_,2)
+                end
+                return out
+            end
+        end
+    end))
 
-    # want_d! = Dolang._filter_lines!(:(begin
-    #     function myfun!(::Dolang.TDer{0},::($Int),out,V::$(AbstractVector),p)
-    #         begin
-    #             expected_size = Dolang._output_size(2, V)
-    #             if size(out) != expected_size
-    #                 msg = "Expected out to be size $(expected_size), found $(size(out))"
-    #                 throw(DimensionMismatch(msg))
-    #             end
-    #         end
-    #         begin
-    #             begin
-    #                 _u_ = Dolang._unpack_var(p,1)
-    #             end
-    #             begin
-    #                 _a_m1_ = Dolang._unpack_var(V,1)
-    #                 _a_ = Dolang._unpack_var(V,2)
-    #                 _b_ = Dolang._unpack_var(V,3)
-    #                 _c_ = Dolang._unpack_var(V,4)
-    #                 _c__1_ = Dolang._unpack_var(V,5)
-    #                 _d__1_ = Dolang._unpack_var(V,6)
-    #             end
-    #             begin
-    #                 _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
-    #                 _bar_ = _c__1_ + _u_ * _d__1_
-    #                 Dolang._assign_var(out,_foo_,1)
-    #                 Dolang._assign_var(out,_bar_,2)
-    #             end
-    #             return out
-    #         end
-    #     end
-    #     function myfun!(::($Int),out,V::$(AbstractVector),p)
-    #         begin
-    #             expected_size = Dolang._output_size(2, V)
-    #             if size(out) != expected_size
-    #                 msg = "Expected out to be size $(expected_size), found $(size(out))"
-    #                 throw(DimensionMismatch(msg))
-    #             end
-    #         end
-    #         begin
-    #             begin
-    #                 _u_ = Dolang._unpack_var(p,1)
-    #             end
-    #             begin
-    #                 _a_m1_ = Dolang._unpack_var(V,1)
-    #                 _a_ = Dolang._unpack_var(V,2)
-    #                 _b_ = Dolang._unpack_var(V,3)
-    #                 _c_ = Dolang._unpack_var(V,4)
-    #                 _c__1_ = Dolang._unpack_var(V,5)
-    #                 _d__1_ = Dolang._unpack_var(V,6)
-    #             end
-    #             begin
-    #                 _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
-    #                 _bar_ = _c__1_ + _u_ * _d__1_
-    #                 Dolang._assign_var(out,_foo_,1)
-    #                 Dolang._assign_var(out,_bar_,2)
-    #             end
-    #             return out
-    #         end
-    #     end
-    # end))
+    want_d_vec = Dolang._filter_lines(:(begin
+        function myfun(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),V::$(AbstractMatrix),p)
+            out = Dolang._allocate_out(eltype(V),2,V)
+            nrow = size(V,1)
+            for _row = 1:nrow
+                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int),view(V,_row,:),p)
+            end
+            return out
+        end
+        function myfun($(Dolang.DISPATCH_ARG)::$(Int),V::$(AbstractMatrix),p)
+            out = Dolang._allocate_out(eltype(V),2,V)
+            nrow = size(V,1)
+            for _row = 1:nrow
+                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int),view(V,_row,:),p)
+            end
+            return out
+        end
+    end))
+
+    want_d! = Dolang._filter_lines!(:(begin
+        function myfun!(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::($Int),out,V::$(AbstractVector),p)
+            begin
+                expected_size = Dolang._output_size(2, V)
+                if size(out) != expected_size
+                    msg = "Expected out to be size $(expected_size), found $(size(out))"
+                    throw(DimensionMismatch(msg))
+                end
+            end
+            begin
+                begin
+                    _u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    _a_m1_ = Dolang._unpack_var(V,1)
+                    _a_ = Dolang._unpack_var(V,2)
+                    _b_ = Dolang._unpack_var(V,3)
+                    _c_ = Dolang._unpack_var(V,4)
+                    _c__1_ = Dolang._unpack_var(V,5)
+                    _d__1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _bar_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo_,1)
+                    Dolang._assign_var(out,_bar_,2)
+                end
+                return out
+            end
+        end
+        function myfun!($(Dolang.DISPATCH_ARG)::($Int),out,V::$(AbstractVector),p)
+            begin
+                expected_size = Dolang._output_size(2, V)
+                if size(out) != expected_size
+                    msg = "Expected out to be size $(expected_size), found $(size(out))"
+                    throw(DimensionMismatch(msg))
+                end
+            end
+            begin
+                begin
+                    _u_ = Dolang._unpack_var(p,1)
+                end
+                begin
+                    _a_m1_ = Dolang._unpack_var(V,1)
+                    _a_ = Dolang._unpack_var(V,2)
+                    _b_ = Dolang._unpack_var(V,3)
+                    _c_ = Dolang._unpack_var(V,4)
+                    _c__1_ = Dolang._unpack_var(V,5)
+                    _d__1_ = Dolang._unpack_var(V,6)
+                end
+                begin
+                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _bar_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo_,1)
+                    Dolang._assign_var(out,_bar_,2)
+                end
+                return out
+            end
+        end
+    end))
+
+    want_d!_vec = Dolang._filter_lines(:(begin
+        function myfun!(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),out,V::$(AbstractMatrix),p)
+            begin
+                expected_size = Dolang._output_size(2,V)
+                if size(out) != expected_size
+                    msg = "Expected out to be size $(expected_size), found $(size(out))"
+                    throw(DimensionMismatch(msg))
+                end
+            end
+            nrow = size(V,1)
+            for _row = 1:nrow
+                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int),view(V,_row,:),p)
+            end
+            return out
+        end
+        function myfun!($(Dolang.DISPATCH_ARG)::$(Int),out,V::$(AbstractMatrix),p)
+            begin
+                expected_size = Dolang._output_size(2,V)
+                if size(out) != expected_size
+                    msg = "Expected out to be size $(expected_size), found $(size(out))"
+                    throw(DimensionMismatch(msg))
+                end
+            end
+            nrow = size(V,1)
+            for _row = 1:nrow
+                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int),view(V,_row,:),p)
+            end
+            return out
+        end
+    end))
 
 
     @testset "  _build_function!?" begin
         @test want == Dolang.build_function(ff, Der{0})
         @test want! == Dolang.build_function!(ff, Der{0})
+        @test want_d == Dolang.build_function(ffd, Der{0})
+        @test want_d! == Dolang.build_function!(ffd, Der{0})
 
-        # @test want_d == Dolang.build_function(ffd, Der{0})
-        # @test want_d! == Dolang.build_function!(ffd, Der{0})
+        @test want_vec == Dolang.build_vectorized_function(ff, Der{0})
+        @test want!_vec == Dolang.build_vectorized_function!(ff, Der{0})
+        @test want_d_vec == Dolang.build_vectorized_function(ffd, Der{0})
+        @test want_d!_vec == Dolang.build_vectorized_function!(ffd, Der{0})
     end
 
     @testset "  make_method" begin
@@ -425,21 +479,21 @@ end
         @test have3 == Expr(:block, want!, want!_vec)
 
         # now dispatch version
-        # @test make_method(ffd) == Expr(:block, want_d!, want_d)
-        # @test make_method(ffd; mutating=false) == Expr(:block, want_d)
-        # @test make_method(ffd; allocating=false) == Expr(:block, want_d!)
+        @test make_method(ffd) == Expr(:block, want_d!, want_d!_vec , want_d, want_d_vec)
+        @test make_method(ffd; mutating=false) == Expr(:block, want_d, want_d_vec)
+        @test make_method(ffd; allocating=false) == Expr(:block, want_d!, want_d!_vec)
 
         # # test version where you pass args and it makes ffd for you
-        # have1 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
-        #                     funname=funname)
-        # have2 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
-        #                     funname=funname, mutating=false)
-        # have3 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
-        #                     funname=funname, allocating=false)
+        have1 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
+                            funname=funname)
+        have2 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
+                            funname=funname, mutating=false)
+        have3 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
+                            funname=funname, allocating=false)
 
-        # @test have1 == Expr(:block, want_d!, want_d)
-        # @test have2 == Expr(:block, want_d)
-        # @test have3 == Expr(:block, want_d!)
+        @test have1 == Expr(:block, want_d!, want_d!_vec, want_d, want_d_vec)
+        @test have2 == Expr(:block, want_d, want_d_vec)
+        @test have3 == Expr(:block, want_d!, want_d!_vec)
     end
 
     @testset " evaluating compiled code" begin
