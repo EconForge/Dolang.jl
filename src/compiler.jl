@@ -192,6 +192,17 @@ param_names{T1,T2<:FlatParams}(::FunctionFactory{T1,T2}) = [:p]
 param_names{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
     collect(keys(ff.params))::Vector{Symbol}
 
+typed_args{T1<:FlatArgs}(::FunctionFactory{T1}, T=AbstractVector) = [:(V::$(T))]
+
+typed_args{T1<:GroupedArgs}(ff::FunctionFactory{T1}, T=AbstractVector) =
+    Expr[:(k::$(T)) for k in keys(ff.args)]
+
+typed_params{T1,T2<:FlatParams}(::FunctionFactory{T1,T2}, T=AbstractVector) =
+    [:(p::$(T))]
+
+typed_params{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}, T=AbstractVector) =
+    Expr[:(k::$(T)) for k in keys(ff.params)]
+
 _extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
     ff.dispatch == SkipArg ? Any[:(::Dolang.TDer{$n})] :
                                 [:(::Dolang.TDer{$n}),
@@ -200,7 +211,7 @@ _extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
 "Method signature for non-mutating version of the function"
 function signature{n}(ff::FunctionFactory, d::TDer{n}=Der{0})
     func_args = vcat(ff.funname, _extra_args(ff, d),
-                     arg_names(ff), param_names(ff))
+                     typed_args(ff), typed_params(ff))
 
     out = Expr(:call)
     out.args = func_args
