@@ -218,6 +218,16 @@ end
 
     end
 
+    @testset " issue #18 (expand definitions in ff.incidence.by_eq)" begin
+        ff = _FF(eqs, args, params, targets=targets, defs=defs, funname=funname)
+
+        @test haskey(ff.incidence.by_eq[1], :a)
+        @test haskey(ff.incidence.by_eq[1], :c)
+        @test ff.incidence.by_eq[1][:a] == Set([-1, 0])
+        @test ff.incidence.by_eq[1][:c] == Set([0])
+
+    end
+
 end
 
 end  # @testset "factory"
