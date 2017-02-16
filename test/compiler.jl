@@ -113,21 +113,21 @@ end
 end
 
 @testset " signature!?" begin
-    @test Dolang.signature(ff) == :(myfun(::Dolang.TDer{0},V::$(AbstractVector),p::$(AbstractVector)))
-    @test Dolang.signature!(ff) == :(myfun!(::Dolang.TDer{0},out,V::$(AbstractVector),p::$(AbstractVector)))
+    @test Dolang.signature(ff) == :(myfun(::Dolang.TDer{0},V::$(AbstractVector),p))
+    @test Dolang.signature!(ff) == :(myfun!(::Dolang.TDer{0},out,V::$(AbstractVector),p))
 
-    @test Dolang.signature(ffnt) == :(myfun(::Dolang.TDer{0},V::$(AbstractVector),p::$(AbstractVector)))
-    @test Dolang.signature!(ffnt) == :(myfun!(::Dolang.TDer{0},out,V::$(AbstractVector),p::$(AbstractVector)))
+    @test Dolang.signature(ffnt) == :(myfun(::Dolang.TDer{0},V::$(AbstractVector),p))
+    @test Dolang.signature!(ffnt) == :(myfun!(::Dolang.TDer{0},out,V::$(AbstractVector),p))
 
     # NOTE: I need to escape the Int here so that it will refer to the exact
     #       same int inside ffd
-    # @test Dolang.signature(ffd) == :(myfun(::Dolang.TDer{0},::$(Int),V::$(AbstractVector),p::$(AbstractVector)))
-    # @test Dolang.signature!(ffd) == :(myfun!(::Dolang.TDer{0},::$(Int),out,V::$(AbstractVector),p::$(AbstractVector)))
+    # @test Dolang.signature(ffd) == :(myfun(::Dolang.TDer{0},::$(Int),V::$(AbstractVector),p))
+    # @test Dolang.signature!(ffd) == :(myfun!(::Dolang.TDer{0},::$(Int),out,V::$(AbstractVector),p))
 end
 
 @testset " compiling functions" begin
     want = Dolang._filter_lines!(:(begin
-        function myfun(::Dolang.TDer{0},V::$(AbstractVector),p::$(AbstractVector))
+        function myfun(::Dolang.TDer{0},V::$(AbstractVector),p)
             out = Dolang._allocate_out(eltype(V),2,V)
             begin
                 begin
@@ -150,7 +150,7 @@ end
                 return out
             end
         end
-        function myfun(V::$(AbstractVector),p::$(AbstractVector))
+        function myfun(V::$(AbstractVector),p)
             out = Dolang._allocate_out(eltype(V),2,V)
             begin
                 begin
@@ -174,9 +174,29 @@ end
             end
         end
     end))
+
+    want_vec = Dolang._filter_lines!(:(begin
+        function myfun(::Dolang.TDer{0},V::$(AbstractMatrix),p)
+            out = Dolang._allocate_out(eltype(V),2,V)
+            nrow = size(V,1)
+            for _row = 1:nrow
+                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),view(V,_row,:),p)
+            end
+            return out
+        end
+        function myfun(V::$(AbstractMatrix),p)
+            out = Dolang._allocate_out(eltype(V),2,V)
+            nrow = size(V,1)
+            for _row = 1:nrow
+                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),view(V,_row,:),p)
+            end
+            return out
+        end
+    end
+    ))
 
     want! = Dolang._filter_lines!(:(begin
-        function myfun!(::Dolang.TDer{0},out,V::$(AbstractVector),p::$(AbstractVector))
+        function myfun!(::Dolang.TDer{0},out,V::$(AbstractVector),p)
             begin
                 expected_size = Dolang._output_size(2, V)
                 if size(out) != expected_size
@@ -205,7 +225,7 @@ end
                 return out
             end
         end
-        function myfun!(out,V::$(AbstractVector),p::$(AbstractVector))
+        function myfun!(out,V::$(AbstractVector),p)
             begin
                 expected_size = Dolang._output_size(2, V)
                 if size(out) != expected_size
@@ -236,8 +256,40 @@ end
         end
     end))
 
+    want!_vec = Dolang._filter_lines!(:(begin
+        function myfun!(::Dolang.TDer{0},out,V::$(AbstractMatrix),p)
+            begin
+                expected_size = Dolang._output_size(2,V)
+                if size(out) != expected_size
+                    msg = "Expected out to be size $(expected_size), found $(size(out))"
+                    throw(DimensionMismatch(msg))
+                end
+            end
+            nrow = size(V,1)
+            for _row = 1:nrow
+                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),view(V,_row,:),p)
+            end
+            return out
+        end
+        function myfun!(out,V::$(AbstractMatrix),p)
+            begin
+                expected_size = Dolang._output_size(2,V)
+                if size(out) != expected_size
+                    msg = "Expected out to be size $(expected_size), found $(size(out))"
+                    throw(DimensionMismatch(msg))
+                end
+            end
+            nrow = size(V,1)
+            for _row = 1:nrow
+                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),view(V,_row,:),p)
+            end
+            return out
+        end
+    end
+    ))
+
     # want_d = Dolang._filter_lines!(:(begin
-    #     function myfun(::Dolang.TDer{0},::$(Int),V::$(AbstractVector),p::$(AbstractVector))
+    #     function myfun(::Dolang.TDer{0},::$(Int),V::$(AbstractVector),p)
     #         out = Dolang._allocate_out(eltype(V),2,V)
     #         begin
     #             begin
@@ -260,7 +312,7 @@ end
     #             return out
     #         end
     #     end
-    #     function myfun(::$(Int),V::$(AbstractVector),p::$(AbstractVector))
+    #     function myfun(::$(Int),V::$(AbstractVector),p)
     #         out = Dolang._allocate_out(eltype(V),2,V)
     #         begin
     #             begin
@@ -286,7 +338,7 @@ end
     # end))
 
     # want_d! = Dolang._filter_lines!(:(begin
-    #     function myfun!(::Dolang.TDer{0},::($Int),out,V::$(AbstractVector),p::$(AbstractVector))
+    #     function myfun!(::Dolang.TDer{0},::($Int),out,V::$(AbstractVector),p)
     #         begin
     #             expected_size = Dolang._output_size(2, V)
     #             if size(out) != expected_size
@@ -315,7 +367,7 @@ end
     #             return out
     #         end
     #     end
-    #     function myfun!(::($Int),out,V::$(AbstractVector),p::$(AbstractVector))
+    #     function myfun!(::($Int),out,V::$(AbstractVector),p)
     #         begin
     #             expected_size = Dolang._output_size(2, V)
     #             if size(out) != expected_size
@@ -348,23 +400,17 @@ end
 
 
     @testset "  _build_function!?" begin
-        have = Dolang.build_function(ff, Der{0})
-        have! = Dolang.build_function!(ff, Der{0})
+        @test want == Dolang.build_function(ff, Der{0})
+        @test want! == Dolang.build_function!(ff, Der{0})
 
-        @test have == want
-        @test have! == want!
-
-        have_d = Dolang.build_function(ffd, Der{0})
-        have_d! = Dolang.build_function!(ffd, Der{0})
-
-        @test have_d == want_d
-        @test have_d! == want_d!
+        # @test want_d == Dolang.build_function(ffd, Der{0})
+        # @test want_d! == Dolang.build_function!(ffd, Der{0})
     end
-    #=
+
     @testset "  make_method" begin
-        @test make_method(ff) == Expr(:block, want!, want)
-        @test make_method(ff; mutating=false) == Expr(:block, want)
-        @test make_method(ff; allocating=false) == Expr(:block, want!)
+        @test make_method(ff) == Expr(:block, want!, want!_vec, want, want_vec)
+        @test make_method(ff; mutating=false) == Expr(:block, want, want_vec)
+        @test make_method(ff; allocating=false) == Expr(:block, want!, want!_vec)
 
         # test version where you pass args and it makes ff for you
         have1 = make_method(eqs, args, params, targets=targets, defs=defs,
@@ -374,28 +420,80 @@ end
         have3 = make_method(eqs, args, params, targets=targets, defs=defs,
                             funname=funname, allocating=false)
 
-        @test have1 == Expr(:block, want!, want)
-        @test have2 == Expr(:block, want)
-        @test have3 == Expr(:block, want!)
+        @test have1 == Expr(:block, want!, want!_vec, want, want_vec)
+        @test have2 == Expr(:block, want, want_vec)
+        @test have3 == Expr(:block, want!, want!_vec)
 
         # now dispatch version
-        @test make_method(ffd) == Expr(:block, want_d!, want_d)
-        @test make_method(ffd; mutating=false) == Expr(:block, want_d)
-        @test make_method(ffd; allocating=false) == Expr(:block, want_d!)
+        # @test make_method(ffd) == Expr(:block, want_d!, want_d)
+        # @test make_method(ffd; mutating=false) == Expr(:block, want_d)
+        # @test make_method(ffd; allocating=false) == Expr(:block, want_d!)
 
-        # test version where you pass args and it makes ffd for you
-        have1 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
-                            funname=funname)
-        have2 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
-                            funname=funname, mutating=false)
-        have3 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
-                            funname=funname, allocating=false)
+        # # test version where you pass args and it makes ffd for you
+        # have1 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
+        #                     funname=funname)
+        # have2 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
+        #                     funname=funname, mutating=false)
+        # have3 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
+        #                     funname=funname, allocating=false)
 
-        @test have1 == Expr(:block, want_d!, want_d)
-        @test have2 == Expr(:block, want_d)
-        @test have3 == Expr(:block, want_d!)
+        # @test have1 == Expr(:block, want_d!, want_d)
+        # @test have2 == Expr(:block, want_d)
+        # @test have3 == Expr(:block, want_d!)
     end
-    =#
+
+    @testset " evaluating compiled code" begin
+        eval(current_module(), Dolang.make_method(ff, orders=[0,1]))
+        u = rand()
+        V = rand(6)+4
+        am, a, b, c, cp, dp = V
+        p = [u]
+
+        want = [log(a) + b/(am / (1-c)), cp + u*dp]
+        out = similar(want)
+
+        # test scalar, allocating version
+        @test want ≈ @inferred myfun(V, p)
+        @test want ≈ @inferred myfun(Dolang.Der{0}, V, p)
+
+        # test scalar, mutating version
+        myfun!(out, V, p)
+        @test want ≈ out
+
+        myfun!(Dolang.Der{0}, out, V, p)
+        @test want ≈ out
+
+        # test vectorized version
+        Vmat = repmat(V', 40, 1)
+        @test maximum(abs, want' .- myfun(Vmat, p)) < 1e-15
+        @test maximum(abs, want' .- myfun(Dolang.Der{0}, Vmat, p)) < 1e-15
+
+        # test vectorized mutating version
+        out_mat = Array{Float64}(40, 2)
+        myfun!(out_mat, Vmat, p)
+        @test maximum(abs, want' .- out_mat) < 1e-15
+
+        myfun!(Dolang.Der{0}, out_mat, Vmat, p)
+        @test maximum(abs, want' .- out_mat) < 1e-15
+
+        ## Now test derivative code!
+        want = zeros(Float64, 2, 6)
+        want[1, 1] = -1 * b *(1-c)/ (am*am)  # ∂foo/∂am
+        want[1, 2] = 1/a  # ∂foo/∂a
+        want[1, 3] = (1-c) / (am)  # ∂foo/∂b
+        want[1, 4] = -b/am  # ∂foo/∂b
+        want[2, 5] = 1.0  # ∂bar/∂cp
+        want[2, 6] = u # # ∂bar/∂dp
+
+        # allocating version
+        @test want ≈ @inferred myfun(Der{1}, V, p)
+
+        # non-alocating version
+        out2 = similar(want)
+        myfun!(Der{1}, out2, V, p)
+        @test want ≈ out2
+
+    end
 end
 
 @testset "derivative code runs" begin

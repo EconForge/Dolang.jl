@@ -278,7 +278,7 @@ function sizecheck_block{n}(ff::FunctionFactory, d::TDer{n})
         end
         # populate with zeros, because we assume everything is zeroed and
         # only fill in non-zero elements
-        fill!(zero(eltype), out)
+        fill!(out, zero(eltype(out)))
     end
     _filter_lines!(ex)
     ex
