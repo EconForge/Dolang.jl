@@ -544,11 +544,11 @@ function make_method{n}(d::TDer{n}, ff::FunctionFactory; mutating::Bool=true,
     out = Expr(:block)
     if mutating
         push!(out.args, build_function!(ff, d))
-        push!(out.args, build_vectorized_function!(ff, d))
+        n == 0 && push!(out.args, build_vectorized_function!(ff, d))
     end
     if allocating
         push!(out.args, build_function(ff, d))
-        push!(out.args, build_vectorized_function(ff, d))
+        n == 0 && push!(out.args, build_vectorized_function(ff, d))
     end
     out
 end
