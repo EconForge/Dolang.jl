@@ -8,9 +8,9 @@ targets = [:foo, :bar]
 funname = :myfun
 
 const flat_args = [(:a, 0), (:b, 1), (:c, -1)]
-const grouped_args = Dict(:x=>[(:a, 0), (:c, -1)], :y=>[(:b, 1)])
+const grouped_args = OrderedDict(:x=>[(:a, -1),], :y=>[(:a, 0), (:b, 0), (:c, 0)], :z=>[(:c, 1), (:d, 1)])
 const flat_params = [:beta, :delta]
-const grouped_params = Dict(:p => [:beta, :delta])
+const grouped_params = Dict(:p => [:u])
 
 
 args2 = vcat(args, [(:foo, 0), (:bar, 0)])::Vector{Tuple{Symbol,Int}}

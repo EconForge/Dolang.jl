@@ -192,16 +192,11 @@ param_names{T1,T2<:FlatParams}(::FunctionFactory{T1,T2}) = [:p]
 param_names{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
     collect(keys(ff.params))::Vector{Symbol}
 
-typed_args{T1<:FlatArgs}(::FunctionFactory{T1}, T=AbstractVector) = [:(V::$(T))]
+typed_args{T1<:FlatArgs}(::FunctionFactory{T1}, T=AbstractVector) =
+    [:(V::$(T))]
 
 typed_args{T1<:GroupedArgs}(ff::FunctionFactory{T1}, T=AbstractVector) =
-    Expr[:(k::$(T)) for k in keys(ff.args)]
-
-typed_params{T1,T2<:FlatParams}(::FunctionFactory{T1,T2}, T=AbstractVector) =
-    [:(p::$(T))]
-
-typed_params{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}, T=AbstractVector) =
-    Expr[:(k::$(T)) for k in keys(ff.params)]
+    Expr[:($(k)::$(T)) for k in keys(ff.args)]
 
 _extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
     ff.dispatch == SkipArg ? Any[:(::Dolang.TDer{$n})] :
@@ -211,7 +206,7 @@ _extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
 "Method signature for non-mutating version of the function"
 function signature{n}(ff::FunctionFactory, d::TDer{n}=Der{0})
     func_args = vcat(ff.funname, _extra_args(ff, d),
-                     typed_args(ff), typed_params(ff))
+                     typed_args(ff), param_names(ff))
 
     out = Expr(:call)
     out.args = func_args
@@ -484,38 +479,56 @@ build_function{n}(ff::FunctionFactory, d::TDer{n}) =
 build_function!{n}(ff::FunctionFactory, d::TDer{n}) =
     _build_function(ff, d, signature!, func_body!)
 
-function build_vectorized_function(ff::FunctionFactory{FlatArgs}, d::TDer{0})
-    sig = signature(ff, d)
-    # need to adjust second to last arg to be type AbstractMatrix
-    sig.args[length(sig.args)-1] = :(V::AbstractMatrix)
+
+function _build_vectorized_function(ff::FunctionFactory, d::TDer{0},
+                                    allocating::Bool)
+
+    sig = allocating ? signature(ff, d) : signature!(ff, d)
+    n_args = length(arg_names(ff))
+    #= We need to adjust sig.args so that all function args (except der,
+    dispatch, and params) have type AbstractMatrix instead of AbstractVector
+
+    These will always be sig.args[end-1-length(arg_names(ff)):end-1]
+    =#
+    start_ix = length(sig.args) - n_args
+    end_ix = length(sig.args) - 1
+    for (i, name) in zip(start_ix:end_ix, arg_names(ff))
+        sig.args[i] = Expr(:(::), name, AbstractMatrix)
+    end
     sig
 
     # use signature to figure out how to call non-vectorized version within the
     # loop
     row_i_sig = signature(ff, d)
     row_i_sig.args[2] = :($(d))
-    row_i_sig.args[length(sig.args)-1] = :(V[_row, :])
+    for (i, name) in zip(start_ix:end_ix, arg_names(ff))
+        row_i_sig.args[i] = Expr(:call, :view, name, :_row, :(:))
+    end
 
     body = Expr(:block,
-        allocate_block(ff, d),
-        :(nrow = size(V, 1)),
+        allocating ? allocate_block(ff, d) : sizecheck_block(ff, d),
+        :(nrow = size($(arg_names(ff)[1]), 1)),
         Expr(:for, :(_row = 1:nrow),
             Expr(:block,
-            :(out[_row, :] = $(row_i_sig))
+            :(@inbounds out[_row, :] = $(row_i_sig))
             )
         ),
         :(return out)
     )
 
     no_der_sig = deepcopy(sig)
-
     splice!(no_der_sig.args, 2)
-
     Expr(:block,
          Expr(:function, sig, body),
          Expr(:function, no_der_sig, body)
          )
 end
+
+build_vectorized_function{n}(ff::FunctionFactory, d::TDer{n}) =
+    _build_vectorized_function(ff, d, true)
+
+build_vectorized_function!{n}(ff::FunctionFactory, d::TDer{n}) =
+    _build_vectorized_function(ff, d, false)
 
 # -------- #
 # User API #
@@ -525,8 +538,14 @@ function make_method{n}(d::TDer{n}, ff::FunctionFactory; mutating::Bool=true,
                         allocating::Bool=true)
 
     out = Expr(:block)
-    mutating && push!(out.args, build_function!(ff, d))
-    allocating && push!(out.args, build_function(ff, d))
+    if mutating
+        push!(out.args, build_function!(ff, d))
+        push!(out.args, build_vectorized_function!(ff, d))
+    end
+    if allocating
+        push!(out.args, build_function(ff, d))
+        push!(out.args, build_vectorized_function(ff, d))
+    end
     out
 end
 
