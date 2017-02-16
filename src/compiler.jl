@@ -501,6 +501,10 @@ function _build_vectorized_function(ff::FunctionFactory, d::TDer{0},
     # loop
     row_i_sig = signature(ff, d)
     row_i_sig.args[2] = :($(d))
+    if !allocating
+        start_ix -= 1
+        end_ix -= 1
+    end
     for (i, name) in zip(start_ix:end_ix, arg_names(ff))
         row_i_sig.args[i] = Expr(:call, :view, name, :_row, :(:))
     end
