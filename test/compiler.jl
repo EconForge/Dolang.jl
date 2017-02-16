@@ -403,5 +403,14 @@ end
     @test (Dolang.build_function(ff, Der{2}); true)
 end  # @testset "derivative code runs"
 
+@testset "issue #14" begin
+    eqs = Expr[:(1+a-a)]
+    ss_args = Tuple{Symbol,Int64}[(:a,0)]
+    p_args = Symbol[:q]
+
+    # just make sure this runs
+    Dolang.make_method(eqs, ss_args, p_args, funname=:f_s, orders=[0, 1])
+end
+
 
 end  # @testset "compiler"

@@ -298,7 +298,10 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{1})
     end
 
     out = Expr(:block)
-    out.args = expr_args
+
+    # when we populated expr_args we skipped terms that were equal to zero.
+    # here we trim expr_args to be the length of the number of non-zero terms
+    out.args = expr_args[1:ix]
     out
 end
 
