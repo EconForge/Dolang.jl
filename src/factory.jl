@@ -299,8 +299,13 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
                 k = normalize((_def, t))
                 def_map[k] = normalize(time_shift(_ex, t, arg_nms, funcs, defs))
 
-                # also add this definition to incidence
-                visit!(incidence, _ex, typemax(Int), t, _flat_params)
+                # also add this definition to incidence. Need to loop over
+                # incidence.by_eq to see which equations it appears in...
+                for (equation_number, equation_incidence) in incidence.by_eq
+                    if haskey(equation_incidence, _def)
+                        visit!(incidence, _ex, equation_number, t, _flat_params)
+                    end
+                end
             end
 
             # Add these times to allowed map for `_def` so we can do equation

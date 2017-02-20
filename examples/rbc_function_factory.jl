@@ -5,8 +5,8 @@ rbc_ff = let
     # construct args
     variables = [:y, :c, :k, :i, :l, :y_l, :z]
     exogenous = [:e]
-    args = vcat([[(v, -1), (v, 0), (v, 1)] for v in variables]...)
-    append!(args, [(v, 0) for v in exogenous])
+    args = [(:y, 0), (:c, 0), (:c, 1), (:k, -1), (:k, 0), (:i, 0), (:l, 0),
+            (:l, 1), (:y_l, 0), (:z, -1), (:z, 0), (:z, 1), (:e, 0)]
 
     # params
     params = [:beta, :psi, :delta, :alpha, :rho]
@@ -15,13 +15,15 @@ rbc_ff = let
     # no targets
 
     # equations
-    eqs = [:((1/c) = beta*(1/c(+1))*(1+alpha*(k^(alpha-1))*(exp(z(+1))*l(+1))^(1-alpha)-delta)),
-           :(psi*c/(1-l) = (1-alpha)*(k(-1)^alpha)*(exp(z)^(1-alpha))*(l^(-alpha))),
-           :(c+i = y),
-           :(y = (k(-1)^alpha)*(exp(z)*l)^(1-alpha)),
-           :(i = k-(1-delta)*k(-1)),
-           :(y_l = y/l),
-           :(z = rho*z(-1)+e)]
+    eqs = [
+        :((1/c) = beta*(1/c(+1))*(1+alpha*(k^(alpha-1))*(exp(z(+1))*l(+1))^(1-alpha)-delta)),
+        :(psi*c/(1-l) = (1-alpha)*(k(-1)^alpha)*(exp(z)^(1-alpha))*(l^(-alpha))),
+        :(c+i = y),
+        :(y = (k(-1)^alpha)*(exp(z)*l)^(1-alpha)),
+        :(i = k-(1-delta)*k(-1)),
+        :(y_l = y/l),
+        :(z = rho*z(-1)+e)
+    ]
 
     map(Dolang._filter_lines!, eqs)
 
