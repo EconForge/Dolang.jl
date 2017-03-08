@@ -5,7 +5,7 @@ const latex_subs = let
     repl_latex = Base.REPLCompletions.latex_symbols
     unicode = Dict([(v, k) for (k, v) in repl_latex])
     tex_name = Dict([(strip(k, '\\'), k) for (k, v) in repl_latex])
-    poppers = ["c", "k"]
+    poppers = [k for k in keys(tex_name) if length(k)==1]
     for p in poppers
         pop!(tex_name, p)
     end
@@ -63,7 +63,7 @@ function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
 
     if isa(n, Integer)
         t = n > 0 ? print(io, "t+", n) :
-        n < 0 ? print(io, "t-", n) :
+        n < 0 ? print(io, "t-", -n) :
         print(io, "t")
     else
         # we have one too many commas here, delete one
@@ -103,6 +103,12 @@ function _latex!(io::IO, ex::Expr)
         return
     end
 
+    if ex.head == :(=)
+        _latex!(io, ex.args[1])
+        print(io, " = ")
+        _latex!(io, ex.args[2])
+        return
+    end
     if ex.head == :call
         f = ex.args[1]
         if f in ARITH_SYMBOLS
@@ -158,7 +164,7 @@ function _latex!(io::IO, ex::Expr)
 end
 
 
-function latex(ex::Expr)
+function latex(ex::Union{Expr,Symbol})
     io = IOBuffer()
     _latex!(io, ex)
     takebuf_string(io)
