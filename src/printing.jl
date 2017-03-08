@@ -104,12 +104,16 @@ function _latex!(io::IO, ex::Expr)
     end
 
     if ex.head == :(=)
-        _latex!(io, ex.args[1])
-        print(io, " = ")
-        _latex!(io, ex.args[2])
+        _latex!(io, :($(ex.args[1]) == $(ex.args[2]) ))
         return
     end
     if ex.head == :call
+        if ex.args[1] == :(==)
+            _latex!(io, ex.args[2])
+            print(io, " = ")
+            _latex!(io, ex.args[3])
+            return
+        end
         f = ex.args[1]
         if f in ARITH_SYMBOLS
             if length(ex.args) == 2  # sometimes a unary negation
