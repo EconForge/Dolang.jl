@@ -1,64 +1,45 @@
+{% set version = "0.0.4" %}
+# {% set sha256 = "2debe8a5fc000668edbf1b16bdc8de6e8830047bc3f3ffcb2a5636c16137b004" %}
+
 package:
   name: dolang
-  version: "0.0.2"
+  version: {{ version }}
 
 source:
-  path: ../
-#  git_url: https://github.com/econforge/Dolang
-#  git_tag: v0.0.2
+  fn: master.tar.gz
+  url: https://github.com/EconForge/Dolang/archive/master.tar.gz
+
+  # url: https://github.com/EconForge/Dolang/archive/v{{ version }}.tar.gz
+  # sha256: {{ sha256 }}
 
 build:
-  script: python setup.py install --single-version-externally-managed  --record=record.txt
-  noarch_python: True
-  preserve_egg_dir: True
-
-  # If this is a new build for the same version, increment the build
-  # number. If you do not include this key, it defaults to 0.
-  # number: 1
+  script: pip install --no-deps .
+  number: 0
 
 requirements:
   build:
     - python
     - setuptools
-    - numba
-    - numpy
-    - numexpr
-    - yaml
-    - nose
-    - sympy
-    - pip
-
   run:
     - python
     - numba
     - numpy
-    - numexpr
+    - pandas
+    - tempita
+    - scipy
     - yaml
     - nose
     - sympy
 
 test:
-  # Python imports
   imports:
     - dolang
 
-  # commands:
-    # You can put test commands to be run here.  Use this to test that the
-    # entry points work.
-
-
-  # You can also put a file called run_test.py in the recipe that will be run
-  # at test time.
-
-  # requires:
-    # Put any additional test requirements here.  For example
-    # - nose
-
 about:
   home: https://github.com/econforge/Dolang
-  license: BSD-2
-  summary: 'Dolo modeling language'
+  license: BSD 2-Clause
+  summary: 'Dolo Modeling Language'
 
-# See
-# http://docs.continuum.io/conda/build.html for
-# more information about meta.yaml
+extra:
+  recipe-maintainers:
+    - albop
