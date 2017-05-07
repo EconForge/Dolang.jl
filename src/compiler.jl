@@ -192,25 +192,29 @@ param_names{T1,T2<:FlatParams}(::FunctionFactory{T1,T2}) = [:p]
 param_names{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
     collect(keys(ff.params))::Vector{Symbol}
 
-typed_args{T1<:FlatArgs}(::FunctionFactory{T1}, T=AbstractVector) =
-    [:(V::$(T))]
-
-typed_args{T1<:GroupedArgs}(ff::FunctionFactory{T1}, T=AbstractVector) =
-    Expr[:($(k)::$(T)) for k in keys(ff.args)]
-
 _extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
     ff.dispatch == SkipArg ? Any[:(::Dolang.TDer{$n})] :
                                 [:(::Dolang.TDer{$n}),
                                  :($(DISPATCH_ARG)::$(ff.dispatch))]
 
-"Method signature for non-mutating version of the function"
-function signature{n}(ff::FunctionFactory, d::TDer{n}=Der{0})
-    func_args = vcat(ff.funname, _extra_args(ff, d),
-                     typed_args(ff), param_names(ff))
+function signature{n,T1<:FlatArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0})
+    Expr(
+        :call,
+        ff.funname,
+        _extra_args(ff, d)...,
+        :(V::AbstractVector),
+        param_names(ff)...
+    )
+end
 
-    out = Expr(:call)
-    out.args = func_args
-    out
+function signature{n,T1<:GroupedArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0})
+    Expr(
+        :call,
+        ff.funname,
+        _extra_args(ff, d)...,
+        [:($(k)::AbstractVector) for k in keys(ff.args)]...,
+        param_names(ff)...
+    )
 end
 
 "Method signature for mutating version of the function"
@@ -238,7 +242,7 @@ function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
     neq = length(ff.eqs)
     nvar = nargs(ff)
 
-    exprs = Array(Union{Symbol,Expr,Number}, neq, nvar)
+    exprs = Array{Union{Symbol,Expr,Number}}(neq, nvar)
     fill!(exprs, 0)
 
     non_zero = 0
@@ -291,7 +295,7 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{1})
 
     # construct expressions that define the body of this function.
     # we need neq*nvar of them
-    expr_args = Array(Expr, non_zero)
+    expr_args = Array{Expr}(non_zero)
 
     # To do this we use linear indexing tricks to access `out` and `expr_mat`.
     # Note the offset on the index to expr_args also (needed because allocating)
@@ -332,7 +336,7 @@ function _hessian_exprs(ff::FunctionFactory{FlatArgs})
     # To do this we use linear indexing tricks to access `out` and `expr_mat`.
     # Note the offset on the index to expr_args also (needed because allocating)
     # is the first expression in the block
-    terms = Array(Tuple{Int,Tuple{Int,Int},Union{Expr,Symbol,Number}},0)
+    terms = Array{Tuple{Int,Tuple{Int,Int},Union{Expr,Symbol,Number}}}(0)
     for i_eq in 1:neq
         ex = _rhs_only(ff.eqs[i_eq])
         eq_prepped = prep_deriv(ex)
@@ -385,10 +389,10 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{2})
 
     # create expressions that fill in the correct elements of i, j, v based
     # on the data in `vals` and the indices in `exprs`
-    pop_exprs = Array(Expr, n_terms)
+    pop_exprs = Array{Expr}(n_terms)
     ix = 0
     for i_expr in 1:n_expr
-        i_eq, (i_v1, i_v2), _ = exprs[i_expr]
+        i_eq, (i_v1, i_v2), _junk = exprs[i_expr]
 
         # we definitely need to fill the `i_eq, (i_v1, i_v2)` element
         ix += 1
@@ -419,9 +423,9 @@ function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{2})
 
     # finally construct the whole blocks
     out = quote
-        i = Array(Int, $(n_terms))
-        j = Array(Int, $(n_terms))
-        v = Array(Float64, $(n_terms))
+        i = Array{Int}($(n_terms))
+        j = Array{Int}($(n_terms))
+        v = Array{Float64}($(n_terms))
 
         # include vals
         $vals
@@ -493,7 +497,7 @@ function _build_vectorized_function(ff::FunctionFactory, d::TDer{0},
     start_ix = length(sig.args) - n_args
     end_ix = length(sig.args) - 1
     for (i, name) in zip(start_ix:end_ix, arg_names(ff))
-        sig.args[i] = Expr(:(::), name, AbstractMatrix)
+        sig.args[i] = Expr(:(::), name, :AbstractMatrix)
     end
     sig
 

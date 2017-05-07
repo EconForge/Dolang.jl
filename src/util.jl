@@ -47,14 +47,14 @@ end
 
 # Allocate an array of eltype `T` for `n_expr` variables that corresponds
 # to input arguments `args...`
-_allocate_out(T::Type, n_expr::Int, args::AbstractVector...) = Array(T, n_expr)
+_allocate_out(T::Type, n_expr::Int, args::AbstractVector...) = Array{T}(n_expr)
 
 _allocate_out(T::Type, n_expr::Int, arg::AbstractMatrix) =
-    Array(T, _output_size(n_expr, arg))
+    Array{T}(_output_size(n_expr, arg))
 
 function _allocate_out(T::Type, n_expr::Int, args...)
     sz = _output_size(n_expr, args...)
-    Array(T, sz[1], sz[2])
+    Array{T}(sz[1], sz[2])
 end
 
 ## Triangular solver
@@ -93,7 +93,7 @@ function solution_order(d::OrderedDict, it::Dolang.IncidenceTable)
 
     # now start stepping through equations
     ix = length(front)
-    for _ in 2:n
+    for _junk in 2:n
         for (eq, eq_vars) in to_solve
             can_solve = true
             for (var, dates) in eq_vars

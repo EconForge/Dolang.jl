@@ -134,11 +134,11 @@ normalize(s::String; kwargs...) = normalize(parse(s); kwargs...)
 normalize(exs::Vector{Expr}; kwargs...)
 ```
 
-Construct a `begin`/`end` block formed by calling `normalize(_; kwargs...)` for
-all `_` in `exs`
+Construct a `begin`/`end` block formed by calling `normalize(i; kwargs...)` for
+all `i` in `exs`
 """
 normalize(exs::Vector{Expr}; kwargs...) =
-    Expr(:block, map(_ -> normalize(_; kwargs...), exs)...)
+    Expr(:block, map(i -> normalize(i; kwargs...), exs)...)
 
 # ---------- #
 # time_shift #
@@ -206,8 +206,8 @@ on the form of `ex` (list below has the form "contents of ex: return expr"):
 - `var(n::Integer)`: `time_shift(var, args, shift + n, defs)`
 - `f(other...)`: if `f` is in `functions` or is a known dolang funciton (see
   `Dolang.DOLANG_FUNCTIONS`) return
-  `f(map(_ -> time_shift(_, args, shift, defs), other))`, otherwise error
-- Any other `Expr`: `Expr(ex.head, map(_ -> time_shift(_, args, shift, defs), ex.args))`
+  `f(map(i -> time_shift(i, args, shift, defs), other))`, otherwise error
+- Any other `Expr`: `Expr(ex.head, map(i -> time_shift(i, args, shift, defs), ex.args))`
 """
 function time_shift(ex::Expr, shift::Integer,
                     variables::Set{Symbol},
@@ -244,7 +244,7 @@ function time_shift(ex::Expr, shift::Integer,
 
     # otherwise just shift all args, but retain expr head
     out = Expr(ex.head)
-    out.args = [time_shift(_, shift, variables, defs) for _ in ex.args]
+    out.args = [time_shift(an_arg, shift, variables, defs) for an_arg in ex.args]
     return out
 end
 
@@ -315,7 +315,7 @@ function steady_state(ex::Expr, functions::Set{Symbol}, defs::Associative)
 
      # otherwise just steady_state all args, but retain expr head
     out = Expr(ex.head)
-    out.args = [steady_state(_, functions, defs) for _ in ex.args]
+    out.args = [steady_state(an_arg, functions, defs) for an_arg in ex.args]
     return out
 end
 
@@ -435,9 +435,9 @@ end
 #     syms = list_symbols(ex; functions=functions, variables=variables)
 #     out = Set{Symbol}()
 #     for (k, v) in syms
-#         for _ in v
-#             isa(_, Symbol) ? push!(out, _) :
-#             isa(_, Tuple{Symbol,Int}) ? push!(out, _[1]):
+#         for sym in v
+#             isa(sym, Symbol) ? push!(out, sym) :
+#             isa(sym, Tuple{Symbol,Int}) ? push!(out, sym[1]):
 #             error("not sure what happened here")
 #         end
 #     end
@@ -480,7 +480,7 @@ function _subs(ex::Expr, d::Associative,
         return ex, false
     end
 
-    out_args = Array(Any, length(ex.args))
+    out_args = Array{Any}(length(ex.args))
     changed = false
 
     for (i, arg) in enumerate(ex.args)

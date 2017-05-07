@@ -6,7 +6,7 @@ const flat_params = [:beta, :delta]
 const grouped_params = Dict(:p => [:beta, :delta])
 
 @testset " convert Grouped" begin
-    @test sort(Dolang.FlatArgs(grouped_args), by=_->_[1]) == flat_args
+    @test sort(Dolang.FlatArgs(grouped_args), by=_junk->_junk[1]) == flat_args
     @test sort(Dolang.FlatParams(grouped_params)) == flat_params
 end
 

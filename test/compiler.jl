@@ -113,21 +113,21 @@ end
 end
 
 @testset " signature!?" begin
-    @test Dolang.signature(ff) == :(myfun(::Dolang.TDer{0},V::$(AbstractVector),p))
-    @test Dolang.signature!(ff) == :(myfun!(::Dolang.TDer{0},out,V::$(AbstractVector),p))
+    @test Dolang.signature(ff) == :(myfun(::Dolang.TDer{0},V::AbstractVector,p))
+    @test Dolang.signature!(ff) == :(myfun!(::Dolang.TDer{0},out,V::AbstractVector,p))
 
-    @test Dolang.signature(ffnt) == :(myfun(::Dolang.TDer{0},V::$(AbstractVector),p))
-    @test Dolang.signature!(ffnt) == :(myfun!(::Dolang.TDer{0},out,V::$(AbstractVector),p))
+    @test Dolang.signature(ffnt) == :(myfun(::Dolang.TDer{0},V::AbstractVector,p))
+    @test Dolang.signature!(ffnt) == :(myfun!(::Dolang.TDer{0},out,V::AbstractVector,p))
 
     # NOTE: I need to escape the Int here so that it will refer to the exact
     #       same int inside ffd
-    # @test Dolang.signature(ffd) == :(myfun(::Dolang.TDer{0},::$(Int),V::$(AbstractVector),p))
-    # @test Dolang.signature!(ffd) == :(myfun!(::Dolang.TDer{0},::$(Int),out,V::$(AbstractVector),p))
+    # @test Dolang.signature(ffd) == :(myfun(::Dolang.TDer{0},::$(Int),V::AbstractVector,p))
+    # @test Dolang.signature!(ffd) == :(myfun!(::Dolang.TDer{0},::$(Int),out,V::AbstractVector,p))
 end
 
 @testset " compiling functions" begin
     want = Dolang._filter_lines!(:(begin
-        function myfun(::Dolang.TDer{0},V::$(AbstractVector),p)
+        function myfun(::Dolang.TDer{0},V::AbstractVector,p)
             out = Dolang._allocate_out(eltype(V),2,V)
             begin
                 begin
@@ -150,7 +150,7 @@ end
                 return out
             end
         end
-        function myfun(V::$(AbstractVector),p)
+        function myfun(V::AbstractVector,p)
             out = Dolang._allocate_out(eltype(V),2,V)
             begin
                 begin
@@ -176,7 +176,7 @@ end
     end))
 
     want_vec = Dolang._filter_lines!(:(begin
-        function myfun(::Dolang.TDer{0},V::$(AbstractMatrix),p)
+        function myfun(::Dolang.TDer{0},V::AbstractMatrix,p)
             out = Dolang._allocate_out(eltype(V),2,V)
             nrow = size(V,1)
             for _row = 1:nrow
@@ -184,7 +184,7 @@ end
             end
             return out
         end
-        function myfun(V::$(AbstractMatrix),p)
+        function myfun(V::AbstractMatrix,p)
             out = Dolang._allocate_out(eltype(V),2,V)
             nrow = size(V,1)
             for _row = 1:nrow
@@ -196,7 +196,7 @@ end
     ))
 
     want! = Dolang._filter_lines!(:(begin
-        function myfun!(::Dolang.TDer{0},out,V::$(AbstractVector),p)
+        function myfun!(::Dolang.TDer{0},out,V::AbstractVector,p)
             begin
                 expected_size = Dolang._output_size(2, V)
                 if size(out) != expected_size
@@ -225,7 +225,7 @@ end
                 return out
             end
         end
-        function myfun!(out,V::$(AbstractVector),p)
+        function myfun!(out,V::AbstractVector,p)
             begin
                 expected_size = Dolang._output_size(2, V)
                 if size(out) != expected_size
@@ -257,7 +257,7 @@ end
     end))
 
     want!_vec = Dolang._filter_lines!(:(begin
-        function myfun!(::Dolang.TDer{0},out,V::$(AbstractMatrix),p)
+        function myfun!(::Dolang.TDer{0},out,V::AbstractMatrix,p)
             begin
                 expected_size = Dolang._output_size(2,V)
                 if size(out) != expected_size
@@ -271,7 +271,7 @@ end
             end
             return out
         end
-        function myfun!(out,V::$(AbstractMatrix),p)
+        function myfun!(out,V::AbstractMatrix,p)
             begin
                 expected_size = Dolang._output_size(2,V)
                 if size(out) != expected_size
@@ -289,7 +289,7 @@ end
     ))
 
     want_d = Dolang._filter_lines!(:(begin
-        function myfun(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),V::$(AbstractVector),p)
+        function myfun(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),V::AbstractVector,p)
             out = Dolang._allocate_out(eltype(V),2,V)
             begin
                 begin
@@ -312,7 +312,7 @@ end
                 return out
             end
         end
-        function myfun($(Dolang.DISPATCH_ARG)::$(Int),V::$(AbstractVector),p)
+        function myfun($(Dolang.DISPATCH_ARG)::$(Int),V::AbstractVector,p)
             out = Dolang._allocate_out(eltype(V),2,V)
             begin
                 begin
@@ -338,7 +338,7 @@ end
     end))
 
     want_d_vec = Dolang._filter_lines(:(begin
-        function myfun(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),V::$(AbstractMatrix),p)
+        function myfun(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),V::AbstractMatrix,p)
             out = Dolang._allocate_out(eltype(V),2,V)
             nrow = size(V,1)
             for _row = 1:nrow
@@ -346,7 +346,7 @@ end
             end
             return out
         end
-        function myfun($(Dolang.DISPATCH_ARG)::$(Int),V::$(AbstractMatrix),p)
+        function myfun($(Dolang.DISPATCH_ARG)::$(Int),V::AbstractMatrix,p)
             out = Dolang._allocate_out(eltype(V),2,V)
             nrow = size(V,1)
             for _row = 1:nrow
@@ -357,7 +357,7 @@ end
     end))
 
     want_d! = Dolang._filter_lines!(:(begin
-        function myfun!(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::($Int),out,V::$(AbstractVector),p)
+        function myfun!(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::($Int),out,V::AbstractVector,p)
             begin
                 expected_size = Dolang._output_size(2, V)
                 if size(out) != expected_size
@@ -386,7 +386,7 @@ end
                 return out
             end
         end
-        function myfun!($(Dolang.DISPATCH_ARG)::($Int),out,V::$(AbstractVector),p)
+        function myfun!($(Dolang.DISPATCH_ARG)::($Int),out,V::AbstractVector,p)
             begin
                 expected_size = Dolang._output_size(2, V)
                 if size(out) != expected_size
@@ -418,7 +418,7 @@ end
     end))
 
     want_d!_vec = Dolang._filter_lines(:(begin
-        function myfun!(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),out,V::$(AbstractMatrix),p)
+        function myfun!(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),out,V::AbstractMatrix,p)
             begin
                 expected_size = Dolang._output_size(2,V)
                 if size(out) != expected_size
@@ -432,7 +432,7 @@ end
             end
             return out
         end
-        function myfun!($(Dolang.DISPATCH_ARG)::$(Int),out,V::$(AbstractMatrix),p)
+        function myfun!($(Dolang.DISPATCH_ARG)::$(Int),out,V::AbstractMatrix,p)
             begin
                 expected_size = Dolang._output_size(2,V)
                 if size(out) != expected_size

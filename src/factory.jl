@@ -10,7 +10,7 @@ end
 
 function Base.showerror(io::IO, v::UnknownSymbolError)
     if !isempty(v.shifts)
-        bad_exprs = [:($(v.bad_var)($_)) for _ in v.shifts]
+        bad_exprs = [:($(v.bad_var)($shift)) for shift in v.shifts]
         bad_str = join(bad_exprs, ", ", " and ")
         print(io, "Unknown symbol(s) $(bad_str) found in equation $(v.eq). ")
     else
@@ -26,7 +26,7 @@ immutable VariableNotAllowedError <: Exception
 end
 
 function Base.showerror(io::IO, v::VariableNotAllowedError)
-    bad_exprs = [:($(v.bad_var)($_)) for _ in v.shifts]
+    bad_exprs = [:($(v.bad_var)($shift)) for shift in v.shifts]
     bad_str = join(bad_exprs, ", ", " and ")
     print(io, "Invalid symbol(s) $(bad_str) found in equation $(v.eq). ")
     print(io, "Try adding $(v.bad_var) to the list of args")
@@ -47,22 +47,22 @@ end
 # Base Types #
 # ---------- #
 
-typealias FlatArgs Vector{Tuple{Symbol,Int}}
-typealias GroupedArgs Associative{Symbol,Vector{Tuple{Symbol,Int}}}
-typealias ArgType Union{FlatArgs,GroupedArgs}
+@compat const FlatArgs =  Vector{Tuple{Symbol,Int}}
+@compat const GroupedArgs =  Associative{Symbol,Vector{Tuple{Symbol,Int}}}
+@compat const ArgType =  Union{FlatArgs,GroupedArgs}
 
-typealias FlatParams Vector{Symbol}
-typealias GroupedParams Associative{Symbol,Vector{Symbol}}
-typealias ParamType Union{FlatParams,GroupedParams}
+@compat const FlatParams =  Vector{Symbol}
+@compat const GroupedParams =  Associative{Symbol,Vector{Symbol}}
+@compat const ParamType =  Union{FlatParams,GroupedParams}
 
 immutable Der{T} end
-typealias TDer{n} Type{Der{n}}
+@compat const TDer{n} = Type{Der{n}}
 
 immutable SkipArg end
 
 function Base.convert(::Type{FlatArgs}, g::GroupedArgs)
-    out = Array(Tuple{Symbol,Int}, 0)
-    for (_, _vec) in g
+    out = Array{Tuple{Symbol,Int}}(0)
+    for (_junk, _vec) in g
         for i in _vec
             push!(out, i)
         end
@@ -159,15 +159,15 @@ function visit!(it::IncidenceTable, ex::Expr, n::Int, shift::Int,
 
     # don't visit the function name
     if ex.head == :call
-        for _ in ex.args[2:end]
-            visit!(it, _, n, shift, skip)
+        for an_arg in ex.args[2:end]
+            visit!(it, an_arg, n, shift, skip)
         end
         return nothing
     end
 
     # Otherwise just visit everything
-    for _ in ex.args
-        visit!(it, _, n, shift, skip)
+    for an_arg in ex.args
+        visit!(it, an_arg, n, shift, skip)
     end
     nothing
 end
@@ -213,8 +213,9 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
     dispatch::T4
     incidence::IncidenceTable
 
-    function FunctionFactory(eqs, args, params, targets, defs, funname,
-                             dispatch)
+    function (::Type{FunctionFactory{T1,T2,T3,T4}}){T1,T2,T3,T4}(
+            eqs, args, params, targets, defs, funname, dispatch
+        )
 
         # if there are no targets, we normalize equations immediately
         if isempty(targets)
@@ -330,12 +331,12 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))
         normalized_eqs = [_f(eq) for eq in eqs]
 
-        new(normalized_eqs, args, params, targets, defs, funname, dispatch,
-            incidence)
+        new{T1,T2,T3,T4}(normalized_eqs, args, params, targets, defs, funname,
+                         dispatch, incidence)
     end
 end
 
-typealias FFSkipArg{T1,T2,T3} FunctionFactory{T1,T2,T3,Type{SkipArg}}
+@compat const FFSkipArg{T1,T2,T3} = FunctionFactory{T1,T2,T3,Type{SkipArg}}
 
 # default outer constructor to do inference and fill in type params
 function FunctionFactory{T1,T2,T3,T4}(eqs::Vector{Expr}, args::T1, params::T2,
@@ -358,12 +359,12 @@ function FunctionFactory{T4}(::Type{T4}, eqs::Vector{Expr}, args::ArgType,
 end
 
 =={T<:Union{IncidenceTable,FunctionFactory}}(x1::T, x2::T) =
-    all(_ -> getfield(x1, _) == getfield(x2, _), fieldnames(x1))
+    all(i -> getfield(x1, i) == getfield(x2, i), fieldnames(x1))
 
 nargs{T<:FlatArgs}(ff::FunctionFactory{T}) = length(ff.args)
 nargs{T<:GroupedArgs}(ff::FunctionFactory{T}) =
-    sum([length(v) for (_, v) in ff.args])::Int
+    sum([length(v) for (_junk, v) in ff.args])::Int
 
 nparams{T1,T2<:FlatParams}(ff::FunctionFactory{T1,T2}) = length(ff.param)
 nparams{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
-    sum([length(v) for (_, v) in ff.params])::Int
+    sum([length(v) for (_junk, v) in ff.params])::Int
