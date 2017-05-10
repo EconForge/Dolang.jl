@@ -10,7 +10,7 @@ end
 function NormalizeError(ex::Expr)
     msg = """Dolang does not know how to normalize
     \t$(ex)
-    Perhaps you want ot use the keyword arugment `custom` when calling normalize?
+    Perhaps you want to use the keyword arugment `custom` when calling normalize?
     """
     NormalizeError(ex, msg)
 end
