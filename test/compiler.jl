@@ -1,6 +1,6 @@
 @testset "compiler" begin
 
-eqs = [:(foo = log(a)+b/x(-1)), :(bar = c(1)+u*d(1))]
+eqs = [:(foo = log(a(0))+b(0)/x(-1)), :(bar = c(1)+u*d(1))]
 args = [(:a, -1), (:a, 0), (:b, 0), (:c, 0), (:c, 1), (:d, 1)]
 params = [:u]
 defs = Dict(:x=>:(a/(1-c(1))))
@@ -70,7 +70,7 @@ end
     have = Dolang.equation_block(ff)
     @test have.head == :block
     @test length(have.args) == 4
-    @test have.args[1] == :(_foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_)))
+    @test have.args[1] == :(_foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_)))
     @test have.args[2] == :(_bar_ = _c__1_ + _u_ * _d__1_)
     @test have.args[3] == :(Dolang._assign_var(out, _foo_, 1))
     @test have.args[4] == :(Dolang._assign_var(out, _bar_, 2))
@@ -80,7 +80,7 @@ end
     @test have.head == :block
     @test length(have.args) == 2
 
-    ex1 = :(log(_a_) + _b_ / (_a_m1_ / (1 - _c_)) - _foo_)
+    ex1 = :(log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_)) - _foo_)
     ex2 = :(_c__1_ + _u_ * _d__1_ - _bar_)
     @test have.args[1] == :(Dolang._assign_var(out, $ex1, 1))
     @test have.args[2] == :(Dolang._assign_var(out, $ex2, 2))
@@ -135,14 +135,14 @@ end
                 end
                 begin
                     _a_m1_ = Dolang._unpack_var(V,1)
-                    _a_ = Dolang._unpack_var(V,2)
-                    _b_ = Dolang._unpack_var(V,3)
-                    _c_ = Dolang._unpack_var(V,4)
+                    _a__0_ = Dolang._unpack_var(V,2)
+                    _b__0_ = Dolang._unpack_var(V,3)
+                    _c__0_ = Dolang._unpack_var(V,4)
                     _c__1_ = Dolang._unpack_var(V,5)
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
                     _bar_ = _c__1_ + _u_ * _d__1_
                     Dolang._assign_var(out,_foo_,1)
                     Dolang._assign_var(out,_bar_,2)
@@ -158,14 +158,14 @@ end
                 end
                 begin
                     _a_m1_ = Dolang._unpack_var(V,1)
-                    _a_ = Dolang._unpack_var(V,2)
-                    _b_ = Dolang._unpack_var(V,3)
-                    _c_ = Dolang._unpack_var(V,4)
+                    _a__0_ = Dolang._unpack_var(V,2)
+                    _b__0_ = Dolang._unpack_var(V,3)
+                    _c__0_ = Dolang._unpack_var(V,4)
                     _c__1_ = Dolang._unpack_var(V,5)
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
                     _bar_ = _c__1_ + _u_ * _d__1_
                     Dolang._assign_var(out,_foo_,1)
                     Dolang._assign_var(out,_bar_,2)
@@ -210,14 +210,14 @@ end
                 end
                 begin
                     _a_m1_ = Dolang._unpack_var(V,1)
-                    _a_ = Dolang._unpack_var(V,2)
-                    _b_ = Dolang._unpack_var(V,3)
-                    _c_ = Dolang._unpack_var(V,4)
+                    _a__0_ = Dolang._unpack_var(V,2)
+                    _b__0_ = Dolang._unpack_var(V,3)
+                    _c__0_ = Dolang._unpack_var(V,4)
                     _c__1_ = Dolang._unpack_var(V,5)
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
                     _bar_ = _c__1_ + _u_ * _d__1_
                     Dolang._assign_var(out,_foo_,1)
                     Dolang._assign_var(out,_bar_,2)
@@ -239,14 +239,14 @@ end
                 end
                 begin
                     _a_m1_ = Dolang._unpack_var(V,1)
-                    _a_ = Dolang._unpack_var(V,2)
-                    _b_ = Dolang._unpack_var(V,3)
-                    _c_ = Dolang._unpack_var(V,4)
+                    _a__0_ = Dolang._unpack_var(V,2)
+                    _b__0_ = Dolang._unpack_var(V,3)
+                    _c__0_ = Dolang._unpack_var(V,4)
                     _c__1_ = Dolang._unpack_var(V,5)
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
                     _bar_ = _c__1_ + _u_ * _d__1_
                     Dolang._assign_var(out,_foo_,1)
                     Dolang._assign_var(out,_bar_,2)
@@ -297,14 +297,14 @@ end
                 end
                 begin
                     _a_m1_ = Dolang._unpack_var(V,1)
-                    _a_ = Dolang._unpack_var(V,2)
-                    _b_ = Dolang._unpack_var(V,3)
-                    _c_ = Dolang._unpack_var(V,4)
+                    _a__0_ = Dolang._unpack_var(V,2)
+                    _b__0_ = Dolang._unpack_var(V,3)
+                    _c__0_ = Dolang._unpack_var(V,4)
                     _c__1_ = Dolang._unpack_var(V,5)
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
                     _bar_ = _c__1_ + _u_ * _d__1_
                     Dolang._assign_var(out,_foo_,1)
                     Dolang._assign_var(out,_bar_,2)
@@ -320,14 +320,14 @@ end
                 end
                 begin
                     _a_m1_ = Dolang._unpack_var(V,1)
-                    _a_ = Dolang._unpack_var(V,2)
-                    _b_ = Dolang._unpack_var(V,3)
-                    _c_ = Dolang._unpack_var(V,4)
+                    _a__0_ = Dolang._unpack_var(V,2)
+                    _b__0_ = Dolang._unpack_var(V,3)
+                    _c__0_ = Dolang._unpack_var(V,4)
                     _c__1_ = Dolang._unpack_var(V,5)
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
                     _bar_ = _c__1_ + _u_ * _d__1_
                     Dolang._assign_var(out,_foo_,1)
                     Dolang._assign_var(out,_bar_,2)
@@ -371,14 +371,14 @@ end
                 end
                 begin
                     _a_m1_ = Dolang._unpack_var(V,1)
-                    _a_ = Dolang._unpack_var(V,2)
-                    _b_ = Dolang._unpack_var(V,3)
-                    _c_ = Dolang._unpack_var(V,4)
+                    _a__0_ = Dolang._unpack_var(V,2)
+                    _b__0_ = Dolang._unpack_var(V,3)
+                    _c__0_ = Dolang._unpack_var(V,4)
                     _c__1_ = Dolang._unpack_var(V,5)
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
                     _bar_ = _c__1_ + _u_ * _d__1_
                     Dolang._assign_var(out,_foo_,1)
                     Dolang._assign_var(out,_bar_,2)
@@ -400,14 +400,14 @@ end
                 end
                 begin
                     _a_m1_ = Dolang._unpack_var(V,1)
-                    _a_ = Dolang._unpack_var(V,2)
-                    _b_ = Dolang._unpack_var(V,3)
-                    _c_ = Dolang._unpack_var(V,4)
+                    _a__0_ = Dolang._unpack_var(V,2)
+                    _b__0_ = Dolang._unpack_var(V,3)
+                    _c__0_ = Dolang._unpack_var(V,4)
                     _c__1_ = Dolang._unpack_var(V,5)
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_))
+                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
                     _bar_ = _c__1_ + _u_ * _d__1_
                     Dolang._assign_var(out,_foo_,1)
                     Dolang._assign_var(out,_bar_,2)

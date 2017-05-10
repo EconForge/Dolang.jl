@@ -28,9 +28,8 @@ Normalize the string or symbol in the following way:
 - if `n < 0` return `_var_mn_`
 
 """
-function normalize(var::Union{String,Symbol}, n::Integer)
-    n == 0 && return normalize(var)
-    Symbol(string("_", var, "_", n > 0 ? "_" : "m", abs(n)), "_")
+function normalize(var::Union{String,Symbol}, n::Integer; custom=nothing)
+    Symbol(string("_", var, "_", n >= 0 ? "_" : "m", abs(n)), "_")
 end
 
 """

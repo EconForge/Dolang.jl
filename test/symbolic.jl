@@ -8,17 +8,17 @@ end
 
 @testset "Dolang.normalize" begin
     @testset "Dolang.normalize(::Union{Symbol,String}, Integer)" begin
-        @test Dolang.normalize(:x, 0) == :_x_
+        @test Dolang.normalize(:x, 0) == :_x__0_
         @test Dolang.normalize(:x, 1) == :_x__1_
         @test Dolang.normalize(:x, -1) == :_x_m1_
         @test Dolang.normalize(:x, -100) == :_x_m100_
 
-        @test Dolang.normalize("x", 0) == :_x_
+        @test Dolang.normalize("x", 0) == :_x__0_
         @test Dolang.normalize("x", 1) == :_x__1_
         @test Dolang.normalize("x", -1) == :_x_m1_
         @test Dolang.normalize("x", -100) == :_x_m100_
 
-        @test Dolang.normalize((:x, 0)) == :_x_
+        @test Dolang.normalize((:x, 0)) == :_x__0_
         @test Dolang.normalize((:x, 1)) == :_x__1_
         @test Dolang.normalize((:x, -1)) == :_x_m1_
         @test Dolang.normalize((:x, -100)) == :_x_m100_
@@ -43,9 +43,6 @@ end
             @test Dolang.normalize(string("x(", T(i), ")")) == Symbol("_x__$(i)_")
             @test Dolang.normalize(string("x(", T(-i), ")")) == Symbol("_x_m$(i)_")
         end
-
-        # only add underscore to naems when shift is 0
-        @test Dolang.normalize("x(0)") == :_x_
     end
 
     @testset "other function calls" begin
@@ -70,8 +67,8 @@ end
         end
 
         @testset "arithmetic" begin
-            @test Dolang.normalize(:(a(1) + b + c(2) + d(-1))) == :(((_a__1_ + _b_) + _c__2_) + _d_m1_)
-            @test Dolang.normalize(:(a(1) * b * c(2) * d(-1))) == :(((_a__1_ * _b_) * _c__2_) * _d_m1_)
+            @test Dolang.normalize(:(a(1) + b + c(2) + d(-1))) == :(_a__1_ + _b_ + _c__2_ + _d_m1_)
+            @test Dolang.normalize(:(a(1) * b * c(2) * d(-1))) == :(_a__1_ * _b_ * _c__2_ * _d_m1_)
             @test Dolang.normalize(:(a(1) - b - c(2) - d(-1))) == :(((_a__1_ - _b_) - _c__2_) - _d_m1_)
             @test Dolang.normalize(:(a(1) ^ b)) == :(_a__1_ ^ _b_)
         end
@@ -93,7 +90,7 @@ end
     end
 
     @testset "normalize(::Tuple{Symbol,Int})" begin
-        @test Dolang.normalize((:x, 0)) == :_x_
+        @test Dolang.normalize((:x, 0)) == :_x__0_
         @test Dolang.normalize((:x, 1)) == :_x__1_
         @test Dolang.normalize((:x, -1)) == :_x_m1_
         @test Dolang.normalize((:x, -100)) == :_x_m100_
