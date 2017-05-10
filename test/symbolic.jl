@@ -2,8 +2,8 @@
 
 @testset "Dolang.eq_expr" begin
     ex = :(z = x + y(1))
-    @test Dolang.eq_expr(ex) == :(_x_ + _y__1_ - _z_)
-    @test Dolang.eq_expr(ex, [:z]) == :(_z_ = _x_ + _y__1_)
+    @test Dolang.normalize(ex) == :(_x_ + _y__1_ - _z_)
+    @test Dolang.normalize(ex, targets=[:z]) == :(_z_ = _x_ + _y__1_)
 end
 
 @testset "Dolang.normalize" begin

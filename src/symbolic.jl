@@ -87,14 +87,28 @@ function normalize(
     if !isnull(cust)
         return get(cust)
     end
-    if ex.head == :(=)
-        return eq_expr(ex, targets)
-    end
 
     # define function to recurse over that passes our custom normalizer
     # this is just convenience so we don't have to set the kwarg so many
     # times
     recur(x) = normalize(x, custom=custom)
+
+    if ex.head == :(=)
+        # translate lhs = rhs to rhs - lhs
+        if isempty(targets)
+            return Expr(:call, :(-), recur(ex.args[2]), recur(ex.args[1]))
+        end
+
+        # ensure lhs is in targets
+        if !(ex.args[1] in targets)
+          msg = string("Expected expression of the form `lhs = rhs` ",
+                       "where `lhs` is one of $(targets)")
+          throw(NormalizeError(ex, msg))
+        end
+
+        return Expr(:(=), recur(ex.args[1]), recur(ex.args[2]))
+    end
+
 
     if ex.head == :block
         if length(ex.args) == 2 && isa(ex.args[1], LineNumberNode)
@@ -638,20 +652,3 @@ Determine if the expression has the form `var(n::Integer)`.
 is_time_shift(ex::Expr) = ex.head == :call &&
                           length(ex.args) == 2 &&
                           isa(ex.args[2], Integer)
-
-function eq_expr(ex::Expr, targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
-    # translate lhs = rhs to rhs - lhs
-    if isempty(targets)
-      return Expr(:call, :(-), normalize(ex.args[2]), normalize(ex.args[1]))
-    end
-
-    # ensure lhs is in targets
-    if !(ex.args[1] in targets)
-      msg = string("Expected expression of the form `lhs = rhs` ",
-                   "where `lhs` is one of $(targets)")
-      throw(NormalizeError(ex, msg))
-    end
-
-    Expr(:(=), normalize(ex.args[1]), normalize(ex.args[2]))
-
-end
