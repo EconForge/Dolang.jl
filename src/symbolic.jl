@@ -111,7 +111,13 @@ function normalize(
 
 
     if ex.head == :block
+        # for 0.5
         if length(ex.args) == 2 && isa(ex.args[1], LineNumberNode)
+            return recur(ex.args[2])
+        end
+
+        # for 0.6
+        if length(ex.args) == 2 && isa(ex.args[1], Expr) && ex.args[1].head == :line
             return recur(ex.args[2])
         end
 
