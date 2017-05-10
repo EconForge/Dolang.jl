@@ -16,6 +16,8 @@ end
 # normalize #
 # --------- #
 
+_empty_normalizer(e) = Nullable{Expr}()
+
 """
 ```julia
 normalize(var::Union{String,Symbol}, n::Integer)
@@ -39,7 +41,7 @@ normalize(x::Tuple{Symbol,Integer})
 
 Same as `normalize(x[1], x[2])`
 """
-normalize{T<:Integer}(x::Tuple{Symbol,T}) = normalize(x[1], x[2])
+normalize{T<:Integer}(x::Tuple{Symbol,T}; custom=nothing) = normalize(x[1], x[2])
 
 """
 ```julia
@@ -48,7 +50,7 @@ normalize(x::Symbol)
 
 Normalize the symbol by returning `_x_`
 """
-normalize(x::Symbol) = Symbol(string("_", x, "_"))
+normalize(x::Symbol; custom=nothing) = Symbol(string("_", x, "_"))
 
 """
 ```julia
@@ -57,7 +59,7 @@ normalize(x::Number)
 
 Just return `x`
 """
-normalize(x::Number) = x
+normalize(x::Number; custom=nothing) = x
 
 """
 ```julia
@@ -75,28 +77,43 @@ below is `input form of ex: returned expression`):
   `normalize(a) ⚡ normalize(b)`
 - `f(args...)`: `f(map(normalize, args)...)`
 """
-function normalize(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
+function normalize(
+        ex::Expr;
+        custom::Function=_empty_normalizer,
+        targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[]
+    )
+    # try custom normalizer
+    cust = custom(ex)
+    if !isnull(cust)
+        return get(cust)
+    end
     if ex.head == :(=)
         return eq_expr(ex, targets)
     end
 
+    # define function to recurse over that passes our custom normalizer
+    # this is just convenience so we don't have to set the kwarg so many
+    # times
+    recur(x) = normalize(x, custom=custom)
+
     if ex.head == :block
         if length(ex.args) == 2 && isa(ex.args[1], LineNumberNode)
-            return normalize(ex.args[2])
+            return recur(ex.args[2])
         end
 
         # often we have an Expr simliar to the above, except that we have filtered
         # out the line nodes. We end up with a block with one arg.
         # This is that case.
         if length(ex.args) == 1
-            return normalize(ex.args[1])
+            return recur(ex.args[1])
         end
     end
+
 
     if ex.head == :call
         # translate x(n) --> x__n_ and x(-n) -> x_mn_
         if length(ex.args) == 2 && isa(ex.args[2], Integer)
-            return normalize(ex.args[1], ex.args[2])
+            return normalize(ex.args[1], ex.args[2]; custom=custom)
         end
 
         # TODO: SymEngine will also choke with things like
@@ -105,15 +122,11 @@ function normalize(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[
         # single symbol. My current solution is to just swap the order of the
         # `*`
         if ex.args[1] == :(*) && length(ex.args) == 3 && isa(ex.args[2], Number)
-            return Expr(:call, :(*), normalize(ex.args[3]), ex.args[2])
+            return Expr(:call, :(*), recur(ex.args[3]), ex.args[2])
         end
 
-        if ex.args[1] in (:+, :*)
-            return call_plus_times_expr(ex)
-        end
-
-        # otherwise it is just some random function call
-        return Expr(:call, ex.args[1], map(normalize, ex.args[2:end])...)
+        # otherwise it is just some other function call
+        return Expr(:call, ex.args[1], recur.(ex.args[2:end])...)
     end
 
     throw(NormalizeError(ex, "Not sure what I just saw"))
@@ -625,19 +638,6 @@ Determine if the expression has the form `var(n::Integer)`.
 is_time_shift(ex::Expr) = ex.head == :call &&
                           length(ex.args) == 2 &&
                           isa(ex.args[2], Integer)
-
-
-function call_plus_times_expr(ex::Expr)
-    fun = ex.args[1]
-    if length(ex.args) == 3
-        return Expr(:call, fun, normalize(ex.args[2]), normalize(ex.args[3]))
-    else
-        call_plus_times_expr(Expr(:call, ex.args[1],
-                                  Expr(:call, fun, ex.args[2], ex.args[3]),
-                                  ex.args[4:end]...))
-    end
-end
-
 
 function eq_expr(ex::Expr, targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
     # translate lhs = rhs to rhs - lhs
