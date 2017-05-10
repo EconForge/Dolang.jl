@@ -120,7 +120,13 @@ end
 
         ex = :(a(1) + x[i](1) / b)
         want = :(_a__1_ + _x__i__1_ / _b_)
-        @test_throws MethodError Dolang.normalize(ex)
+        @test_throws Dolang.NormalizeError Dolang.normalize(ex)
+        try
+            Dolang.normalize(ex)
+        catch e
+            @test isa(e, Dolang.NormalizeError)
+            @test e.ex == :(x[i](1))
+        end
         @test Dolang.normalize(ex, custom=agent_time_normalizer) == want
 
         # test with target

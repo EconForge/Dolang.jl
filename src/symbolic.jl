@@ -7,6 +7,18 @@ immutable NormalizeError <: Exception
     msg::String
 end
 
+function NormalizeError(ex::Expr)
+    msg = """Dolang does not know how to normalize
+    \t$(ex)
+    Perhaps you want ot use the keyword arugment `custom` when calling normalize?
+    """
+    NormalizeError(ex, msg)
+end
+
+function Base.showerror(io::IO, ne::NormalizeError)
+    print(io, ne.msg)
+end
+
 immutable UnknownFunctionError <: Exception
     func_name::Symbol
     msg::String
@@ -101,9 +113,12 @@ function normalize(
 
         # ensure lhs is in targets
         if !(ex.args[1] in targets)
-          msg = string("Expected expression of the form `lhs = rhs` ",
-                       "where `lhs` is one of $(targets)")
-          throw(NormalizeError(ex, msg))
+            msg = string(
+                "Error normalizing expression\n\t$(ex)\n",
+                "Expected expression of the form `lhs = rhs` ",
+                "where `lhs` is one of $(join(targets, ", "))"
+            )
+            throw(NormalizeError(ex, msg))
         end
 
         return Expr(:(=), recur(ex.args[1]), recur(ex.args[2]))
@@ -133,7 +148,11 @@ function normalize(
     if ex.head == :call
         # translate x(n) --> x__n_ and x(-n) -> x_mn_
         if length(ex.args) == 2 && isa(ex.args[2], Integer)
-            return normalize(ex.args[1], ex.args[2]; custom=custom)
+            if isa(ex.args[1], Symbol)
+                return normalize(ex.args[1], ex.args[2]; custom=custom)
+            else
+                throw(NormalizeError(ex))
+            end
         end
 
         # TODO: SymEngine will also choke with things like
@@ -149,7 +168,7 @@ function normalize(
         return Expr(:call, ex.args[1], recur.(ex.args[2:end])...)
     end
 
-    throw(NormalizeError(ex, "Not sure what I just saw"))
+    throw(NormalizeError(ex))
 end
 
 """
