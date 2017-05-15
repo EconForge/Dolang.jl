@@ -1,4 +1,4 @@
-module DoloTests
+module DolangTests
 
 using Dolang
 using Compat
