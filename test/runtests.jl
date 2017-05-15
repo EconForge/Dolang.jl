@@ -17,6 +17,7 @@ tests = length(ARGS) > 0 ? ARGS : [
                                    "factory",
                                    "compiler",
                                    "util",
+                                   "printing",
                                    ]
 for t in tests
     include("$(t).jl")
