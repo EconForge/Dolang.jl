@@ -7,6 +7,18 @@ immutable NormalizeError <: Exception
     msg::String
 end
 
+function NormalizeError(ex::Expr)
+    msg = """Dolang does not know how to normalize
+    \t$(ex)
+    Perhaps you want to use the keyword arugment `custom` when calling normalize?
+    """
+    NormalizeError(ex, msg)
+end
+
+function Base.showerror(io::IO, ne::NormalizeError)
+    print(io, ne.msg)
+end
+
 immutable UnknownFunctionError <: Exception
     func_name::Symbol
     msg::String
@@ -15,6 +27,8 @@ end
 # --------- #
 # normalize #
 # --------- #
+
+_empty_normalizer(e) = Nullable{Expr}()
 
 """
 ```julia
@@ -28,9 +42,8 @@ Normalize the string or symbol in the following way:
 - if `n < 0` return `_var_mn_`
 
 """
-function normalize(var::Union{String,Symbol}, n::Integer)
-    n == 0 && return normalize(var)
-    Symbol(string("_", var, "_", n > 0 ? "_" : "m", abs(n)), "_")
+function normalize(var::Union{String,Symbol}, n::Integer; custom=nothing)
+    Symbol(string("_", var, "_", n >= 0 ? "_" : "m", abs(n)), "_")
 end
 
 """
@@ -40,7 +53,7 @@ normalize(x::Tuple{Symbol,Integer})
 
 Same as `normalize(x[1], x[2])`
 """
-normalize{T<:Integer}(x::Tuple{Symbol,T}) = normalize(x[1], x[2])
+normalize{T<:Integer}(x::Tuple{Symbol,T}; custom=nothing) = normalize(x[1], x[2])
 
 """
 ```julia
@@ -49,7 +62,7 @@ normalize(x::Symbol)
 
 Normalize the symbol by returning `_x_`
 """
-normalize(x::Symbol) = Symbol(string("_", x, "_"))
+normalize(x::Symbol; custom=nothing) = Symbol(string("_", x, "_"))
 
 """
 ```julia
@@ -58,7 +71,7 @@ normalize(x::Number)
 
 Just return `x`
 """
-normalize(x::Number) = x
+normalize(x::Number; custom=nothing) = x
 
 """
 ```julia
@@ -76,28 +89,70 @@ below is `input form of ex: returned expression`):
   `normalize(a) ⚡ normalize(b)`
 - `f(args...)`: `f(map(normalize, args)...)`
 """
-function normalize(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
-    if ex.head == :(=)
-        return eq_expr(ex, targets)
+function normalize(
+        ex::Expr;
+        custom::Function=_empty_normalizer,
+        targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[]
+    )
+    # try custom normalizer
+    cust = custom(ex)
+    if !isnull(cust)
+        return get(cust)
     end
 
+    # define function to recurse over that passes our custom normalizer
+    # this is just convenience so we don't have to set the kwarg so many
+    # times
+    recur(x) = normalize(x, custom=custom)
+
+    if ex.head == :(=)
+        # translate lhs = rhs to rhs - lhs
+        if isempty(targets)
+            return Expr(:call, :(-), recur(ex.args[2]), recur(ex.args[1]))
+        end
+
+        # ensure lhs is in targets
+        if !(ex.args[1] in targets)
+            msg = string(
+                "Error normalizing expression\n\t$(ex)\n",
+                "Expected expression of the form `lhs = rhs` ",
+                "where `lhs` is one of $(join(targets, ", "))"
+            )
+            throw(NormalizeError(ex, msg))
+        end
+
+        return Expr(:(=), recur(ex.args[1]), recur(ex.args[2]))
+    end
+
+
     if ex.head == :block
+        # for 0.5
         if length(ex.args) == 2 && isa(ex.args[1], LineNumberNode)
-            return normalize(ex.args[2])
+            return recur(ex.args[2])
+        end
+
+        # for 0.6
+        if length(ex.args) == 2 && isa(ex.args[1], Expr) && ex.args[1].head == :line
+            return recur(ex.args[2])
         end
 
         # often we have an Expr simliar to the above, except that we have filtered
         # out the line nodes. We end up with a block with one arg.
         # This is that case.
         if length(ex.args) == 1
-            return normalize(ex.args[1])
+            return recur(ex.args[1])
         end
     end
+
 
     if ex.head == :call
         # translate x(n) --> x__n_ and x(-n) -> x_mn_
         if length(ex.args) == 2 && isa(ex.args[2], Integer)
-            return normalize(ex.args[1], ex.args[2])
+            if isa(ex.args[1], Symbol)
+                return normalize(ex.args[1], ex.args[2]; custom=custom)
+            else
+                throw(NormalizeError(ex))
+            end
         end
 
         # TODO: SymEngine will also choke with things like
@@ -106,18 +161,14 @@ function normalize(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[
         # single symbol. My current solution is to just swap the order of the
         # `*`
         if ex.args[1] == :(*) && length(ex.args) == 3 && isa(ex.args[2], Number)
-            return Expr(:call, :(*), normalize(ex.args[3]), ex.args[2])
+            return Expr(:call, :(*), recur(ex.args[3]), ex.args[2])
         end
 
-        if ex.args[1] in (:+, :*)
-            return call_plus_times_expr(ex)
-        end
-
-        # otherwise it is just some random function call
-        return Expr(:call, ex.args[1], map(normalize, ex.args[2:end])...)
+        # otherwise it is just some other function call
+        return Expr(:call, ex.args[1], recur.(ex.args[2:end])...)
     end
 
-    throw(NormalizeError(ex, "Not sure what I just saw"))
+    throw(NormalizeError(ex))
 end
 
 """
@@ -626,33 +677,3 @@ Determine if the expression has the form `var(n::Integer)`.
 is_time_shift(ex::Expr) = ex.head == :call &&
                           length(ex.args) == 2 &&
                           isa(ex.args[2], Integer)
-
-
-function call_plus_times_expr(ex::Expr)
-    fun = ex.args[1]
-    if length(ex.args) == 3
-        return Expr(:call, fun, normalize(ex.args[2]), normalize(ex.args[3]))
-    else
-        call_plus_times_expr(Expr(:call, ex.args[1],
-                                  Expr(:call, fun, ex.args[2], ex.args[3]),
-                                  ex.args[4:end]...))
-    end
-end
-
-
-function eq_expr(ex::Expr, targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
-    # translate lhs = rhs to rhs - lhs
-    if isempty(targets)
-      return Expr(:call, :(-), normalize(ex.args[2]), normalize(ex.args[1]))
-    end
-
-    # ensure lhs is in targets
-    if !(ex.args[1] in targets)
-      msg = string("Expected expression of the form `lhs = rhs` ",
-                   "where `lhs` is one of $(targets)")
-      throw(NormalizeError(ex, msg))
-    end
-
-    Expr(:(=), normalize(ex.args[1]), normalize(ex.args[2]))
-
-end

@@ -2,23 +2,23 @@
 
 @testset "Dolang.eq_expr" begin
     ex = :(z = x + y(1))
-    @test Dolang.eq_expr(ex) == :(_x_ + _y__1_ - _z_)
-    @test Dolang.eq_expr(ex, [:z]) == :(_z_ = _x_ + _y__1_)
+    @test Dolang.normalize(ex) == :(_x_ + _y__1_ - _z_)
+    @test Dolang.normalize(ex, targets=[:z]) == :(_z_ = _x_ + _y__1_)
 end
 
 @testset "Dolang.normalize" begin
     @testset "Dolang.normalize(::Union{Symbol,String}, Integer)" begin
-        @test Dolang.normalize(:x, 0) == :_x_
+        @test Dolang.normalize(:x, 0) == :_x__0_
         @test Dolang.normalize(:x, 1) == :_x__1_
         @test Dolang.normalize(:x, -1) == :_x_m1_
         @test Dolang.normalize(:x, -100) == :_x_m100_
 
-        @test Dolang.normalize("x", 0) == :_x_
+        @test Dolang.normalize("x", 0) == :_x__0_
         @test Dolang.normalize("x", 1) == :_x__1_
         @test Dolang.normalize("x", -1) == :_x_m1_
         @test Dolang.normalize("x", -100) == :_x_m100_
 
-        @test Dolang.normalize((:x, 0)) == :_x_
+        @test Dolang.normalize((:x, 0)) == :_x__0_
         @test Dolang.normalize((:x, 1)) == :_x__1_
         @test Dolang.normalize((:x, -1)) == :_x_m1_
         @test Dolang.normalize((:x, -100)) == :_x_m100_
@@ -43,9 +43,6 @@ end
             @test Dolang.normalize(string("x(", T(i), ")")) == Symbol("_x__$(i)_")
             @test Dolang.normalize(string("x(", T(-i), ")")) == Symbol("_x_m$(i)_")
         end
-
-        # only add underscore to naems when shift is 0
-        @test Dolang.normalize("x(0)") == :_x_
     end
 
     @testset "other function calls" begin
@@ -70,8 +67,8 @@ end
         end
 
         @testset "arithmetic" begin
-            @test Dolang.normalize(:(a(1) + b + c(2) + d(-1))) == :(((_a__1_ + _b_) + _c__2_) + _d_m1_)
-            @test Dolang.normalize(:(a(1) * b * c(2) * d(-1))) == :(((_a__1_ * _b_) * _c__2_) * _d_m1_)
+            @test Dolang.normalize(:(a(1) + b + c(2) + d(-1))) == :(_a__1_ + _b_ + _c__2_ + _d_m1_)
+            @test Dolang.normalize(:(a(1) * b * c(2) * d(-1))) == :(_a__1_ * _b_ * _c__2_ * _d_m1_)
             @test Dolang.normalize(:(a(1) - b - c(2) - d(-1))) == :(((_a__1_ - _b_) - _c__2_) - _d_m1_)
             @test Dolang.normalize(:(a(1) ^ b)) == :(_a__1_ ^ _b_)
         end
@@ -93,10 +90,49 @@ end
     end
 
     @testset "normalize(::Tuple{Symbol,Int})" begin
-        @test Dolang.normalize((:x, 0)) == :_x_
+        @test Dolang.normalize((:x, 0)) == :_x__0_
         @test Dolang.normalize((:x, 1)) == :_x__1_
         @test Dolang.normalize((:x, -1)) == :_x_m1_
         @test Dolang.normalize((:x, -100)) == :_x_m100_
+    end
+
+    @testset "Custom normalizer" begin
+        function agent_time_normalizer(ex::Expr)
+            # matches var[inds](time)
+            if (ex.head == :call &&  # function matches ending `()`
+                length(ex.args) == 2 &&   # only one arg inside `()`
+                isa(ex.args[1], Expr) &&  # part before `()` is an expr
+                ex.args[1].head == :ref &&  # part before `()` is a `[]`
+                isa(ex.args[1].args[2], Union{Symbol, Number}) &&  # part in `[]` is scalar
+                isa(ex.args[2], Union{Symbol, Number})  # part in `()` is scalar
+                )
+                # have structure we want, just need to unpack it
+                var = ex.args[1].args[1]
+                ind = ex.args[1].args[2]
+                shift = ex.args[2]
+                return Nullable(
+                    Symbol("_$(var)__$(ind)", shift >= 0 ? "__" : "_m", abs(shift), "_")
+                    )
+            else
+                return Nullable{Symbol}()
+            end
+        end
+
+        ex = :(a(1) + x[i](1) / b)
+        want = :(_a__1_ + _x__i__1_ / _b_)
+        @test_throws Dolang.NormalizeError Dolang.normalize(ex)
+        try
+            Dolang.normalize(ex)
+        catch e
+            @test isa(e, Dolang.NormalizeError)
+            @test e.ex == :(x[i](1))
+        end
+        @test Dolang.normalize(ex, custom=agent_time_normalizer) == want
+
+        # test with target
+        ex = :(z(1) = a(1) + x[i](1) / b)
+        want = :(_a__1_ + _x__i__1_ / _b_ - _z__1_)
+        @test Dolang.normalize(ex, custom=agent_time_normalizer) == want
     end
 end
 

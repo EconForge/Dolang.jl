@@ -156,7 +156,7 @@ end
         ff = _FF(eqs, args, params, targets=targets, defs=defs, funname=funname)
 
         # test that equations were normalized properly
-        norm_eq1 = :(_foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c_)))
+        norm_eq1 = :(_foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c__0_)))
         norm_eq2 = :(_bar_ = _c__1_ + _u_ * _d__1_)
         norm_eq = [norm_eq1, norm_eq2]
         @test ff.eqs == norm_eq
