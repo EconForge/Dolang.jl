@@ -66,5 +66,14 @@
         @test Dolang._to_expr(:(x+y)) == :(x+y)
     end
 
+    @testset "inf_to_Inf" begin
+        x = rand()
+        @test Dolang.inf_to_Inf(x) == x
+        @test Dolang.inf_to_Inf(Inf) == Inf
+        @test Dolang.inf_to_Inf(:inf) == Inf
+        @test Dolang.inf_to_Inf(:(-inf)) == :(-$(Inf))
+        @test Dolang.inf_to_Inf(:(x-inf)) == :(x-$(Inf))
+    end
+
 
 end  # @testset "util"

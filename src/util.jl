@@ -63,16 +63,8 @@ _expr_or_number(x::Union{AbstractString,Symbol,Expr}) = _to_expr(x)
 _expr_or_number(x::Number) = x
 
 inf_to_Inf(x::Number) = x
-inf_to_Inf(x::Symbol) = @match x begin
-    inf => Inf
-    _ => x
-end
-
-inf_to_Inf(x::Expr) = @match x begin
-    -inf => -Inf
-    -x_Number => -x
-    f_(a__) => Expr(:call, f, map(inf_to_Inf, a)...)
-end
+inf_to_Inf(x::Symbol) = x in (:inf, :Inf) ? Inf : x
+inf_to_Inf(ex::Expr) = Expr(ex.head, map(inf_to_Inf, ex.args)...)
 
 _to_Float64(x::Real) = convert(Float64, x)
 _to_Float64(x::AbstractArray) = map(Float64, x)
