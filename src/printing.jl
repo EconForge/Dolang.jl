@@ -12,17 +12,25 @@ const latex_subs = let
     merge(unicode, tex_name)
 end
 
+v = :a__k_i_j
+
 function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
     # split the symbol into parts
     v_string = string(v)
     v_string = strip(v_string, '_')  # undo Dolang normalization
-    parts = split(v_string, "_")
+    front_ix = findfirst(v_string, '_')
+    if front_ix == 0
+        # no subscripts or superscripts
+        front = v_string
+        back = ""
+    else
+        front = v_string[1:front_ix-1]
+        back = v_string[front_ix:end]
+    end
 
-    # first part is the variable name, plus any overbar, dot, or star
-    # let's extract all the modifiers
-    front = parts[1]
     mods = []
 
+    # figure how which of bar, star, dot we have
     while true
         m = match(r"(?<front>\w+)(?<mod>bar|star|dot)", front)
         # if we didn't match, we are done
@@ -43,22 +51,17 @@ function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
     "dot" in mods && print(io, "}")
     "bar" in mods && print(io, "}")
 
-    # now work on subscripts and superscripts. First get indices
-    empty_ix = findfirst(isempty, parts)
-    has_superscript = empty_ix > 0
-    has_subscript = length(parts) > 1
-
-    subscript_inds = 2:(has_superscript ? (empty_ix-1) : length(parts))
-    superscript_inds = has_superscript ? (empty_ix+1:length(parts)) : (1:-1)
+    # now work on subscripts
+    subscripts = strip.(matchall(r"(?<!_)_([a-zA-Z0-9]+)", back), ['_'])
+    has_subscript = !isempty(subscripts)
 
     # now print subscripts
     (has_subscript || isa(n, Integer)) && print(io, "_{")
     if has_subscript
-        for part_ix in subscript_inds[1:end-1]
-            _latex!(io, parts[part_ix])
+        for sub in subscripts
+            _latex!(io, sub)
             print(io, ",")
         end
-        _latex!(io, parts[subscript_inds[end]])
     end
 
     if isa(n, Integer)
@@ -72,21 +75,22 @@ function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
 
     (has_subscript || isa(n, Integer)) && print(io, "}")
 
-
-    # now print superscripts
+    # now work on superscripts
+    superscripts = strip.(matchall(r"__([a-zA-Z0-9]+)", back), ['_'])
+    has_superscript = !isempty(superscripts)
     (has_superscript || "star" in mods) &&  print(io, "^{")
 
     if "star" in mods
-        print(io, "*")
+        print(io, "\\star")
         has_superscript && print(io, ",")
     end
 
     if has_superscript
-        for part_ix in superscript_inds[1:end-1]
-            _latex!(io, parts[part_ix])
+        for sup in superscripts[1:end-1]
+            _latex!(io, sup)
             print(io, ",")
         end
-        _latex!(io, parts[superscript_inds[end]])
+        _latex!(io, superscripts[end])
     end
     (has_superscript || "star" in mods) &&  print(io, "}")
 end
@@ -171,7 +175,7 @@ end
 function latex(ex::Union{Expr,Symbol})
     io = IOBuffer()
     _latex!(io, ex)
-    takebuf_string(io)
+    String(take!(io))
 end
 
 latex(s::String) = latex(parse(s))

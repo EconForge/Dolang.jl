@@ -1,6 +1,5 @@
 module Dolang
 
-using MacroTools
 using DataStructures
 
 const HAVE_SYMENGINE = try

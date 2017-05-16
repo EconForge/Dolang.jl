@@ -676,4 +676,5 @@ Determine if the expression has the form `var(n::Integer)`.
 """
 is_time_shift(ex::Expr) = ex.head == :call &&
                           length(ex.args) == 2 &&
+                          isa(ex.args[1], Symbol) &&
                           isa(ex.args[2], Integer)
