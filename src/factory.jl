@@ -118,10 +118,8 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         # if there are no _targets, we normalize equations immediately
         if isempty(_targets)
             eqs = map(_rhs_only, eqs)
-            targets = Symbol[]
-        else
-            targets = Symbol[is_normalized(t) ? t : normalize(t) for t in _targets]
         end
+        targets = normalize.(_targets)
 
         # Need FlatParams so `visit!` and `IncidenceTable` skip them when
         # visiting expressions
