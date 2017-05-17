@@ -69,7 +69,7 @@ inf_to_Inf(ex::Expr) = Expr(ex.head, map(inf_to_Inf, ex.args)...)
 _to_Float64(x::Real) = convert(Float64, x)
 _to_Float64(x::AbstractArray) = map(Float64, x)
 
-function solution_order(d::OrderedDict, it::Dolang.IncidenceTable)
+function solution_order(d::OrderedDict, it::IncidenceTable)
     # unpack some data
     vars = collect(keys(d))
     n = length(d)
@@ -114,7 +114,6 @@ function solution_order(_d::Associative)
     solution_order(d, it)
 end
 
-# solve_triangular_system(sm::ASM) = solve_triangular_system(sm.calibration)
 solve_triangular_system(d::Associative) = solve_triangular_system(OrderedDict(d))
 
 function solve_triangular_system(d::OrderedDict)
