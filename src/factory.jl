@@ -317,11 +317,7 @@ end
 
 nargs{T<:FlatArgs}(ff::FunctionFactory{T}) = length(ff.args)
 nargs{T<:GroupedArgs}(ff::FunctionFactory{T}) =
-    sum([length(v) for (_junk, v) in ff.args])::Int
-
-nparams{T1,T2<:FlatParams}(ff::FunctionFactory{T1,T2}) = length(ff.param)
-nparams{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
-    sum([length(v) for (_junk, v) in ff.params])::Int
+    sum(length(i) for i in values(ff.args))::Int
 
 function validate!(ff::FunctionFactory)
     full_incidence = IncidenceTable(ff.eqs)
