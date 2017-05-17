@@ -43,7 +43,7 @@ Normalize the string or symbol in the following way:
 
 """
 function normalize(var::Union{String,Symbol}, n::Integer; custom=nothing)
-    Symbol(string("_", var, "_", n >= 0 ? "_" : "m", abs(n)), "_")
+    Symbol(normalize(var), n >= 0 ? "_" : "m", abs(n), "_")
 end
 
 """
@@ -60,9 +60,17 @@ normalize{T<:Integer}(x::Tuple{Symbol,T}; custom=nothing) = normalize(x[1], x[2]
 normalize(x::Symbol)
 ```
 
-Normalize the symbol by returning `_x_`
+Normalize the symbol by returning `_x_` if `x` doesn't alread have leading
+and trailling `_` characters
 """
-normalize(x::Symbol; custom=nothing) = Symbol(string("_", x, "_"))
+function normalize(x::Symbol; custom=nothing)
+    str_x = string(x)
+    if str_x[1] == str_x[end] == '_'
+        return x
+    else
+        return Symbol(string("_", x, "_"))
+    end
+end
 
 """
 ```julia

@@ -35,7 +35,9 @@ end
     @testset "symbols" begin
         for i=1:10
             s = gensym()
-            @test Dolang.normalize(s) == Symbol("_", string(s), "_")
+            want = Symbol("_", s, "_")
+            @test Dolang.normalize(s) == want
+            @test Dolang.normalize(want) == want
         end
     end
 
