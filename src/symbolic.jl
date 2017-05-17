@@ -721,6 +721,11 @@ end
 arg_name(s::Symbol) = s
 arg_name(s::Tuple{Symbol,Int}) = s[1]
 
+arg_time(s::Symbol) = 0
+arg_time(s::Tuple{Symbol,Int}) = s[2]
+
+arg_name_time(s) = (arg_name(s), arg_time(s))
+
 # --------- #
 # Utilities #
 # --------- #

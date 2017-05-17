@@ -261,18 +261,25 @@ end
 
 end
 
-@testset "arg_name" begin
+@testset "arg_name, arg_time, arg_name_time" begin
     for i in 1:5
         s = gensym()
         @test Dolang.arg_name(s) == s
+        @test Dolang.arg_time(s) == 0
+        @test Dolang.arg_name_time(s) == (s, 0)
         for t in 1:10
             @test Dolang.arg_name((s, t)) == s
+            @test Dolang.arg_time((s, t)) == t
+            @test Dolang.arg_name_time((s, t)) == (s, t)
         end
+
     end
 
-    @test_throws MethodError Dolang.arg_name(:(x(0)))  # Expr
-    @test_throws MethodError Dolang.arg_name(1)        # Number
-    @test_throws MethodError Dolang.arg_name([1])      # Array
+    for f in (Dolang.arg_name, Dolang.arg_time, Dolang.arg_name_time)
+        @test_throws MethodError f(:(x(0)))  # Expr
+        @test_throws MethodError f(1)        # Number
+        @test_throws MethodError f([1])      # Array
+    end
 end
 
 end  # @testset "symbolic"
