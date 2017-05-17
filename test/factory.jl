@@ -120,11 +120,11 @@ end
 @testset " Function Factory" begin
     # TODO: test grouped argument style
 
-    eqs = [:(foo = log(a)+b/x(-1)), :(bar = c(1)+u*d(1))]
+    eqs = [:(foo(0) = log(a(0))+b(0)/x(-1)), :(bar(0) = c(1)+u*d(1))]
     args = [(:a, -1), (:a, 0), (:b, 0), (:c, 0), (:c, 1), (:d, 1)]
     params = [:u]
     defs = Dict(:x=>:(a/(1-c(1))))
-    targets = [:foo, :bar]
+    targets = [(:foo, 0), (:bar, 0)]
     funname = :myfun
     _FF = Dolang.FunctionFactory
 
@@ -156,51 +156,15 @@ end
         ff = _FF(eqs, args, params, targets=targets, defs=defs, funname=funname)
 
         # test that equations were normalized properly
-        norm_eq1 = :(_foo_ = log(_a_) + _b_ / (_a_m1_ / (1 - _c__0_)))
-        norm_eq2 = :(_bar_ = _c__1_ + _u_ * _d__1_)
+        norm_eq1 = :(_foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_)))
+        norm_eq2 = :(_bar__0_ = _c__1_ + _u_ * _d__1_)
         norm_eq = [norm_eq1, norm_eq2]
         @test ff.eqs == norm_eq
-
-        # test that Exceptions are thrown for bad defs
-        bad_defs = Dict(:x=> :(a(2)/(1-c(1))))
-        @test_throws(Dolang.DefinitionNotAllowedError,
-                     _FF(eqs, args, params, targets=targets, defs=bad_defs,
-                         funname=funname))
-
-        # make sure content of the Exception is correct
-        ex = try
-            _FF(eqs, args, params, targets=targets, defs=bad_defs)
-           catch e
-               e
-           end
-
-        @test ex.var == :x
-        @test ex.def == :(a(2)/(1-c(1)))
-        @test ex.shift == -1
-
-        # test that excecptions are thrown for variables appearing at the
-        # wrong time in the equations
-        bad_eqs = vcat(eqs, :(foo = b + a(1)))::Vector{Expr}
-        @test_throws(Dolang.VariableNotAllowedError,
-                     _FF(bad_eqs, args, params, targets=targets, defs=defs,
-                         funname=funname))
-
-        # check content of exception
-        ex = try
-            _FF(bad_eqs, args, params, targets=targets, targets=targets,
-                defs=defs)
-           catch e
-               e
-           end
-
-        @test ex.eq == :(foo = b + a(1))
-        @test ex.bad_var == :a
-        @test ex.shifts == Set(1)
 
         # test that exceptions are thrown for unknown variables appearing
         # in the equations
         bad_eqs = vcat(eqs, :(whoami = a-b))::Vector{Expr}
-        @test_throws(Dolang.UnknownSymbolError,
+        @test_throws(Dolang.NormalizeError,
                      _FF(bad_eqs, args, params, targets=targets, defs=defs,
                          funname=funname))
 
@@ -212,9 +176,7 @@ end
                e
            end
 
-        @test ex.eq == :(whoami = a-b)
-        @test ex.bad_var == :whoami
-        @test ex.shifts == Set{Int}()
+        @test ex.ex == :(whoami = a - b)
 
     end
 

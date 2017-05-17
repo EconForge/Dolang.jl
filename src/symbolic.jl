@@ -92,13 +92,15 @@ below is `input form of ex: returned expression`):
 function normalize(
         ex::Expr;
         custom::Function=_empty_normalizer,
-        targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[]
+        targets=Symbol[]
     )
     # try custom normalizer
     cust = custom(ex)
     if !isnull(cust)
         return get(cust)
     end
+
+    norm_targets = Symbol[is_normalized(t) ? t : normalize(t) for t in targets]
 
     # define function to recurse over that passes our custom normalizer
     # this is just convenience so we don't have to set the kwarg so many
@@ -112,7 +114,7 @@ function normalize(
         end
 
         # ensure lhs is in targets
-        if !(ex.args[1] in targets)
+        if !(recur(ex.args[1]) in norm_targets)
             msg = string(
                 "Error normalizing expression\n\t$(ex)\n",
                 "Expected expression of the form `lhs = rhs` ",

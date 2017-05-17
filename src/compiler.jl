@@ -573,7 +573,7 @@ end
 function make_method(eqs::Vector{Expr},
                      arguments::ArgType,
                      params::ParamType;
-                     targets::Vector{Symbol}=Symbol[],
+                     targets=Symbol[],
                      defs::Associative=Dict(),
                      funname::Symbol=gensym(:anonymous),
                      mutating::Bool=true,
@@ -589,7 +589,7 @@ end
 function make_method{T}(::Type{T}, eqs::Vector{Expr},
                         arguments::ArgType,
                         params::ParamType;
-                        targets::Vector{Symbol}=Symbol[],
+                        targets=Symbol[],
                         defs::Associative=Dict(),
                         funname::Symbol=gensym(:anonymous),
                         mutating::Bool=true,

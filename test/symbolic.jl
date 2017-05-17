@@ -1,9 +1,10 @@
 @testset "symbolic" begin
 
 @testset "Dolang.eq_expr" begin
-    ex = :(z = x + y(1))
-    @test Dolang.normalize(ex) == :(_x_ + _y__1_ - _z_)
-    @test Dolang.normalize(ex, targets=[:z]) == :(_z_ = _x_ + _y__1_)
+    ex = :(z(0) = x + y(1))
+    @test Dolang.normalize(ex) == :(_x_ + _y__1_ - _z__0_)
+    @test Dolang.normalize(ex, targets=[:_z__0_]) == :(_z__0_ = _x_ + _y__1_)
+    @test Dolang.normalize(ex, targets=[(:z, 0)]) == :(_z__0_ = _x_ + _y__1_)
 end
 
 @testset "Dolang.normalize" begin
