@@ -191,6 +191,47 @@ all `i` in `exs`
 normalize(exs::Vector{Expr}; kwargs...) =
     Expr(:block, map(i -> normalize(i; kwargs...), exs)...)
 
+# ------------- #
+# is_normalized #
+# ------------- #
+
+is_normalized(x::Number) = true
+is_normalized(s::AbstractString) = is_normalized(parse(s))
+is_normalized(t::Tuple{Symbol,Int}) = false
+
+function is_normalized(ex::Expr)
+    # normalized expressions should only contain symbols and function calls
+    # So, if the head is call, we check two things:
+    # 1. is the call a time shift? If so, the expr is not normalized
+    # 2. Otherwise are all arugments to the called function normalized?
+    if ex.head == :call
+        is_time_shift(ex) && return false
+        return all(is_normalized(a) for a in ex.args[2:end])
+    end
+
+    # any other kind of expression is false
+    false
+end
+
+function is_normalized(s::Symbol)
+    str = string(s)
+    # make sure str matches one of our expected normalized forms
+
+    # result of `normalize(s::Symbol, i::Int)` where i < 0
+    ismatch(r"_.+_m\d+_", str) && return true
+
+    # result of `normalize(s::Symbol, i::Int)` where i >= 0
+    ismatch(r"_.+__\d+_", str) && return true
+
+    # TODO: not sure how to make this more precise
+    # result of `normalize(s::Symbol)`
+    str[1] == '_' && str[end] == '_' && return true
+
+    # if we made it here, the answer is false
+    false
+end
+
+
 # ---------- #
 # time_shift #
 # ---------- #
