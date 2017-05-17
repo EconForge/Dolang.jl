@@ -599,3 +599,25 @@ function make_method{T}(::Type{T}, eqs::Vector{Expr},
 
     make_method(ff; mutating=mutating, allocating=allocating, orders=orders)
 end
+
+
+function make_function(
+        eqs::Vector{Expr}, variables::AbstractVector,
+        to_diff::AbstractVector=1:length(variables);
+        dispatch::DataType=SkipArg,
+        targets=Symbol[],
+        orders::AbstractVector{Int}=[0, 1],
+        name::Symbol=:anon, allocating::Bool=true
+    )
+
+    args = variables[to_diff]
+    not_to_diff = setdiff(1:length(variables), to_diff)
+    params = variables[not_to_diff]
+
+    ff = FunctionFactory(
+        dispatch, eqs, args, params; targets=targets, funname=name
+    )
+
+    make_method(ff; allocating=allocating, orders=orders)
+
+end
