@@ -232,7 +232,7 @@ end
 
 # first we need a couple of helper methods
 
-function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
+function _jacobian_expr_mat{T<:FlatArgs}(ff::FunctionFactory{T})
     # NOTE: I'm starting with the easy version, where I just differentiate
     #       with respect to all arguments in the order they were given. It
     #       would be better if I went though `ff.incidence.by_var` and only
@@ -287,7 +287,7 @@ function sizecheck_block{n}(ff::FunctionFactory, d::TDer{n})
     ex
 end
 
-function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{1})
+function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{1})
     expr_mat, non_zero = _jacobian_expr_mat(ff)
     neq = size(expr_mat, 1)
     nvar = size(expr_mat, 2)
@@ -324,7 +324,7 @@ end
 allocate_block(ff::FunctionFactory, ::TDer{2}) = nothing
 sizecheck_block(ff::FunctionFactory, ::TDer{2}) = nothing
 
-function _hessian_exprs(ff::FunctionFactory{FlatArgs})
+function _hessian_exprs{T<:FlatArgs}(ff::FunctionFactory{T})
     # NOTE: I'm starting with the easy version, where I just differentiate
     #       with respect to all arguments in the order they were given. It
     #       would be better if I went though `ff.incidence.by_var` and only
@@ -367,7 +367,7 @@ function _hessian_exprs(ff::FunctionFactory{FlatArgs})
 end
 
 # Ordering of hessian is H[eq, (v1,v2)]
-function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{2})
+function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{2})
     exprs = _hessian_exprs(ff)
     n_expr = length(exprs)
     nvar = nargs(ff)
