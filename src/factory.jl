@@ -279,6 +279,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         # if there are no _targets, we normalize equations immediately
         if isempty(_targets)
             eqs = map(_rhs_only, eqs)
+            targets = Symbol[]
         else
             targets = Symbol[is_normalized(t) ? t : normalize(t) for t in _targets]
         end
@@ -293,12 +294,29 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         # construct mapping from normalized definition name to desired
         # expression
         dynvars = Set(keys(allowed_dates(args)))
-        @show def_map = build_definition_map(defs, incidence, dynvars)
+        def_map = build_definition_map(defs, incidence, dynvars)
 
         # now normalize the equations and make subs
         # _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))
         _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))
         normalized_eqs = _f.(eqs)
+
+        # also need to add definitions to incidence table so that derivative
+        # code is correct
+        norm_defs = OrderedDict{Tuple{Symbol,Int},Any}(
+            (v, 0) => e for (v, e) in defs
+        )
+        for def_var in keys(defs)
+            for (eq_num, eq_incidence) in incidence.by_eq
+                if haskey(eq_incidence, def_var)
+                    _ex = csubs(defs[def_var], norm_defs)
+                    for t in eq_incidence[def_var]
+                        visit!(incidence, _ex, eq_num, t, _flat_params)
+                    end
+                end
+            end
+        end
+
 
         ff = new{T1,T2,T3,T4}(
             normalized_eqs, args, params, targets, defs, funname, dispatch,
