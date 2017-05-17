@@ -115,9 +115,8 @@ function equation_block(ff::FunctionFactory, ::TDer{0}=Der{0})
     else
         # otherwise, need to parse the targets, evaluate them, and then set
         # elements of out equal to the targets
-        parsed_targets = map(normalize, ff.targets)
         assignments = map((rhs, i) -> _assign_var_expr(:out, rhs, i),
-                          parsed_targets, 1:n_expr)
+                          ff.targets, 1:n_expr)
         func_block.args = vcat(ff.eqs, assignments)
     end
 

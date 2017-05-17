@@ -85,10 +85,6 @@ allowed_dates(args::GroupedArgs) = allowed_dates(FlatArgs(args))
 param_names(p::FlatParams) = p
 param_names(p::GroupedParams) = param_names(FlatParams(p))
 
-# ---------------- #
-# helper functions #
-# ---------------- #
-
 # -------------- #
 # IncidenceTable #
 # -------------- #
@@ -193,6 +189,60 @@ end
 filter_args(args::ArgType, incidence::IncidenceTable) =
     filter_args!(deepcopy(args), incidence)
 
+# ---------------- #
+# helper functions #
+# ---------------- #
+"""
+    build_definition_map(defs::Associative, incidence::IncidenceTable,
+                         dynvars::Vector{Symbol})
+
+For each key `k` in `defs`, and each time shift in `incidence.by_eq[k]`,
+construct a mapping between the time shifted normalized symbol for `k` to the
+normalized expression that it should be replaced with.
+
+## Example
+
+```jlcon
+julia> defs = Dict(:x=>:(a/(1-c(1))));
+
+julia> incidence = Dolang.IncidenceTable(:(foo(0) = log(a)+b/x(-1)));
+
+julia> dynvars = [:a, :b, :c];
+
+julia> Dolang.build_definition_map(defs, incidence, dynvars)
+Dict{Symbol,Union{Expr, Number, Symbol}} with 1 entry:
+  :_x_m1_ => :(_a_m1_ / (1 - _c__0_))
+```
+"""
+function build_definition_map(defs::Associative, incidence::IncidenceTable,
+                              _dynvars::Union{Vector{Symbol},Set{Symbol}})
+    out = Dict{Symbol,Union{Symbol,Expr,Number}}()
+
+    # NOTE: we need to make the keys of definitions have the form
+    #       (def, shift)::Tuple{Symbol,Int} in order for csubs to work
+    #       properly below
+    norm_defs = OrderedDict{Tuple{Symbol,Int},Any}()
+    for (_def, _ex) in defs
+        norm_defs[(_def, 0)] = _ex
+    end
+
+    funcs = Set{Symbol}()
+    dynvars = Set(_dynvars)
+
+    for def_var in keys(defs)
+        if haskey(incidence.by_var, def_var)
+            _ex = csubs(defs[def_var], norm_defs)
+            for time in incidence.by_var[def_var]
+                new_key = normalize((def_var, time))
+                out[new_key] = normalize(
+                    time_shift(_ex, time, dynvars, funcs, defs)
+                )
+            end
+        end
+    end
+    out
+end
+
 # --------------- #
 # FunctionFactory #
 # --------------- #
@@ -203,23 +253,34 @@ function _check_known(allowed::Associative, v::Symbol, ex::Expr,
     throw(UnknownSymbolError(v, ex, shifts))
 end
 
+
 immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
+    # normalized equations
     eqs::Vector{Expr}
+    # canonical  variables to differentiate wrt
     args::T1
+    # canonical (not-normalized) variables not to differentiate wrt (e.g. parameters)
     params::T2
+    # normalized target names
     targets::Vector{Symbol}
+    # definitions to be (recursively) substituted into eqs
     defs::T3
+    # name of function
     funname::Symbol
+    # type to drive dispatch
     dispatch::T4
+    # incidence table for the eqs
     incidence::IncidenceTable
 
     function (::Type{FunctionFactory{T1,T2,T3,T4}}){T1,T2,T3,T4}(
-            eqs, args, params, targets, defs, funname, dispatch
+            eqs, args, params, _targets, defs, funname, dispatch
         )
 
-        # if there are no targets, we normalize equations immediately
-        if isempty(targets)
+        # if there are no _targets, we normalize equations immediately
+        if isempty(_targets)
             eqs = map(_rhs_only, eqs)
+        else
+            targets = Symbol[is_normalized(t) ? t : normalize(t) for t in _targets]
         end
 
         # Need FlatParams so `visit!` and `IncidenceTable` skip them when
@@ -229,110 +290,20 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
         # create incidence table of equations
         incidence = IncidenceTable(eqs, _flat_params)
 
-        # construct table of dates each arg, param, target is allowed
-        # start with args
-        allowed_args = allowed_dates(args)
-        allowed = copy(allowed_args)
-
-        # now params and targets (they can only ever appear at 0)
-        s0 = Set(0)
-        for p in param_names(params)
-            allowed[p] = s0
-        end
-
-        # NOTE: targets might also be in args, so we can't just set
-        #       allowed[t]. we need to push onto a set if one exists
-        for t in targets
-            push!(get!(allowed, t, Set(0)), 0)
-        end
-
-        # This maps from the normalized_ name to the normalized_ expression that
-        # should be substituted for the parsed name
-        def_map = Dict{Symbol,Expr}()
-        arg_nms = Set(keys(allowed_args))
-
-        # build this empty set once and pass to time_shift below
-        funcs = Set{Symbol}()
-
-        # add all definitions at time 0 allowed (for when we have definitions
-        # depend on one another)
-        for _def in keys(defs)
-            allowed[_def] = Set([0])
-        end
-
-        # NOTE: we need to make the keys of definitions have the form
-        #       (def, shift)::Tuple{Symbol,Int} in order for csubs to work
-        #       properly below
-        norm_defs = OrderedDict{Tuple{Symbol,Int},Any}()
-        for (_def, _ex) in defs
-            norm_defs[(_def, 0)] = _ex
-        end
-
-        # make sure the _used_ definitions are all valid. If they are, add
-        # them to the def_map
-        for (_def, _ex) in defs
-            if !haskey(incidence.by_var, _def)
-                # if the definition never shows up, just move on :)
-                continue
-            end
-
-            times = incidence[_def]
-
-            # recursively resolve this defintion so we get down to args, params
-            # and targets.
-            _ex = csubs(_ex, norm_defs)
-
-            # compute incidence of each shift and make sure it is valid
-            for t in times
-                def_incidence = IncidenceTable()
-
-                visit!(def_incidence, _ex, 1, t, _flat_params)
-
-                for (v, _set) in def_incidence.by_var
-                    # make sure appearance of each variable is allowed
-                    _check_known(allowed, v, _ex, Set(t))
-                    if _set ⊈ allowed[v]
-                        throw(DefinitionNotAllowedError(_def, _ex, t))
-                    end
-                end
-
-                # construct shifted version of the definition and add to map
-                k = normalize((_def, t))
-                def_map[k] = normalize(time_shift(_ex, t, arg_nms, funcs, defs))
-
-                # also add this definition to incidence. Need to loop over
-                # incidence.by_eq to see which equations it appears in...
-                for (equation_number, equation_incidence) in incidence.by_eq
-                    if haskey(equation_incidence, _def)
-                        visit!(incidence, _ex, equation_number, t, _flat_params)
-                    end
-                end
-            end
-
-            # Add these times to allowed map for `_def` so we can do equation
-            # validation next
-            push!(allowed[_def], times...)
-
-        end
-
-        # do equation validation
-        for (i, _dict) in incidence.by_eq
-            i == typemax(Int) && continue # we've already validated defs
-            for (v, _set) in _dict
-                _check_known(allowed, v, eqs[i])
-                if _set ⊈ allowed[v]
-                    shifts = setdiff(_set, allowed[v])
-                    throw(VariableNotAllowedError(v, eqs[i], shifts))
-                end
-            end
-        end
+        # construct mapping from normalized definition name to desired
+        # expression
+        dynvars = Set(keys(allowed_dates(args)))
+        @show def_map = build_definition_map(defs, incidence, dynvars)
 
         # now normalize the equations and make subs
+        # _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))
         _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))
-        normalized_eqs = [_f(eq) for eq in eqs]
+        normalized_eqs = _f.(eqs)
 
-        new{T1,T2,T3,T4}(normalized_eqs, args, params, targets, defs, funname,
-                         dispatch, incidence)
+        ff = new{T1,T2,T3,T4}(
+            normalized_eqs, args, params, targets, defs, funname, dispatch,
+            incidence
+        )
     end
 end
 
@@ -340,7 +311,7 @@ end
 
 # default outer constructor to do inference and fill in type params
 function FunctionFactory{T1,T2,T3,T4}(eqs::Vector{Expr}, args::T1, params::T2,
-                                     targets::Vector{Symbol}, defs::T3,
+                                     targets, defs::T3,
                                      funname::Symbol, dispatch::T4)
     FunctionFactory{T1,T2,T3,T4}(eqs, args, params, targets, defs, funname,
                                  dispatch)
@@ -368,3 +339,16 @@ nargs{T<:GroupedArgs}(ff::FunctionFactory{T}) =
 nparams{T1,T2<:FlatParams}(ff::FunctionFactory{T1,T2}) = length(ff.param)
 nparams{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
     sum([length(v) for (_junk, v) in ff.params])::Int
+
+function validate!(ff::FunctionFactory)
+    full_incidence = IncidenceTable(ff.eqs)
+    known = vcat(normalize.(ff.args), normalize.(ff.params), ff.targets)
+
+    for (eq_num, seen) in full_incidence.by_eq
+        for variable in keys(seen)
+            if !(in(variable, known))
+                throw(VariableNotAllowedError(variable, ff.eqs[i], Set(0)))
+            end
+        end
+    end
+end
