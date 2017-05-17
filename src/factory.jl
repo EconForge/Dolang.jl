@@ -2,23 +2,6 @@
 # Exception handling #
 # ------------------ #
 
-immutable UnknownSymbolError <: Exception
-    bad_var::Symbol
-    eq::Expr
-    shifts::Set{Int}
-end
-
-function Base.showerror(io::IO, v::UnknownSymbolError)
-    if !isempty(v.shifts)
-        bad_exprs = [:($(v.bad_var)($shift)) for shift in v.shifts]
-        bad_str = join(bad_exprs, ", ", " and ")
-        print(io, "Unknown symbol(s) $(bad_str) found in equation $(v.eq). ")
-    else
-        print(io, "Unknown symbol $(v.bad_var) found in equation $(v.eq). ")
-    end
-    print(io, "Try adding $(v.bad_var) to the list of args")
-end
-
 immutable VariableNotAllowedError <: Exception
     bad_var::Symbol
     eq::Expr
@@ -30,17 +13,6 @@ function Base.showerror(io::IO, v::VariableNotAllowedError)
     bad_str = join(bad_exprs, ", ", " and ")
     print(io, "Invalid symbol(s) $(bad_str) found in equation $(v.eq). ")
     print(io, "Try adding $(v.bad_var) to the list of args")
-end
-
-immutable DefinitionNotAllowedError <: Exception
-    var::Symbol
-    def::Expr
-    shift::Int
-end
-
-function Base.showerror(io::IO, d::DefinitionNotAllowedError)
-    print(io, "Invalid definition found for $(d.var) = $(d.def). ")
-    print(io, "Cannot apply at shift $(d.shift) given argument restrictions")
 end
 
 # ---------- #
@@ -246,13 +218,6 @@ end
 # --------------- #
 # FunctionFactory #
 # --------------- #
-
-function _check_known(allowed::Associative, v::Symbol, ex::Expr,
-                      shifts::Set{Int}=Set{Int}())
-    haskey(allowed, v) && return
-    throw(UnknownSymbolError(v, ex, shifts))
-end
-
 
 immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
     # normalized equations
