@@ -714,6 +714,13 @@ function csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
     csubs(ex, d, Set(variables), Set(functions))
 end
 
+# ---------#
+# arg_name #
+# ---------#
+
+arg_name(s::Symbol) = s
+arg_name(s::Tuple{Symbol,Int}) = s[1]
+
 # --------- #
 # Utilities #
 # --------- #
