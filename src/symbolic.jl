@@ -108,7 +108,7 @@ function normalize(
         return get(cust)
     end
 
-    norm_targets = Symbol[is_normalized(t) ? t : normalize(t) for t in targets]
+    norm_targets = normalize.(targets)
 
     # define function to recurse over that passes our custom normalizer
     # this is just convenience so we don't have to set the kwarg so many
