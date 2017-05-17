@@ -251,11 +251,11 @@ function _jacobian_expr_mat{T<:FlatArgs}(ff::FunctionFactory{T})
         eq_incidence = ff.incidence.by_eq[i_eq]
 
         for i_var in 1:nvar
-            v, shift = args[i_var]
+            v, shift = arg_name_time(args[i_var])
 
             if haskey(eq_incidence, v) && in(shift, eq_incidence[v])
                 non_zero += 1
-                my_deriv = deriv(eq_prepped, normalize((v, shift)))
+                my_deriv = deriv(eq_prepped, normalize(args[i_var]))
                 exprs[i_eq, i_var] = post_deriv(my_deriv)
             end
         end
@@ -342,16 +342,16 @@ function _hessian_exprs{T<:FlatArgs}(ff::FunctionFactory{T})
         eq_incidence = ff.incidence.by_eq[i_eq]
 
         for i_v1 in 1:nvar
-            v1, shift1 = ff.args[i_v1]
+            v1, shift1 = arg_name_time(ff.args[i_v1])
 
             if haskey(eq_incidence, v1) && in(shift1, eq_incidence[v1])
-                diff_v1 = deriv(eq_prepped, normalize((v1, shift1)))
+                diff_v1 = deriv(eq_prepped, normalize(ff.args[i_v1]))
 
                 for i_v2 in i_v1:nvar
-                    v2, shift2 = ff.args[i_v2]
+                    v2, shift2 = arg_name_time(ff.args[i_v2])
 
                     if haskey(eq_incidence, v2) && in(shift2, eq_incidence[v2])
-                        diff_v1v2 = deriv(diff_v1, normalize((v2, shift2)))
+                        diff_v1v2 = deriv(diff_v1, normalize(ff.args[i_v2]))
 
                         # might still be zero if terms were independent
                         if diff_v1v2 != 0
