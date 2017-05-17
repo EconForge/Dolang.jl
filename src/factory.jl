@@ -19,147 +19,21 @@ end
 # Base Types #
 # ---------- #
 
-@compat const FlatArgs =  Vector{Tuple{Symbol,Int}}
-@compat const GroupedArgs =  Associative{Symbol,Vector{Tuple{Symbol,Int}}}
-@compat const ArgType =  Union{FlatArgs,GroupedArgs}
+@compat const FlatArgs = AbstractVector
+@compat const GroupedArgs = Associative{Symbol,<:Any}
+@compat const ArgType = Union{FlatArgs,GroupedArgs}
 
-@compat const FlatParams =  Vector{Symbol}
-@compat const GroupedParams =  Associative{Symbol,Vector{Symbol}}
-@compat const ParamType =  Union{FlatParams,GroupedParams}
+@compat const FlatParams = AbstractVector
+@compat const GroupedParams = Associative{Symbol,<:Any}
+@compat const ParamType = Union{FlatParams,GroupedParams}
 
 immutable Der{T} end
 @compat const TDer{n} = Type{Der{n}}
 
 immutable SkipArg end
 
-function Base.convert(::Type{FlatArgs}, g::GroupedArgs)
-    out = Array{Tuple{Symbol,Int}}(0)
-    for (_junk, _vec) in g
-        for i in _vec
-            push!(out, i)
-        end
-    end
-    out
-end
-
-Base.convert(::Type{FlatParams}, g::GroupedParams) =
-    vcat([v for (k, v) in g]...)::Vector{Symbol}
-
-function allowed_dates!(args::FlatArgs, out=Dict{Symbol,Set{Int}}())
-    for (s, i) in args
-        push!(get!(out, s, Set{Int}()), i)
-    end
-    out
-end
-
-allowed_dates(args::FlatArgs) = allowed_dates!(args)
-allowed_dates(args::GroupedArgs) = allowed_dates(FlatArgs(args))
-param_names(p::FlatParams) = p
-param_names(p::GroupedParams) = param_names(FlatParams(p))
-
-# -------------- #
-# IncidenceTable #
-# -------------- #
-
-"""
-Maps from equation number to a Dict: variable -> Set(time_periods)
-"""
-immutable IncidenceTable
-    by_eq::Dict{Int,Dict{Symbol,Set{Int}}}
-    by_var::Dict{Symbol,Set{Int}}
-    by_date::Dict{Int,Set{Symbol}}
-end
-
-IncidenceTable() = IncidenceTable(Dict(), Dict(), Dict())
-
-function IncidenceTable(eqs::AbstractVector, skip::Vector{Symbol}=Symbol[])
-    # create incidence
-    it = IncidenceTable()
-    for (i, eq) in enumerate(eqs)
-        visit!(it, eq, i, 0, skip)
-    end
-    it
-end
-
-function IncidenceTable(eq::Expr, skip::Vector{Symbol}=Symbol[])
-    it = IncidenceTable()
-    visit!(it, eq, 1, 0, skip)
-    it
-end
-
-Base.getindex(it::IncidenceTable, i::Int) = it.by_date[i]
-Base.getindex(it::IncidenceTable, s::Symbol) = it.by_var[s]
-
-function visit!(it::IncidenceTable, s::Symbol, n::Int, shift::Int,
-                skip::Vector{Symbol}=Symbol[])
-
-    if s in skip
-        return nothing
-    end
-
-    for_eq = get!(it.by_eq, n, Dict{Symbol,Set{Int}}())
-    for_sym = get!(for_eq, s, Set{Int}())
-    push!(for_sym, shift)
-
-    # update by_var
-    push!(get!(it.by_var, s, Set{Int}()), shift)
-
-    # upate by_date
-    push!(get!(it.by_date, shift, Set{Symbol}()), s)
-
-    nothing
-end
-
-# don't worry about anything else
-function visit!(it::IncidenceTable, s::Any, n::Int, shift::Int,
-                skip::Vector{Symbol}=Symbol[])
-    nothing
-end
-
-function visit!(it::IncidenceTable, ex::Expr, n::Int, shift::Int,
-                skip::Vector{Symbol}=Symbol[])
-    if is_time_shift(ex)
-        var = ex.args[1]
-        i = ex.args[2]
-        visit!(it, var, n, i+shift, skip)
-        return nothing
-    end
-
-    # don't visit the function name
-    if ex.head == :call
-        for an_arg in ex.args[2:end]
-            visit!(it, an_arg, n, shift, skip)
-        end
-        return nothing
-    end
-
-    # Otherwise just visit everything
-    for an_arg in ex.args
-        visit!(it, an_arg, n, shift, skip)
-    end
-    nothing
-end
-
-"Filter the args so that it only includes elements that appear in equations"
-filter_args!(args::FlatArgs, incidence::IncidenceTable) =
-    filter!(args) do x
-        haskey(incidence.by_var, x[1]) && x[2] in incidence[x[1]]
-    end
-
-function filter_args!{T<:GroupedArgs}(args::T, incidence::IncidenceTable)
-    return args
-
-    # TODO: below is the code that handles this, but I don't think we want
-    #       to remove things in the grouped version...
-    out = T()
-    for (k, v) in args
-        out[k] = filter_args!(v, incidence)
-    end
-    out
-end
-
-filter_args(args::ArgType, incidence::IncidenceTable) =
-    filter_args!(deepcopy(args), incidence)
+_to_flat(f::FlatArgs) = f
+_to_flat(g::GroupedArgs) = vcat(values(g)...)
 
 # ---------------- #
 # helper functions #
