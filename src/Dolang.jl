@@ -1,7 +1,6 @@
 module Dolang
 
 using DataStructures
-using Parameters
 
 const HAVE_SYMENGINE = try
     import SymEngine;
