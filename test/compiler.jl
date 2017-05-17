@@ -496,6 +496,72 @@ end
         @test have3 == Expr(:block, want_d!, want_d!_vec)
     end
 
+
+    @testset " make_function" begin
+        eqs = [:(a(0)*p^2+b(0))]
+        variables = [(:a, 0), (:b, 0), :p]
+
+        for (to_diff, args, params) in [
+                ([1, 2], [(:a, 0), (:b, 0)], [:p]),
+                ([1], [(:a, 0)], [(:b, 0), :p]),
+                ([1, 3], [(:a, 0), :p], [(:b ,0)])
+            ]
+
+            ff1 = Dolang.FunctionFactory(eqs, args, params)
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff),
+                Dolang.make_method(ff1, orders=[0, 1])
+            )
+
+            # test orders argument
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, orders=[0]),
+                Dolang.make_method(ff1, orders=[0])
+            )
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, orders=[0, 1]),
+                Dolang.make_method(ff1, orders=[0, 1])
+            )
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, orders=[1]),
+                Dolang.make_method(ff1, orders=[1])
+            )
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, orders=[2]),
+                Dolang.make_method(ff1, orders=[2])
+            )
+
+            # test dispatch arugment
+            ff2 = Dolang.FunctionFactory(Int, eqs, args, params)
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, dispatch=Int),
+                Dolang.make_method(ff2, orders=[0, 1])
+            )
+
+            # test name argument
+            ff3 = Dolang.FunctionFactory(eqs, args, params, funname=:slick)
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, name=:slick),
+                Dolang.make_method(ff3, orders=[0, 1])
+            )
+
+            # test allocating arg
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, allocating=false),
+                Dolang.make_method(ff1, orders=[0, 1], allocating=false)
+            )
+
+            # test targets argument
+            eqs2 = eqs = [:(x(0) = a(0)*p^2+b(0))]
+            targets = [(:x, 0)]
+            ff4 = Dolang.FunctionFactory(eqs2, args, params, targets=targets)
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, targets=targets),
+                Dolang.make_method(ff4, orders=[0, 1])
+            )
+        end
+    end
+
     @testset " evaluating compiled code" begin
         eval(current_module(), Dolang.make_method(ff, orders=[0,1]))
         u = rand()

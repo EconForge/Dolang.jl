@@ -442,7 +442,7 @@ end
 
 # we don't support non-allocating method for Hessians
 build_function!(ff::FunctionFactory, ::TDer{2}) =
-    error("Non-allocating Hessians not supported")
+    warn("Non-allocating Hessians not supported")
 
 # -------------------------- #
 # Putting functions together #
