@@ -123,14 +123,14 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
         # Need FlatParams so `visit!` and `IncidenceTable` skip them when
         # visiting expressions
-        _flat_params = FlatParams(params)
+        _flat_params = _to_flat(params)
 
         # create incidence table of equations
         incidence = IncidenceTable(eqs, _flat_params)
 
         # construct mapping from normalized definition name to desired
         # expression
-        dynvars = Set(keys(allowed_dates(args)))
+        dynvars = arg_name.(args)
         def_map = build_definition_map(defs, incidence, dynvars)
 
         # now normalize the equations and make subs
@@ -153,7 +153,6 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
                 end
             end
         end
-
 
         ff = new{T1,T2,T3,T4}(
             normalized_eqs, args, params, targets, defs, funname, dispatch,

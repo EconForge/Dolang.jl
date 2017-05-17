@@ -6,22 +6,8 @@ const flat_params = [:beta, :delta]
 const grouped_params = Dict(:p => [:beta, :delta])
 
 @testset " convert Grouped" begin
-    @test sort(Dolang.FlatArgs(grouped_args), by=_junk->_junk[1]) == flat_args
-    @test sort(Dolang.FlatParams(grouped_params)) == flat_params
-end
-
-@testset " allowed_dates" begin
-    out = OrderedDict()
-    Dolang.allowed_dates!(flat_args, out)
-    @test out == OrderedDict(:a=>Set(0), :b=>Set(1), :c=>Set(-1))
-
-    @test out == Dolang.allowed_dates(flat_args)
-    @test out == Dolang.allowed_dates(grouped_args)
-end
-
-@testset " param_names" begin
-    @test Dolang.param_names(flat_params) == flat_params
-    @test Dolang.param_names(grouped_params) == flat_params
+    @test sort(Dolang._to_flat(grouped_args), by=_junk->_junk[1]) == flat_args
+    @test sort(Dolang._to_flat(grouped_params)) == flat_params
 end
 
 @testset " is_time_shift" begin
@@ -45,8 +31,8 @@ end
 
     @testset "  constructors" begin
         # inner constructor directly
-        ff1 = _FF{Dolang.FlatArgs,
-                  Dolang.FlatParams,
+        ff1 = _FF{typeof(args),
+                  typeof(params),
                   Dict{Symbol,Expr},
                   DataType}(eqs, args, params, targets, defs, funname,
                             Dolang.SkipArg)
