@@ -147,49 +147,36 @@ end
 
 @testset "Dolang.time_shift" begin
     defs = Dict(:a=>:(b(-1)/c))
+    defs_sanitized = Dict(:a=>:(b(-1)/c(0)))
     funcs = [:foobar]
     for shift in [-1, 0, 1]
-        have = Dolang.time_shift(:(a+b(1) + c), shift, variables=[:b])
+        have = Dolang.time_shift(:(a+b(1) + c), shift)
         @test have == :(a+b($(shift+1)) + c)
 
-        # with variables
-        have = Dolang.time_shift(:(a+b(1) + c), shift, variables=[:b, :c])
-        @test have == :(a+b($(shift+1)) + c($shift))
+        have = Dolang.time_shift(:(a+b(1) + c(0)), shift)
+        @test have == :(a+b($(shift+1)) + c($(shift)))
 
         # with defs
-        have = Dolang.time_shift(:(a+b(1) + c), shift, defs=defs, variables=[:b])
+        have = Dolang.time_shift(:(a+b(1) + c), shift, defs=defs)
         @test have == :(b($(shift-1))/c + b($(shift+1)) + c)
 
-        # with defs + variables
-        have = Dolang.time_shift(:(a+b(1) + c), shift,
-                                 defs=defs, variables=[:b, :c])
+        have = Dolang.time_shift(:(a+b(1) + c(0)), shift, defs=defs)
+        @test have == :(b($(shift-1))/c + b($(shift+1)) + c($(shift)))
+
+        # note that defs have to be sanitized
+        have = Dolang.time_shift(:(a+b(1) + c(0)), shift, defs=defs_sanitized)
         @test have == :(b($(shift-1))/c($(shift)) + b($(shift+1)) + c($(shift)))
 
         # unknown function
         @test_throws Dolang.UnknownFunctionError Dolang.time_shift(:(a+b(1) + foobar(c)), shift)
 
         # with functions
-        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, functions=funcs,
-                                 variables=[:b])
+        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, functions=funcs)
         @test have == :(a+b($(shift+1)) + foobar(c))
 
         # functions + defs
-        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, variables=[:b],
-                                 defs=defs, functions=funcs)
+        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, defs=defs, functions=funcs)
         @test have == :(b($(shift-1))/c + b($(shift+1)) + foobar(c))
-
-        # functions + variables
-        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, variables=[:b],
-                                 variables=[:b, :c], functions=funcs)
-        @test have == :(a+b($(shift+1)) + foobar(c($shift)))
-
-        # functions + variables + defs
-        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift,
-                                 variables=[:b, :c], functions=funcs,
-                                 defs=defs)
-        want = :(b($(shift-1))/c($(shift)) + b($(shift+1)) + foobar(c($(shift))))
-        @test have == want
-
     end
 end
 

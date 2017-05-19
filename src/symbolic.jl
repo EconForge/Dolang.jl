@@ -222,30 +222,20 @@ normalize(exs::Vector{Expr}; kwargs...) =
 """
 ```julia
 time_shift(s::Symbol, shift::Integer,
-           variables::Set{Symbol}=Set{Symbol}(),
            functions::Set{Symbol}=Set{Symbol}(),
            defs::Associative=Dict())
 ```
-
-If `s` is in `variables`, then return the expression `s(shift)`
 
 If `s` is in `defs`, then return the shifted version of the definition
 
 Otherwise return `s`
 """
 function time_shift(s::Symbol, shift::Integer,
-                    variables::Set{Symbol},
                     functions::Set{Symbol},
                     defs::Associative)
-
-    # if `s` is a function arg then return shifted version of s
-    if s in variables
-        return :($s($(shift)))
-    end
-
     # if it is a def, recursively substitute it
     if haskey(defs, s)
-        return time_shift(defs[s], shift, variables, functions, defs)
+        return time_shift(defs[s], shift, functions, defs)
     end
 
     # any other symbols just gets parsed
@@ -253,9 +243,7 @@ function time_shift(s::Symbol, shift::Integer,
 end
 
 """
-```julia
-time_shift(x::Number, other...)
-```
+    time_shift(x::Number, other...)
 
 Return `x` for all values of `other`
 """
@@ -264,7 +252,6 @@ time_shift(x::Number, other...) = x
 """
 ```julia
 time_shift(ex::Expr, shift::Integer,
-           variables::Set{Symbol}=Set{Symbol}(),
            functions::Set{Symbol}=Set{Symbol}(),
            defs::Associative=Dict())
 ```
@@ -279,7 +266,6 @@ on the form of `ex` (list below has the form "contents of ex: return expr"):
 - Any other `Expr`: `Expr(ex.head, map(i -> time_shift(i, args, shift, defs), ex.args))`
 """
 function time_shift(ex::Expr, shift::Integer,
-                    variables::Set{Symbol},
                     functions::Set{Symbol},
                     defs::Associative)
 
@@ -290,11 +276,14 @@ function time_shift(ex::Expr, shift::Integer,
 
         # if we found a definition, move to resolving it
         if haskey(defs, var)
-            time_shift(defs[var], shift+i, variables, functions, defs)
+            time_shift(defs[var], shift+i, functions, defs)
         end
 
-        # variables = Symbol[variables; var]
-        return time_shift(var, shift+i, variables, functions, defs)
+        if var in functions
+            return ex
+        else
+            return Expr(:call, var, shift+i)
+        end
     end
 
     # if it is some kind of function call, shift arguments
@@ -303,7 +292,7 @@ function time_shift(ex::Expr, shift::Integer,
         if func in DOLANG_FUNCTIONS || func in functions
             out = Expr(:call, func)
             for arg in ex.args[2:end]
-                push!(out.args, time_shift(arg, shift, variables, functions, defs))
+                push!(out.args, time_shift(arg, shift, functions, defs))
             end
             return out
         else
@@ -313,26 +302,24 @@ function time_shift(ex::Expr, shift::Integer,
 
     # otherwise just shift all args, but retain expr head
     out = Expr(ex.head)
-    out.args = [time_shift(an_arg, shift, variables, defs) for an_arg in ex.args]
+    out.args = [time_shift(an_arg, shift, defs) for an_arg in ex.args]
     return out
 end
 
 """
 ```julia
 time_shift(ex::Expr, shift::Int=0;
-           variables::Union{Set{Symbol},Vector{Symbol}}=Vector{Symbol}(),
            functions::Union{Set{Symbol},Vector{Symbol}}=Vector{Symbol}(),
            defs::Associative=Dict())
 ```
 
-Version of `time_shift` where `variables`, `functions`, and `defs` are keyword
-arguments with default values.
+Version of `time_shift` where `functions` and `defs` are keyword arguments with
+default values.
 """
 function time_shift(ex::Expr, shift::Integer=0;
-                    variables::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
                     functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
                     defs::Associative=Dict())
-    time_shift(ex, shift, Set(variables), Set(functions), defs)
+    time_shift(ex, shift, Set(functions), defs)
 end
 
 # ------------ #
