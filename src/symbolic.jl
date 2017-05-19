@@ -468,14 +468,14 @@ function list_symbols!(out, ex::Expr, functions::Set{Symbol},
                        variables::Set{Symbol})
     # here we just need to walk the expression tree and pull out symbols
     if is_time_shift(ex)
-        var = ex.args[1]
-        shift = ex.args[2]
+        var, shift = arg_name_time(ex)
         current = get!(out, :variables, Set{Tuple{Symbol,Int}}())
         push!(current, (var, shift))
         return out
     end
 
-    # if it is some kind of function call, steady_state arguments
+    # if it is some kind of function call, make sure we recognize it and throw
+    # errors otherwise
     if ex.head == :call
         func = ex.args[1]
         if func in DOLANG_FUNCTIONS || func in functions
@@ -687,9 +687,31 @@ end
 
 arg_name(s::Symbol) = s
 arg_name(s::Tuple{Symbol,Int}) = s[1]
+function arg_name(ex::Expr)::Symbol
+    if is_time_shift(ex)
+        return ex.args[1]
+    else
+        m = string(
+            "Expression $(ex) does not look like a variable. ",
+            "The only allowed expressions must satisfy `is_time_shift(ex)`"
+        )
+        error(m)
+    end
+end
 
 arg_time(s::Symbol) = 0
 arg_time(s::Tuple{Symbol,Int}) = s[2]
+function arg_time(ex::Expr)::Int
+    if is_time_shift(ex)
+        return ex.args[2]
+    else
+        m = string(
+            "Expression $(ex) does not look like a variable. ",
+            "The only allowed expressions must satisfy `is_time_shift(ex)`"
+        )
+        error(m)
+    end
+end
 
 arg_name_time(s) = (arg_name(s), arg_time(s))
 

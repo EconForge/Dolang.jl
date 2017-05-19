@@ -281,11 +281,13 @@ end
             @test Dolang.arg_name((s, t)) == s
             @test Dolang.arg_time((s, t)) == t
             @test Dolang.arg_name_time((s, t)) == (s, t)
+            @test Dolang.arg_name(Expr(:call, s, t)) == s
+            @test Dolang.arg_time(Expr(:call, s, t)) == t
+            @test Dolang.arg_name_time(Expr(:call, s, t)) == (s, t)
         end
     end
 
     for f in (Dolang.arg_name, Dolang.arg_time, Dolang.arg_name_time, Dolang.arg_names)
-        @test_throws MethodError f(:(x(0)))  # Expr
         @test_throws MethodError f(1)        # Number
         @test_throws MethodError f([1])      # Array of number
     end
