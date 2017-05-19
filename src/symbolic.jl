@@ -396,63 +396,43 @@ end
 # ------------ #
 
 function list_symbols(ex::Expr;
-                      functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
-                      variables::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
+                      functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
     out = Dict{Symbol,Any}()
-    list_symbols!(out, ex, Set(functions), Set(variables))
+    list_symbols!(out, ex, Set(functions))
 end
 
 """
-```julia
-list_symbols!(out, s::Symbol, functions::Set{Symbol}, variables::Set{Symbol})
-```
+    list_symbols!(out, s::Symbol, functions::Set{Symbol})
 
-If `s` is in `variables`, add `(s, 0)` to `out[:variables]`. Otherwise, add
-`s` to `out[:parameters]``
+Add `s` to `out[:parameters]``
 """
-function list_symbols!(out, s::Symbol, functions::Set{Symbol},
-                       variables::Set{Symbol})
-    if s in variables
-        current = get!(out, :variables, Set{Tuple{Symbol,Int}}())
-        push!(current, (s, 0))
-    else
-        current = get!(out, :parameters, Set{Symbol}())
-        push!(current, s)
-    end
-
+function list_symbols!(out, s::Symbol, functions::Set{Symbol})
+    current = get!(out, :parameters, Set{Symbol}())
+    push!(current, s)
     out
 end
 
 
 """
-```julia
-list_symbols!(out, s::Any, functions::Set{Symbol}, variables::Set{Symbol})
-```
+    list_symbols!(out, s::Any, functions::Set{Symbol})
 
 Do nothing -- if s is not a `Symbol` or `Expr` (handled in separate methods)
 do not add anything to symbol list.
 """
-function list_symbols!(out, ex::Any, functions::Set{Symbol},
-                       variables::Set{Symbol})
-    nothing
-end
+list_symbols!(out, ex::Any, functions::Set{Symbol}) = out
 
 """
-```julia
-list_symbols!(out, s::Expr, functions::Set{Symbol}, variables::Set{Symbol})
-```
+    list_symbols!(out, s::Expr, functions::Set{Symbol})
 
 Walk the expression and populate `out` according to the following rules for
 each type of subexpression encoutered:
 
-- `s::Symbol`: if `s` is in `variables`, add `(s, 0)` to `out[:variables]`,
-otherwise add `s` to `out[:parameters]`
+- `s::Symbol`: add `s` to `out[:parameters]`
 - `x(i::Integer)`: Add `(x, i)` out `out[:parameters]``
 - All other function calls: add any arguments to `out` according to above rules
 - Anything else: do nothing.
 """
-function list_symbols!(out, ex::Expr, functions::Set{Symbol},
-                       variables::Set{Symbol})
+function list_symbols!(out, ex::Expr, functions::Set{Symbol})
     # here we just need to walk the expression tree and pull out symbols
     if is_time_shift(ex)
         var, shift = arg_name_time(ex)
@@ -467,19 +447,15 @@ function list_symbols!(out, ex::Expr, functions::Set{Symbol},
         func = ex.args[1]
         if func in DOLANG_FUNCTIONS || func in functions
             for arg in ex.args[2:end]
-                list_symbols!(out, arg, functions, variables)
+                list_symbols!(out, arg, functions)
             end
             return out
         else
             throw(UnknownFunctionError(func, "Unknown function $func"))
         end
     end
-
+    out
 end
-
-# TODO: potential name change. match_recipe?
-# function list_symbols(::Expr, recipe::Associative) => Dict(keys=keys(recipe), values=incidence)
-# end
 
 # -------------- #
 # list_variables #

@@ -197,16 +197,14 @@ end
 
 @testset "Dolang.list_symbols" begin
     out = Dolang.list_symbols(:(a+b(1)+c))
-    want = Set{Tuple{Symbol,Int}}(); push!(want, (:b, 1))
     @test haskey(out, :variables)
-    @test out[:variables] == want
+    @test out[:variables] == Set([(:b, 1)])
     @test haskey(out, :parameters)
     @test out[:parameters] == Set{Symbol}([:a, :c])
 
-    out = Dolang.list_symbols(:(a+b(1)+c), variables=[:c])
-    want = Set{Tuple{Symbol,Int}}(); push!(want, (:b, 1)); push!(want, (:c, 0))
+    out = Dolang.list_symbols(:(a+b(1)+c(0)))
     @test haskey(out, :variables)
-    @test out[:variables] == want
+    @test out[:variables] == Set([(:b, 1), (:c, 0)])
     @test haskey(out, :parameters)
     @test out[:parameters] == Set{Symbol}([:a])
 
@@ -215,9 +213,8 @@ end
 
     # now let the function be ok
     out = Dolang.list_symbols(:(a+b(1)+c + foobar(c)), functions=[:foobar])
-    want = Set{Tuple{Symbol,Int}}(); push!(want, (:b, 1))
     @test haskey(out, :variables)
-    @test out[:variables] == want
+    @test out[:variables] == Set([(:b, 1)])
     @test haskey(out, :parameters)
     @test out[:parameters] == Set{Symbol}([:a, :c])
 end
