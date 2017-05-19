@@ -261,24 +261,27 @@ end
 
 end
 
-@testset "arg_name, arg_time, arg_name_time" begin
+@testset "arg_name, arg_time, arg_name_time, arg_names" begin
     for i in 1:5
         s = gensym()
+        s_vec = [gensym() for xxxxxx in 1:3]
+        s_dict = OrderedDict(:m => s_vec, :M => [s])
         @test Dolang.arg_name(s) == s
         @test Dolang.arg_time(s) == 0
         @test Dolang.arg_name_time(s) == (s, 0)
+        @test Dolang.arg_names(s_vec) == s_vec
+        @test Dolang.arg_names(s_dict) == vcat(s_vec, s)
         for t in 1:10
             @test Dolang.arg_name((s, t)) == s
             @test Dolang.arg_time((s, t)) == t
             @test Dolang.arg_name_time((s, t)) == (s, t)
         end
-
     end
 
-    for f in (Dolang.arg_name, Dolang.arg_time, Dolang.arg_name_time)
+    for f in (Dolang.arg_name, Dolang.arg_time, Dolang.arg_name_time, Dolang.arg_names)
         @test_throws MethodError f(:(x(0)))  # Expr
         @test_throws MethodError f(1)        # Number
-        @test_throws MethodError f([1])      # Array
+        @test_throws MethodError f([1])      # Array of number
     end
 end
 

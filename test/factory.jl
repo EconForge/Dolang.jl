@@ -23,6 +23,10 @@ end
 
     eqs = [:(foo(0) = log(a(0))+b(0)/x(-1)), :(bar(0) = c(1)+u*d(1))]
     args = [(:a, -1), (:a, 0), (:b, 0), (:c, 0), (:c, 1), (:d, 1)]
+    args_grouped = Dict(
+        :m => [(:a, -1), (:a, 0), (:b, 0), (:c, 0)],
+        :M => [(:c, 1), (:d, 1)]
+    )
     params = [:u]
     defs = Dict(:x=>:(a/(1-c(1))))
     targets = [(:foo, 0), (:bar, 0)]
@@ -50,6 +54,29 @@ end
         @test ff2 == ff1
         @test ff3 == ff1
         @test ff4 == ff1
+
+        # test with grouped args
+        # inner constructor directly
+        ffg1 = _FF{typeof(args_grouped),
+                  typeof(params),
+                  Dict{Symbol,Expr},
+                  DataType}(eqs, args_grouped, params, targets, defs, funname,
+                            Dolang.SkipArg)
+
+        # First outer constructor
+        ffg2 = _FF(eqs, args_grouped, params, targets, defs, funname, Dolang.SkipArg)
+
+        # kwarg outer constructor -- SkipArg default
+        ffg3 = _FF(eqs, args_grouped, params, targets=targets, defs=defs,
+                  funname=funname)
+
+        ffg4 = _FF(Dolang.SkipArg, eqs, args_grouped, params, targets=targets,
+                  defs=defs, funname=funname)
+
+        @test ffg2 == ffg1
+        @test ffg3 == ffg1
+        @test ffg4 == ffg1
+
     end
 
     @testset "  constructor behavior" begin

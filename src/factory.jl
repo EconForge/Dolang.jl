@@ -130,7 +130,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
         # construct mapping from normalized definition name to desired
         # expression
-        dynvars = arg_name.(args)
+        dynvars = arg_names(args)
         def_map = build_definition_map(defs, incidence, dynvars)
 
         # now normalize the equations and make subs

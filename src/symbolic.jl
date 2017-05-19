@@ -685,6 +685,9 @@ arg_time(s::Tuple{Symbol,Int}) = s[2]
 
 arg_name_time(s) = (arg_name(s), arg_time(s))
 
+arg_names(s::AbstractVector) = arg_name.(s)
+arg_names(s::Associative) = vcat([arg_names(v) for v in values(s)]...)
+
 # --------- #
 # Utilities #
 # --------- #
