@@ -196,27 +196,37 @@ end
 end
 
 @testset "Dolang.list_symbols" begin
-    out = Dolang.list_symbols(:(a+b(1)+c))
+    ex = :(a+b(1)+c)
+    out = Dolang.list_symbols(ex)
     @test haskey(out, :variables)
     @test out[:variables] == Set([(:b, 1)])
     @test haskey(out, :parameters)
     @test out[:parameters] == Set{Symbol}([:a, :c])
+    @test out[:variables] == @inferred Dolang.list_variables(ex)
+    @test out[:parameters] == @inferred Dolang.list_parameters(ex)
 
-    out = Dolang.list_symbols(:(a+b(1)+c(0)))
+    ex = :(a+b(1)+c(0))
+    out = Dolang.list_symbols(ex)
     @test haskey(out, :variables)
     @test out[:variables] == Set([(:b, 1), (:c, 0)])
     @test haskey(out, :parameters)
     @test out[:parameters] == Set{Symbol}([:a])
+    @test out[:variables] == @inferred Dolang.list_variables(ex)
+    @test out[:parameters] == @inferred Dolang.list_parameters(ex)
 
     # Unknown function
     @test_throws Dolang.UnknownFunctionError Dolang.list_symbols(:(a+b(1)+c+foobar(c)))
 
     # now let the function be ok
-    out = Dolang.list_symbols(:(a+b(1)+c + foobar(c)), functions=[:foobar])
+    ex = :(a+b(1)+c + foobar(c))
+    out = Dolang.list_symbols(ex, functions=[:foobar])
     @test haskey(out, :variables)
     @test out[:variables] == Set([(:b, 1)])
     @test haskey(out, :parameters)
     @test out[:parameters] == Set{Symbol}([:a, :c])
+    @test out[:variables] == @inferred Dolang.list_variables(ex, functions=[:foobar])
+    @test out[:parameters] == @inferred Dolang.list_parameters(ex, functions=[:foobar])
+
 end
 
 @testset " csubs()" begin

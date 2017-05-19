@@ -428,7 +428,7 @@ Walk the expression and populate `out` according to the following rules for
 each type of subexpression encoutered:
 
 - `s::Symbol`: add `s` to `out[:parameters]`
-- `x(i::Integer)`: Add `(x, i)` out `out[:parameters]``
+- `x(i::Integer)`: Add `(x, i)` out `out[:variables]`
 - All other function calls: add any arguments to `out` according to above rules
 - Anything else: do nothing.
 """
@@ -454,6 +454,9 @@ function list_symbols!(out, ex::Expr, functions::Set{Symbol})
             throw(UnknownFunctionError(func, "Unknown function $func"))
         end
     end
+
+    # TODO: this is not flexible. It will completely skip over things like
+    #       b[i](t).
     out
 end
 
@@ -461,20 +464,20 @@ end
 # list_variables #
 # -------------- #
 
-# function list_variables(ex::Expr;
-#                       functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
-#                       variables::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
-#     syms = list_symbols(ex; functions=functions, variables=variables)
-#     out = Set{Symbol}()
-#     for (k, v) in syms
-#         for sym in v
-#             isa(sym, Symbol) ? push!(out, sym) :
-#             isa(sym, Tuple{Symbol,Int}) ? push!(out, sym[1]):
-#             error("not sure what happened here")
-#         end
-#     end
-#     out
-# end
+function list_variables(
+        arg;
+        functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}()
+    )::Set{Tuple{Symbol,Int}}
+    list_symbols(arg, functions=functions)[:variables]
+end
+
+
+function list_parameters(
+        arg;
+        functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}()
+    )::Set{Symbol}
+    list_symbols(arg, functions=functions)[:parameters]
+end
 
 # ---- #
 # subs #
