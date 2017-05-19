@@ -238,19 +238,21 @@ end
     want = :(python(faster + more, eats))
     @test Dolang.csubs(:(monty(run + eat, eats)), d) == want
 
-    d = Dict(:b => :(c + d(1)))
-    ex = :(a + b + b(1))
-    want = :(a + (c + d(1)) + b(1))
-    @test Dolang.csubs(ex, d) == want
+    for ex in [:(a + b(0) + b(1)), :(a + b + b(1))]
+        for key in [:b, (:b, 0)]
+            d = Dict(key => :(c(0) + d(1)))
+            want = :(a + (c(0) + d(1)) + (c(1) + d(2)))
+            @test Dolang.csubs(ex, d) == want
 
-    d = Dict((:b, 0) => :(c + d(1)))
-    ex = :(a + b + b(1))
-    want = :(a + (c + d(1)) + b(1))
-    @test Dolang.csubs(ex, d) == want
+            d = Dict(key => :(c + d(1)))
+            want = :(a + (c + d(1)) + (c + d(2)))
+            @test Dolang.csubs(ex, d) == want
+        end
+    end
 
-    d = Dict((:b, 0) => :(c + d(1)), (:b, 1) => :(c(1) + d(2)))
+    d = Dict((:b, 0) => :(c + d(1)), (:b, 1) => :(c(100) + d(2)))
     ex = :(a + b + b(1))
-    want = :(a + (c + d(1)) + (c(1) + d(2)))
+    want = :(a + (c + d(1)) + (c(100) + d(2)))
     @test Dolang.csubs(ex, d) == want
 
     # case where subs and csubs aren't the same

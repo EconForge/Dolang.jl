@@ -500,14 +500,22 @@ end
 
 _subs(x::Number, d::Associative, a...) = (x, false)
 
-function _subs(ex::Expr, d::Associative,
-               variables::Set{Symbol},
-               funcs::Set{Symbol})
+function _subs(ex::Expr, d::Associative, funcs::Set{Symbol})
     if is_time_shift(ex)
-        var = ex.args[1]
-        shift = ex.args[2]
+        var, shift = arg_name_time(ex)
         if haskey(d, (var, shift))
             new_ex = d[(var, shift)]
+            return new_ex, true
+        end
+
+        if haskey(d, var)
+            new_ex = time_shift(var, shift, funcs, d)
+            return new_ex, true
+        end
+
+        # repeat for (var, 0)
+        if haskey(d, (var, 0))
+            new_ex = time_shift(d[(var, 0)], shift, funcs, d)
             return new_ex, true
         end
 
@@ -519,7 +527,7 @@ function _subs(ex::Expr, d::Associative,
     changed = false
 
     for (i, arg) in enumerate(ex.args)
-        new_arg, arg_changed = _subs(arg, d, variables, funcs)
+        new_arg, arg_changed = _subs(arg, d, funcs)
         out_args[i] = new_arg
         changed = changed || arg_changed
     end
@@ -541,9 +549,8 @@ for that expression: `(:x, 1)`
 """
 function subs(ex::Union{Expr,Symbol,Number}, from,
               to::Union{Symbol,Expr,Number},
-              variables::Set{Symbol},
               funcs::Set{Symbol})
-    _subs(ex, Dict(from=>to), variables, funcs)[1]
+    _subs(ex, Dict(from=>to), funcs)[1]
 end
 
 """
@@ -563,9 +570,8 @@ The one exception to this rule is that a key `:k` is treated the same as `(:k,
 0)`.
 """
 function subs(ex::Union{Expr,Symbol,Number}, d::Associative,
-              variables::Set{Symbol},
               funcs::Set{Symbol})
-    _subs(ex, d, variables, funcs)[1]
+    _subs(ex, d, funcs)[1]
 end
 
 """
@@ -579,27 +585,13 @@ Verison of `subs` where `variables` and `functions` are keyword arguments with
 default values
 """
 function subs(ex::Union{Expr,Symbol,Number}, d::Associative;
-              variables::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}(),
               functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
-    subs(ex, d, Set(variables), Set(functions))
+    subs(ex, d, Set(functions))
 end
 
 """
 ```julia
-csubs(x::Union{Symbol,Number}, d::Associative)
-```
-
-If `x` is a key in `d`, return the assocaited value. Otherwise return `x`
-"""
-function csubs(x::Union{Symbol,Number}, d::Associative,
-               variables::Set{Symbol},
-               funcs::Set{Symbol})
-    _subs(x, d, variables, funcs)[1]
-end
-
-"""
-```julia
-csubs(ex::Expr, d::Associative,
+csubs(ex::Union{Symbol,Expr,Number}, d::Associative,
       variables::Set{Symbol}=Set{Symbol}(),
       funcs::Set{Symbol}=Set{Symbol}())
 ```
@@ -618,14 +610,13 @@ subs(ex, d)  # returns :(a + c / a)
 csubs(ex, d)  # returns :(a + (2a) / a)
 ```
 """
-function csubs(ex::Expr, d::Associative,
-               variables::Set{Symbol},
+function csubs(ex::Union{Symbol,Expr,Number}, d::Associative,
                funcs::Set{Symbol})
-    max_it = length(d) + 1
+    max_it = (length(d) + 1)^2
     max_it == 1 && return ex
 
     for i in 1:max_it
-        ex, changed = _subs(ex, d, variables, funcs)
+        ex, changed = _subs(ex, d, funcs)
         !changed && return ex
     end
 
@@ -635,16 +626,14 @@ end
 """
 ```julia
 csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
-      variables::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}(),
       functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
 ```
 
 Verison of `csubs` where `variables` and `functions` are keyword arguments.
 """
 function csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
-               variables::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}(),
                functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
-    csubs(ex, d, Set(variables), Set(functions))
+    csubs(ex, d, Set(functions))
 end
 
 # ---------#
