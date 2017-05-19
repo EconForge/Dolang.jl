@@ -1,10 +1,15 @@
 @testset "symbolic" begin
 
 @testset "Dolang.eq_expr" begin
-    ex = :(z(0) = x + y(1))
-    @test Dolang.normalize(ex) == :(_x_ + _y__1_ - _z__0_)
-    @test Dolang.normalize(ex, targets=[:_z__0_]) == :(_z__0_ = _x_ + _y__1_)
-    @test Dolang.normalize(ex, targets=[(:z, 0)]) == :(_z__0_ = _x_ + _y__1_)
+    ex1 = :(z(0) = x + y(1))
+    ex2 = :(z(0) == x + y(1))
+
+    for ex in (ex1, ex2)
+        @test Dolang.normalize(ex) == :(_x_ + _y__1_ - _z__0_)
+        @test Dolang.normalize(ex, targets=[:_z__0_]) == :(_z__0_ = _x_ + _y__1_)
+        @test Dolang.normalize(ex, targets=[(:z, 0)]) == :(_z__0_ = _x_ + _y__1_)
+    end
+
 end
 
 @testset "Dolang.normalize" begin
@@ -88,6 +93,7 @@ end
 
         @testset "with targets" begin
             @test Dolang.normalize(:(x = log(y(-1))); targets=[:x]) == :(_x_ = log(_y_m1_))
+            @test Dolang.normalize(:(x == log(y(-1))); targets=[:x]) == :(_x_ = log(_y_m1_))
             @test_throws Dolang.NormalizeError Dolang.normalize(:(x = y); targets=[:y])
         end
     end

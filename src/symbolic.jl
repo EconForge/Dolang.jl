@@ -115,14 +115,22 @@ function normalize(
     # times
     recur(x) = normalize(x, custom=custom)
 
-    if ex.head == :(=)
+    # make sure `lhs == rhs` is treated the same as `lhs = rhs`
+    if (ex.head == :(=)) || (ex.head == :call && ex.args[1] == :(==))
+        if ex.head == :(=)
+            lhs = ex.args[1]
+            rhs = ex.args[2]
+        else
+            lhs = ex.args[2]
+            rhs = ex.args[3]
+        end
         # translate lhs = rhs to rhs - lhs
         if isempty(targets)
-            return Expr(:call, :(-), recur(ex.args[2]), recur(ex.args[1]))
+            return Expr(:call, :(-), recur(rhs), recur(lhs))
         end
 
         # ensure lhs is in targets
-        if !(recur(ex.args[1]) in norm_targets)
+        if !(recur(lhs) in norm_targets)
             msg = string(
                 "Error normalizing expression\n\t$(ex)\n",
                 "Expected expression of the form `lhs = rhs` ",
@@ -131,7 +139,7 @@ function normalize(
             throw(NormalizeError(ex, msg))
         end
 
-        return Expr(:(=), recur(ex.args[1]), recur(ex.args[2]))
+        return Expr(:(=), recur(lhs), recur(rhs))
     end
 
 
