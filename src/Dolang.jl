@@ -44,6 +44,7 @@ _to_expr(x::AbstractString) = _to_expr(parse(_replace_star_star(x)))
 
 # core files
 include("symbolic.jl")
+include("incidence.jl")
 include("factory.jl")
 include("util.jl")
 include("compiler.jl")

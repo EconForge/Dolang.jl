@@ -1,9 +1,15 @@
 @testset "symbolic" begin
 
 @testset "Dolang.eq_expr" begin
-    ex = :(z = x + y(1))
-    @test Dolang.normalize(ex) == :(_x_ + _y__1_ - _z_)
-    @test Dolang.normalize(ex, targets=[:z]) == :(_z_ = _x_ + _y__1_)
+    ex1 = :(z(0) = x + y(1))
+    ex2 = :(z(0) == x + y(1))
+
+    for ex in (ex1, ex2)
+        @test Dolang.normalize(ex) == :(_x_ + _y__1_ - _z__0_)
+        @test Dolang.normalize(ex, targets=[:_z__0_]) == :(_z__0_ = _x_ + _y__1_)
+        @test Dolang.normalize(ex, targets=[(:z, 0)]) == :(_z__0_ = _x_ + _y__1_)
+    end
+
 end
 
 @testset "Dolang.normalize" begin
@@ -34,7 +40,9 @@ end
     @testset "symbols" begin
         for i=1:10
             s = gensym()
-            @test Dolang.normalize(s) == Symbol("_", string(s), "_")
+            want = Symbol("_", s, "_")
+            @test Dolang.normalize(s) == want
+            @test Dolang.normalize(want) == want
         end
     end
 
@@ -85,6 +93,7 @@ end
 
         @testset "with targets" begin
             @test Dolang.normalize(:(x = log(y(-1))); targets=[:x]) == :(_x_ = log(_y_m1_))
+            @test Dolang.normalize(:(x == log(y(-1))); targets=[:x]) == :(_x_ = log(_y_m1_))
             @test_throws Dolang.NormalizeError Dolang.normalize(:(x = y); targets=[:y])
         end
     end
@@ -256,6 +265,30 @@ end
     @test Dolang.subs(ex, d) == :(a + c/a)
     @test Dolang.csubs(ex, d) == :(a + (2a)/a)
 
+end
+
+@testset "arg_name, arg_time, arg_name_time, arg_names" begin
+    for i in 1:5
+        s = gensym()
+        s_vec = [gensym() for xxxxxx in 1:3]
+        s_dict = OrderedDict(:m => s_vec, :M => [s])
+        @test Dolang.arg_name(s) == s
+        @test Dolang.arg_time(s) == 0
+        @test Dolang.arg_name_time(s) == (s, 0)
+        @test Dolang.arg_names(s_vec) == s_vec
+        @test Dolang.arg_names(s_dict) == vcat(s_vec, s)
+        for t in 1:10
+            @test Dolang.arg_name((s, t)) == s
+            @test Dolang.arg_time((s, t)) == t
+            @test Dolang.arg_name_time((s, t)) == (s, t)
+        end
+    end
+
+    for f in (Dolang.arg_name, Dolang.arg_time, Dolang.arg_name_time, Dolang.arg_names)
+        @test_throws MethodError f(:(x(0)))  # Expr
+        @test_throws MethodError f(1)        # Number
+        @test_throws MethodError f([1])      # Array of number
+    end
 end
 
 end  # @testset "symbolic"

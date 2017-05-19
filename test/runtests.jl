@@ -14,6 +14,7 @@ end
 
 tests = length(ARGS) > 0 ? ARGS : [
                                    "symbolic",
+                                   "incidence",
                                    "factory",
                                    "compiler",
                                    "util",

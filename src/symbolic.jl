@@ -43,7 +43,7 @@ Normalize the string or symbol in the following way:
 
 """
 function normalize(var::Union{String,Symbol}, n::Integer; custom=nothing)
-    Symbol(string("_", var, "_", n >= 0 ? "_" : "m", abs(n)), "_")
+    Symbol(normalize(var), n >= 0 ? "_" : "m", abs(n), "_")
 end
 
 """
@@ -60,9 +60,17 @@ normalize{T<:Integer}(x::Tuple{Symbol,T}; custom=nothing) = normalize(x[1], x[2]
 normalize(x::Symbol)
 ```
 
-Normalize the symbol by returning `_x_`
+Normalize the symbol by returning `_x_` if `x` doesn't alread have leading
+and trailling `_` characters
 """
-normalize(x::Symbol; custom=nothing) = Symbol(string("_", x, "_"))
+function normalize(x::Symbol; custom=nothing)
+    str_x = string(x)
+    if str_x[1] == str_x[end] == '_'
+        return x
+    else
+        return Symbol(string("_", x, "_"))
+    end
+end
 
 """
 ```julia
@@ -92,7 +100,7 @@ below is `input form of ex: returned expression`):
 function normalize(
         ex::Expr;
         custom::Function=_empty_normalizer,
-        targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[]
+        targets=Symbol[]
     )
     # try custom normalizer
     cust = custom(ex)
@@ -100,19 +108,29 @@ function normalize(
         return get(cust)
     end
 
+    norm_targets = normalize.(targets)
+
     # define function to recurse over that passes our custom normalizer
     # this is just convenience so we don't have to set the kwarg so many
     # times
     recur(x) = normalize(x, custom=custom)
 
-    if ex.head == :(=)
+    # make sure `lhs == rhs` is treated the same as `lhs = rhs`
+    if (ex.head == :(=)) || (ex.head == :call && ex.args[1] == :(==))
+        if ex.head == :(=)
+            lhs = ex.args[1]
+            rhs = ex.args[2]
+        else
+            lhs = ex.args[2]
+            rhs = ex.args[3]
+        end
         # translate lhs = rhs to rhs - lhs
         if isempty(targets)
-            return Expr(:call, :(-), recur(ex.args[2]), recur(ex.args[1]))
+            return Expr(:call, :(-), recur(rhs), recur(lhs))
         end
 
         # ensure lhs is in targets
-        if !(ex.args[1] in targets)
+        if !(recur(lhs) in norm_targets)
             msg = string(
                 "Error normalizing expression\n\t$(ex)\n",
                 "Expected expression of the form `lhs = rhs` ",
@@ -121,7 +139,7 @@ function normalize(
             throw(NormalizeError(ex, msg))
         end
 
-        return Expr(:(=), recur(ex.args[1]), recur(ex.args[2]))
+        return Expr(:(=), recur(lhs), recur(rhs))
     end
 
 
@@ -662,6 +680,21 @@ function csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
                functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
     csubs(ex, d, Set(variables), Set(functions))
 end
+
+# ---------#
+# arg_name #
+# ---------#
+
+arg_name(s::Symbol) = s
+arg_name(s::Tuple{Symbol,Int}) = s[1]
+
+arg_time(s::Symbol) = 0
+arg_time(s::Tuple{Symbol,Int}) = s[2]
+
+arg_name_time(s) = (arg_name(s), arg_time(s))
+
+arg_names(s::AbstractVector) = arg_name.(s)
+arg_names(s::Associative) = vcat([arg_names(v) for v in values(s)]...)
 
 # --------- #
 # Utilities #

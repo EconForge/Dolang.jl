@@ -1,10 +1,10 @@
 @testset "compiler" begin
 
-eqs = [:(foo = log(a(0))+b(0)/x(-1)), :(bar = c(1)+u*d(1))]
+eqs = [:(foo(0) = log(a(0))+b(0)/x(-1)), :(bar(0) = c(1)+u*d(1))]
 args = [(:a, -1), (:a, 0), (:b, 0), (:c, 0), (:c, 1), (:d, 1)]
 params = [:u]
-defs = Dict(:x=>:(a/(1-c(1))))
-targets = [:foo, :bar]
+defs = Dict(:x=>:(a(0)/(1-c(1))))
+targets = [(:foo, 0), (:bar, 0)]
 funname = :myfun
 
 const flat_args = [(:a, 0), (:b, 1), (:c, -1)]
@@ -13,7 +13,7 @@ const flat_params = [:beta, :delta]
 const grouped_params = Dict(:p => [:u])
 
 
-args2 = vcat(args, [(:foo, 0), (:bar, 0)])::Vector{Tuple{Symbol,Int}}
+args2 = vcat(args, targets)::Vector{Tuple{Symbol,Int}}
 
 ff = Dolang.FunctionFactory(eqs, args, params, targets=targets, defs=defs,
                             funname=funname)
@@ -70,18 +70,18 @@ end
     have = Dolang.equation_block(ff)
     @test have.head == :block
     @test length(have.args) == 4
-    @test have.args[1] == :(_foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_)))
-    @test have.args[2] == :(_bar_ = _c__1_ + _u_ * _d__1_)
-    @test have.args[3] == :(Dolang._assign_var(out, _foo_, 1))
-    @test have.args[4] == :(Dolang._assign_var(out, _bar_, 2))
+    @test have.args[1] == :(_foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_)))
+    @test have.args[2] == :(_bar__0_ = _c__1_ + _u_ * _d__1_)
+    @test have.args[3] == :(Dolang._assign_var(out, _foo__0_, 1))
+    @test have.args[4] == :(Dolang._assign_var(out, _bar__0_, 2))
 
     # now test without targets
     have = Dolang.equation_block(ffnt)
     @test have.head == :block
     @test length(have.args) == 2
 
-    ex1 = :(log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_)) - _foo_)
-    ex2 = :(_c__1_ + _u_ * _d__1_ - _bar_)
+    ex1 = :(log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_)) - _foo__0_)
+    ex2 = :(_c__1_ + _u_ * _d__1_ - _bar__0_)
     @test have.args[1] == :(Dolang._assign_var(out, $ex1, 1))
     @test have.args[2] == :(Dolang._assign_var(out, $ex2, 2))
 end
@@ -142,10 +142,10 @@ end
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
-                    _bar_ = _c__1_ + _u_ * _d__1_
-                    Dolang._assign_var(out,_foo_,1)
-                    Dolang._assign_var(out,_bar_,2)
+                    _foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
+                    _bar__0_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo__0_,1)
+                    Dolang._assign_var(out,_bar__0_,2)
                 end
                 return out
             end
@@ -165,10 +165,10 @@ end
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
-                    _bar_ = _c__1_ + _u_ * _d__1_
-                    Dolang._assign_var(out,_foo_,1)
-                    Dolang._assign_var(out,_bar_,2)
+                    _foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
+                    _bar__0_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo__0_,1)
+                    Dolang._assign_var(out,_bar__0_,2)
                 end
                 return out
             end
@@ -217,10 +217,10 @@ end
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
-                    _bar_ = _c__1_ + _u_ * _d__1_
-                    Dolang._assign_var(out,_foo_,1)
-                    Dolang._assign_var(out,_bar_,2)
+                    _foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
+                    _bar__0_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo__0_,1)
+                    Dolang._assign_var(out,_bar__0_,2)
                 end
                 return out
             end
@@ -246,10 +246,10 @@ end
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
-                    _bar_ = _c__1_ + _u_ * _d__1_
-                    Dolang._assign_var(out,_foo_,1)
-                    Dolang._assign_var(out,_bar_,2)
+                    _foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
+                    _bar__0_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo__0_,1)
+                    Dolang._assign_var(out,_bar__0_,2)
                 end
                 return out
             end
@@ -304,10 +304,10 @@ end
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
-                    _bar_ = _c__1_ + _u_ * _d__1_
-                    Dolang._assign_var(out,_foo_,1)
-                    Dolang._assign_var(out,_bar_,2)
+                    _foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
+                    _bar__0_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo__0_,1)
+                    Dolang._assign_var(out,_bar__0_,2)
                 end
                 return out
             end
@@ -327,10 +327,10 @@ end
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
-                    _bar_ = _c__1_ + _u_ * _d__1_
-                    Dolang._assign_var(out,_foo_,1)
-                    Dolang._assign_var(out,_bar_,2)
+                    _foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
+                    _bar__0_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo__0_,1)
+                    Dolang._assign_var(out,_bar__0_,2)
                 end
                 return out
             end
@@ -378,10 +378,10 @@ end
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
-                    _bar_ = _c__1_ + _u_ * _d__1_
-                    Dolang._assign_var(out,_foo_,1)
-                    Dolang._assign_var(out,_bar_,2)
+                    _foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
+                    _bar__0_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo__0_,1)
+                    Dolang._assign_var(out,_bar__0_,2)
                 end
                 return out
             end
@@ -407,10 +407,10 @@ end
                     _d__1_ = Dolang._unpack_var(V,6)
                 end
                 begin
-                    _foo_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
-                    _bar_ = _c__1_ + _u_ * _d__1_
-                    Dolang._assign_var(out,_foo_,1)
-                    Dolang._assign_var(out,_bar_,2)
+                    _foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
+                    _bar__0_ = _c__1_ + _u_ * _d__1_
+                    Dolang._assign_var(out,_foo__0_,1)
+                    Dolang._assign_var(out,_bar__0_,2)
                 end
                 return out
             end
@@ -494,6 +494,72 @@ end
         @test have1 == Expr(:block, want_d!, want_d!_vec, want_d, want_d_vec)
         @test have2 == Expr(:block, want_d, want_d_vec)
         @test have3 == Expr(:block, want_d!, want_d!_vec)
+    end
+
+
+    @testset " make_function" begin
+        eqs = [:(a(0)*p^2+b(0))]
+        variables = [(:a, 0), (:b, 0), :p]
+
+        for (to_diff, args, params) in [
+                ([1, 2], [(:a, 0), (:b, 0)], [:p]),
+                ([1], [(:a, 0)], [(:b, 0), :p]),
+                ([1, 3], [(:a, 0), :p], [(:b ,0)])
+            ]
+
+            ff1 = Dolang.FunctionFactory(eqs, args, params)
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff),
+                Dolang.make_method(ff1, orders=[0, 1])
+            )
+
+            # test orders argument
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, orders=[0]),
+                Dolang.make_method(ff1, orders=[0])
+            )
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, orders=[0, 1]),
+                Dolang.make_method(ff1, orders=[0, 1])
+            )
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, orders=[1]),
+                Dolang.make_method(ff1, orders=[1])
+            )
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, orders=[2]),
+                Dolang.make_method(ff1, orders=[2])
+            )
+
+            # test dispatch arugment
+            ff2 = Dolang.FunctionFactory(Int, eqs, args, params)
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, dispatch=Int),
+                Dolang.make_method(ff2, orders=[0, 1])
+            )
+
+            # test name argument
+            ff3 = Dolang.FunctionFactory(eqs, args, params, funname=:slick)
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, name=:slick),
+                Dolang.make_method(ff3, orders=[0, 1])
+            )
+
+            # test allocating arg
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, allocating=false),
+                Dolang.make_method(ff1, orders=[0, 1], allocating=false)
+            )
+
+            # test targets argument
+            eqs2 = eqs = [:(x(0) = a(0)*p^2+b(0))]
+            targets = [(:x, 0)]
+            ff4 = Dolang.FunctionFactory(eqs2, args, params, targets=targets)
+            @test ==(
+                Dolang.make_function(eqs, variables, to_diff, targets=targets),
+                Dolang.make_method(ff4, orders=[0, 1])
+            )
+        end
     end
 
     @testset " evaluating compiled code" begin

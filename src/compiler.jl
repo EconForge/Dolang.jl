@@ -115,9 +115,8 @@ function equation_block(ff::FunctionFactory, ::TDer{0}=Der{0})
     else
         # otherwise, need to parse the targets, evaluate them, and then set
         # elements of out equal to the targets
-        parsed_targets = map(normalize, ff.targets)
         assignments = map((rhs, i) -> _assign_var_expr(:out, rhs, i),
-                          parsed_targets, 1:n_expr)
+                          ff.targets, 1:n_expr)
         func_block.args = vcat(ff.eqs, assignments)
     end
 
@@ -233,7 +232,7 @@ end
 
 # first we need a couple of helper methods
 
-function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
+function _jacobian_expr_mat{T<:FlatArgs}(ff::FunctionFactory{T})
     # NOTE: I'm starting with the easy version, where I just differentiate
     #       with respect to all arguments in the order they were given. It
     #       would be better if I went though `ff.incidence.by_var` and only
@@ -252,11 +251,11 @@ function _jacobian_expr_mat(ff::FunctionFactory{FlatArgs})
         eq_incidence = ff.incidence.by_eq[i_eq]
 
         for i_var in 1:nvar
-            v, shift = args[i_var]
+            v, shift = arg_name_time(args[i_var])
 
             if haskey(eq_incidence, v) && in(shift, eq_incidence[v])
                 non_zero += 1
-                my_deriv = deriv(eq_prepped, normalize((v, shift)))
+                my_deriv = deriv(eq_prepped, normalize(args[i_var]))
                 exprs[i_eq, i_var] = post_deriv(my_deriv)
             end
         end
@@ -288,7 +287,7 @@ function sizecheck_block{n}(ff::FunctionFactory, d::TDer{n})
     ex
 end
 
-function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{1})
+function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{1})
     expr_mat, non_zero = _jacobian_expr_mat(ff)
     neq = size(expr_mat, 1)
     nvar = size(expr_mat, 2)
@@ -325,7 +324,7 @@ end
 allocate_block(ff::FunctionFactory, ::TDer{2}) = nothing
 sizecheck_block(ff::FunctionFactory, ::TDer{2}) = nothing
 
-function _hessian_exprs(ff::FunctionFactory{FlatArgs})
+function _hessian_exprs{T<:FlatArgs}(ff::FunctionFactory{T})
     # NOTE: I'm starting with the easy version, where I just differentiate
     #       with respect to all arguments in the order they were given. It
     #       would be better if I went though `ff.incidence.by_var` and only
@@ -343,16 +342,16 @@ function _hessian_exprs(ff::FunctionFactory{FlatArgs})
         eq_incidence = ff.incidence.by_eq[i_eq]
 
         for i_v1 in 1:nvar
-            v1, shift1 = ff.args[i_v1]
+            v1, shift1 = arg_name_time(ff.args[i_v1])
 
             if haskey(eq_incidence, v1) && in(shift1, eq_incidence[v1])
-                diff_v1 = deriv(eq_prepped, normalize((v1, shift1)))
+                diff_v1 = deriv(eq_prepped, normalize(ff.args[i_v1]))
 
                 for i_v2 in i_v1:nvar
-                    v2, shift2 = ff.args[i_v2]
+                    v2, shift2 = arg_name_time(ff.args[i_v2])
 
                     if haskey(eq_incidence, v2) && in(shift2, eq_incidence[v2])
-                        diff_v1v2 = deriv(diff_v1, normalize((v2, shift2)))
+                        diff_v1v2 = deriv(diff_v1, normalize(ff.args[i_v2]))
 
                         # might still be zero if terms were independent
                         if diff_v1v2 != 0
@@ -368,7 +367,7 @@ function _hessian_exprs(ff::FunctionFactory{FlatArgs})
 end
 
 # Ordering of hessian is H[eq, (v1,v2)]
-function equation_block(ff::FunctionFactory{FlatArgs}, ::TDer{2})
+function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{2})
     exprs = _hessian_exprs(ff)
     n_expr = length(exprs)
     nvar = nargs(ff)
@@ -443,7 +442,7 @@ end
 
 # we don't support non-allocating method for Hessians
 build_function!(ff::FunctionFactory, ::TDer{2}) =
-    error("Non-allocating Hessians not supported")
+    warn("Non-allocating Hessians not supported")
 
 # -------------------------- #
 # Putting functions together #
@@ -574,7 +573,7 @@ end
 function make_method(eqs::Vector{Expr},
                      arguments::ArgType,
                      params::ParamType;
-                     targets::Vector{Symbol}=Symbol[],
+                     targets=Symbol[],
                      defs::Associative=Dict(),
                      funname::Symbol=gensym(:anonymous),
                      mutating::Bool=true,
@@ -590,7 +589,7 @@ end
 function make_method{T}(::Type{T}, eqs::Vector{Expr},
                         arguments::ArgType,
                         params::ParamType;
-                        targets::Vector{Symbol}=Symbol[],
+                        targets=Symbol[],
                         defs::Associative=Dict(),
                         funname::Symbol=gensym(:anonymous),
                         mutating::Bool=true,
@@ -599,4 +598,26 @@ function make_method{T}(::Type{T}, eqs::Vector{Expr},
                          targets=targets, defs=defs, funname=funname)
 
     make_method(ff; mutating=mutating, allocating=allocating, orders=orders)
+end
+
+
+function make_function(
+        eqs::Vector{Expr}, variables::AbstractVector,
+        to_diff::AbstractVector=1:length(variables);
+        dispatch::DataType=SkipArg,
+        targets=Symbol[],
+        orders::AbstractVector{Int}=[0, 1],
+        name::Symbol=:anon, allocating::Bool=true
+    )
+
+    args = variables[to_diff]
+    not_to_diff = setdiff(1:length(variables), to_diff)
+    params = variables[not_to_diff]
+
+    ff = FunctionFactory(
+        dispatch, eqs, args, params; targets=targets, funname=name
+    )
+
+    make_method(ff; allocating=allocating, orders=orders)
+
 end
