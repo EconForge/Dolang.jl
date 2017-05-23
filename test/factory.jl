@@ -28,7 +28,7 @@ end
         :M => [(:c, 1), (:d, 1)]
     )
     params = [:u]
-    defs = Dict(:x=>:(a/(1-c(1))))
+    defs = Dict(:x=>:(a(0)/(1-c(1))))
     targets = [(:foo, 0), (:bar, 0)]
     funname = :myfun
     _FF = Dolang.FunctionFactory

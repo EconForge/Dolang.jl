@@ -49,19 +49,16 @@ normalized expression that it should be replaced with.
 ## Example
 
 ```jlcon
-julia> defs = Dict(:x=>:(a/(1-c(1))));
+julia> defs = Dict(:x=>:(a(0)/(1-c(1))));
 
-julia> incidence = Dolang.IncidenceTable(:(foo(0) = log(a)+b/x(-1)));
+julia> incidence = Dolang.IncidenceTable(:(foo(0) = log(a(0))+b(0)/x(-1)));
 
-julia> dynvars = [:a, :b, :c];
-
-julia> Dolang.build_definition_map(defs, incidence, dynvars)
+julia> Dolang.build_definition_map(defs, incidence)
 Dict{Symbol,Union{Expr, Number, Symbol}} with 1 entry:
   :_x_m1_ => :(_a_m1_ / (1 - _c__0_))
 ```
 """
-function build_definition_map(defs::Associative, incidence::IncidenceTable,
-                              _dynvars::Union{Vector{Symbol},Set{Symbol}})
+function build_definition_map(defs::Associative, incidence::IncidenceTable)
     out = Dict{Symbol,Union{Symbol,Expr,Number}}()
 
     # NOTE: we need to make the keys of definitions have the form
@@ -73,7 +70,6 @@ function build_definition_map(defs::Associative, incidence::IncidenceTable,
     end
 
     funcs = Set{Symbol}()
-    dynvars = Set(_dynvars)
 
     for def_var in keys(defs)
         if haskey(incidence.by_var, def_var)
@@ -81,7 +77,7 @@ function build_definition_map(defs::Associative, incidence::IncidenceTable,
             for time in incidence.by_var[def_var]
                 new_key = normalize((def_var, time))
                 out[new_key] = normalize(
-                    time_shift(_ex, time, dynvars, funcs, defs)
+                    time_shift(_ex, time, funcs, defs)
                 )
             end
         end
@@ -130,8 +126,7 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
 
         # construct mapping from normalized definition name to desired
         # expression
-        dynvars = arg_names(args)
-        def_map = build_definition_map(defs, incidence, dynvars)
+        def_map = build_definition_map(defs, incidence)
 
         # now normalize the equations and make subs
         # _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))

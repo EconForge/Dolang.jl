@@ -222,30 +222,20 @@ normalize(exs::Vector{Expr}; kwargs...) =
 """
 ```julia
 time_shift(s::Symbol, shift::Integer,
-           variables::Set{Symbol}=Set{Symbol}(),
            functions::Set{Symbol}=Set{Symbol}(),
            defs::Associative=Dict())
 ```
-
-If `s` is in `variables`, then return the expression `s(shift)`
 
 If `s` is in `defs`, then return the shifted version of the definition
 
 Otherwise return `s`
 """
 function time_shift(s::Symbol, shift::Integer,
-                    variables::Set{Symbol},
                     functions::Set{Symbol},
                     defs::Associative)
-
-    # if `s` is a function arg then return shifted version of s
-    if s in variables
-        return :($s($(shift)))
-    end
-
     # if it is a def, recursively substitute it
     if haskey(defs, s)
-        return time_shift(defs[s], shift, variables, functions, defs)
+        return time_shift(defs[s], shift, functions, defs)
     end
 
     # any other symbols just gets parsed
@@ -253,9 +243,7 @@ function time_shift(s::Symbol, shift::Integer,
 end
 
 """
-```julia
-time_shift(x::Number, other...)
-```
+    time_shift(x::Number, other...)
 
 Return `x` for all values of `other`
 """
@@ -264,7 +252,6 @@ time_shift(x::Number, other...) = x
 """
 ```julia
 time_shift(ex::Expr, shift::Integer,
-           variables::Set{Symbol}=Set{Symbol}(),
            functions::Set{Symbol}=Set{Symbol}(),
            defs::Associative=Dict())
 ```
@@ -279,7 +266,6 @@ on the form of `ex` (list below has the form "contents of ex: return expr"):
 - Any other `Expr`: `Expr(ex.head, map(i -> time_shift(i, args, shift, defs), ex.args))`
 """
 function time_shift(ex::Expr, shift::Integer,
-                    variables::Set{Symbol},
                     functions::Set{Symbol},
                     defs::Associative)
 
@@ -290,11 +276,14 @@ function time_shift(ex::Expr, shift::Integer,
 
         # if we found a definition, move to resolving it
         if haskey(defs, var)
-            time_shift(defs[var], shift+i, variables, functions, defs)
+            time_shift(defs[var], shift+i, functions, defs)
         end
 
-        # variables = Symbol[variables; var]
-        return time_shift(var, shift+i, variables, functions, defs)
+        if var in functions
+            return ex
+        else
+            return Expr(:call, var, shift+i)
+        end
     end
 
     # if it is some kind of function call, shift arguments
@@ -303,7 +292,7 @@ function time_shift(ex::Expr, shift::Integer,
         if func in DOLANG_FUNCTIONS || func in functions
             out = Expr(:call, func)
             for arg in ex.args[2:end]
-                push!(out.args, time_shift(arg, shift, variables, functions, defs))
+                push!(out.args, time_shift(arg, shift, functions, defs))
             end
             return out
         else
@@ -313,26 +302,24 @@ function time_shift(ex::Expr, shift::Integer,
 
     # otherwise just shift all args, but retain expr head
     out = Expr(ex.head)
-    out.args = [time_shift(an_arg, shift, variables, defs) for an_arg in ex.args]
+    out.args = [time_shift(an_arg, shift, defs) for an_arg in ex.args]
     return out
 end
 
 """
 ```julia
 time_shift(ex::Expr, shift::Int=0;
-           variables::Union{Set{Symbol},Vector{Symbol}}=Vector{Symbol}(),
            functions::Union{Set{Symbol},Vector{Symbol}}=Vector{Symbol}(),
            defs::Associative=Dict())
 ```
 
-Version of `time_shift` where `variables`, `functions`, and `defs` are keyword
-arguments with default values.
+Version of `time_shift` where `functions` and `defs` are keyword arguments with
+default values.
 """
 function time_shift(ex::Expr, shift::Integer=0;
-                    variables::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
                     functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
                     defs::Associative=Dict())
-    time_shift(ex, shift, Set(variables), Set(functions), defs)
+    time_shift(ex, shift, Set(functions), defs)
 end
 
 # ------------ #
@@ -409,78 +396,58 @@ end
 # ------------ #
 
 function list_symbols(ex::Expr;
-                      functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
-                      variables::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
+                      functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
     out = Dict{Symbol,Any}()
-    list_symbols!(out, ex, Set(functions), Set(variables))
+    list_symbols!(out, ex, Set(functions))
 end
 
 """
-```julia
-list_symbols!(out, s::Symbol, functions::Set{Symbol}, variables::Set{Symbol})
-```
+    list_symbols!(out, s::Symbol, functions::Set{Symbol})
 
-If `s` is in `variables`, add `(s, 0)` to `out[:variables]`. Otherwise, add
-`s` to `out[:parameters]``
+Add `s` to `out[:parameters]``
 """
-function list_symbols!(out, s::Symbol, functions::Set{Symbol},
-                       variables::Set{Symbol})
-    if s in variables
-        current = get!(out, :variables, Set{Tuple{Symbol,Int}}())
-        push!(current, (s, 0))
-    else
-        current = get!(out, :parameters, Set{Symbol}())
-        push!(current, s)
-    end
-
+function list_symbols!(out, s::Symbol, functions::Set{Symbol})
+    current = get!(out, :parameters, Set{Symbol}())
+    push!(current, s)
     out
 end
 
 
 """
-```julia
-list_symbols!(out, s::Any, functions::Set{Symbol}, variables::Set{Symbol})
-```
+    list_symbols!(out, s::Any, functions::Set{Symbol})
 
 Do nothing -- if s is not a `Symbol` or `Expr` (handled in separate methods)
 do not add anything to symbol list.
 """
-function list_symbols!(out, ex::Any, functions::Set{Symbol},
-                       variables::Set{Symbol})
-    nothing
-end
+list_symbols!(out, ex::Any, functions::Set{Symbol}) = out
 
 """
-```julia
-list_symbols!(out, s::Expr, functions::Set{Symbol}, variables::Set{Symbol})
-```
+    list_symbols!(out, s::Expr, functions::Set{Symbol})
 
 Walk the expression and populate `out` according to the following rules for
 each type of subexpression encoutered:
 
-- `s::Symbol`: if `s` is in `variables`, add `(s, 0)` to `out[:variables]`,
-otherwise add `s` to `out[:parameters]`
-- `x(i::Integer)`: Add `(x, i)` out `out[:parameters]``
+- `s::Symbol`: add `s` to `out[:parameters]`
+- `x(i::Integer)`: Add `(x, i)` out `out[:variables]`
 - All other function calls: add any arguments to `out` according to above rules
 - Anything else: do nothing.
 """
-function list_symbols!(out, ex::Expr, functions::Set{Symbol},
-                       variables::Set{Symbol})
+function list_symbols!(out, ex::Expr, functions::Set{Symbol})
     # here we just need to walk the expression tree and pull out symbols
     if is_time_shift(ex)
-        var = ex.args[1]
-        shift = ex.args[2]
+        var, shift = arg_name_time(ex)
         current = get!(out, :variables, Set{Tuple{Symbol,Int}}())
         push!(current, (var, shift))
         return out
     end
 
-    # if it is some kind of function call, steady_state arguments
+    # if it is some kind of function call, make sure we recognize it and throw
+    # errors otherwise
     if ex.head == :call
         func = ex.args[1]
         if func in DOLANG_FUNCTIONS || func in functions
             for arg in ex.args[2:end]
-                list_symbols!(out, arg, functions, variables)
+                list_symbols!(out, arg, functions)
             end
             return out
         else
@@ -488,30 +455,29 @@ function list_symbols!(out, ex::Expr, functions::Set{Symbol},
         end
     end
 
+    # TODO: this is not flexible. It will completely skip over things like
+    #       b[i](t).
+    out
 end
-
-# TODO: potential name change. match_recipe?
-# function list_symbols(::Expr, recipe::Associative) => Dict(keys=keys(recipe), values=incidence)
-# end
 
 # -------------- #
 # list_variables #
 # -------------- #
 
-# function list_variables(ex::Expr;
-#                       functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
-#                       variables::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
-#     syms = list_symbols(ex; functions=functions, variables=variables)
-#     out = Set{Symbol}()
-#     for (k, v) in syms
-#         for sym in v
-#             isa(sym, Symbol) ? push!(out, sym) :
-#             isa(sym, Tuple{Symbol,Int}) ? push!(out, sym[1]):
-#             error("not sure what happened here")
-#         end
-#     end
-#     out
-# end
+function list_variables(
+        arg;
+        functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}()
+    )::Set{Tuple{Symbol,Int}}
+    list_symbols(arg, functions=functions)[:variables]
+end
+
+
+function list_parameters(
+        arg;
+        functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}()
+    )::Set{Symbol}
+    list_symbols(arg, functions=functions)[:parameters]
+end
 
 # ---- #
 # subs #
@@ -534,14 +500,22 @@ end
 
 _subs(x::Number, d::Associative, a...) = (x, false)
 
-function _subs(ex::Expr, d::Associative,
-               variables::Set{Symbol},
-               funcs::Set{Symbol})
+function _subs(ex::Expr, d::Associative, funcs::Set{Symbol})
     if is_time_shift(ex)
-        var = ex.args[1]
-        shift = ex.args[2]
+        var, shift = arg_name_time(ex)
         if haskey(d, (var, shift))
             new_ex = d[(var, shift)]
+            return new_ex, true
+        end
+
+        if haskey(d, var)
+            new_ex = time_shift(var, shift, funcs, d)
+            return new_ex, true
+        end
+
+        # repeat for (var, 0)
+        if haskey(d, (var, 0))
+            new_ex = time_shift(d[(var, 0)], shift, funcs, d)
             return new_ex, true
         end
 
@@ -553,7 +527,7 @@ function _subs(ex::Expr, d::Associative,
     changed = false
 
     for (i, arg) in enumerate(ex.args)
-        new_arg, arg_changed = _subs(arg, d, variables, funcs)
+        new_arg, arg_changed = _subs(arg, d, funcs)
         out_args[i] = new_arg
         changed = changed || arg_changed
     end
@@ -575,9 +549,8 @@ for that expression: `(:x, 1)`
 """
 function subs(ex::Union{Expr,Symbol,Number}, from,
               to::Union{Symbol,Expr,Number},
-              variables::Set{Symbol},
               funcs::Set{Symbol})
-    _subs(ex, Dict(from=>to), variables, funcs)[1]
+    _subs(ex, Dict(from=>to), funcs)[1]
 end
 
 """
@@ -597,9 +570,8 @@ The one exception to this rule is that a key `:k` is treated the same as `(:k,
 0)`.
 """
 function subs(ex::Union{Expr,Symbol,Number}, d::Associative,
-              variables::Set{Symbol},
               funcs::Set{Symbol})
-    _subs(ex, d, variables, funcs)[1]
+    _subs(ex, d, funcs)[1]
 end
 
 """
@@ -613,27 +585,13 @@ Verison of `subs` where `variables` and `functions` are keyword arguments with
 default values
 """
 function subs(ex::Union{Expr,Symbol,Number}, d::Associative;
-              variables::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}(),
               functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
-    subs(ex, d, Set(variables), Set(functions))
+    subs(ex, d, Set(functions))
 end
 
 """
 ```julia
-csubs(x::Union{Symbol,Number}, d::Associative)
-```
-
-If `x` is a key in `d`, return the assocaited value. Otherwise return `x`
-"""
-function csubs(x::Union{Symbol,Number}, d::Associative,
-               variables::Set{Symbol},
-               funcs::Set{Symbol})
-    _subs(x, d, variables, funcs)[1]
-end
-
-"""
-```julia
-csubs(ex::Expr, d::Associative,
+csubs(ex::Union{Symbol,Expr,Number}, d::Associative,
       variables::Set{Symbol}=Set{Symbol}(),
       funcs::Set{Symbol}=Set{Symbol}())
 ```
@@ -652,14 +610,13 @@ subs(ex, d)  # returns :(a + c / a)
 csubs(ex, d)  # returns :(a + (2a) / a)
 ```
 """
-function csubs(ex::Expr, d::Associative,
-               variables::Set{Symbol},
+function csubs(ex::Union{Symbol,Expr,Number}, d::Associative,
                funcs::Set{Symbol})
-    max_it = length(d) + 1
+    max_it = (length(d) + 1)^2
     max_it == 1 && return ex
 
     for i in 1:max_it
-        ex, changed = _subs(ex, d, variables, funcs)
+        ex, changed = _subs(ex, d, funcs)
         !changed && return ex
     end
 
@@ -669,16 +626,14 @@ end
 """
 ```julia
 csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
-      variables::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}(),
       functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
 ```
 
 Verison of `csubs` where `variables` and `functions` are keyword arguments.
 """
 function csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
-               variables::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}(),
                functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
-    csubs(ex, d, Set(variables), Set(functions))
+    csubs(ex, d, Set(functions))
 end
 
 # ---------#
@@ -687,9 +642,31 @@ end
 
 arg_name(s::Symbol) = s
 arg_name(s::Tuple{Symbol,Int}) = s[1]
+function arg_name(ex::Expr)::Symbol
+    if is_time_shift(ex)
+        return ex.args[1]
+    else
+        m = string(
+            "Expression $(ex) does not look like a variable. ",
+            "The only allowed expressions must satisfy `is_time_shift(ex)`"
+        )
+        error(m)
+    end
+end
 
 arg_time(s::Symbol) = 0
 arg_time(s::Tuple{Symbol,Int}) = s[2]
+function arg_time(ex::Expr)::Int
+    if is_time_shift(ex)
+        return ex.args[2]
+    else
+        m = string(
+            "Expression $(ex) does not look like a variable. ",
+            "The only allowed expressions must satisfy `is_time_shift(ex)`"
+        )
+        error(m)
+    end
+end
 
 arg_name_time(s) = (arg_name(s), arg_time(s))
 

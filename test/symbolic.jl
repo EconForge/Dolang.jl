@@ -147,49 +147,36 @@ end
 
 @testset "Dolang.time_shift" begin
     defs = Dict(:a=>:(b(-1)/c))
+    defs_sanitized = Dict(:a=>:(b(-1)/c(0)))
     funcs = [:foobar]
     for shift in [-1, 0, 1]
-        have = Dolang.time_shift(:(a+b(1) + c), shift, variables=[:b])
+        have = Dolang.time_shift(:(a+b(1) + c), shift)
         @test have == :(a+b($(shift+1)) + c)
 
-        # with variables
-        have = Dolang.time_shift(:(a+b(1) + c), shift, variables=[:b, :c])
-        @test have == :(a+b($(shift+1)) + c($shift))
+        have = Dolang.time_shift(:(a+b(1) + c(0)), shift)
+        @test have == :(a+b($(shift+1)) + c($(shift)))
 
         # with defs
-        have = Dolang.time_shift(:(a+b(1) + c), shift, defs=defs, variables=[:b])
+        have = Dolang.time_shift(:(a+b(1) + c), shift, defs=defs)
         @test have == :(b($(shift-1))/c + b($(shift+1)) + c)
 
-        # with defs + variables
-        have = Dolang.time_shift(:(a+b(1) + c), shift,
-                                 defs=defs, variables=[:b, :c])
+        have = Dolang.time_shift(:(a+b(1) + c(0)), shift, defs=defs)
+        @test have == :(b($(shift-1))/c + b($(shift+1)) + c($(shift)))
+
+        # note that defs have to be sanitized
+        have = Dolang.time_shift(:(a+b(1) + c(0)), shift, defs=defs_sanitized)
         @test have == :(b($(shift-1))/c($(shift)) + b($(shift+1)) + c($(shift)))
 
         # unknown function
         @test_throws Dolang.UnknownFunctionError Dolang.time_shift(:(a+b(1) + foobar(c)), shift)
 
         # with functions
-        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, functions=funcs,
-                                 variables=[:b])
+        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, functions=funcs)
         @test have == :(a+b($(shift+1)) + foobar(c))
 
         # functions + defs
-        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, variables=[:b],
-                                 defs=defs, functions=funcs)
+        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, defs=defs, functions=funcs)
         @test have == :(b($(shift-1))/c + b($(shift+1)) + foobar(c))
-
-        # functions + variables
-        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, variables=[:b],
-                                 variables=[:b, :c], functions=funcs)
-        @test have == :(a+b($(shift+1)) + foobar(c($shift)))
-
-        # functions + variables + defs
-        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift,
-                                 variables=[:b, :c], functions=funcs,
-                                 defs=defs)
-        want = :(b($(shift-1))/c($(shift)) + b($(shift+1)) + foobar(c($(shift))))
-        @test have == want
-
     end
 end
 
@@ -209,30 +196,37 @@ end
 end
 
 @testset "Dolang.list_symbols" begin
-    out = Dolang.list_symbols(:(a+b(1)+c))
-    want = Set{Tuple{Symbol,Int}}(); push!(want, (:b, 1))
+    ex = :(a+b(1)+c)
+    out = Dolang.list_symbols(ex)
     @test haskey(out, :variables)
-    @test out[:variables] == want
+    @test out[:variables] == Set([(:b, 1)])
     @test haskey(out, :parameters)
     @test out[:parameters] == Set{Symbol}([:a, :c])
+    @test out[:variables] == @inferred Dolang.list_variables(ex)
+    @test out[:parameters] == @inferred Dolang.list_parameters(ex)
 
-    out = Dolang.list_symbols(:(a+b(1)+c), variables=[:c])
-    want = Set{Tuple{Symbol,Int}}(); push!(want, (:b, 1)); push!(want, (:c, 0))
+    ex = :(a+b(1)+c(0))
+    out = Dolang.list_symbols(ex)
     @test haskey(out, :variables)
-    @test out[:variables] == want
+    @test out[:variables] == Set([(:b, 1), (:c, 0)])
     @test haskey(out, :parameters)
     @test out[:parameters] == Set{Symbol}([:a])
+    @test out[:variables] == @inferred Dolang.list_variables(ex)
+    @test out[:parameters] == @inferred Dolang.list_parameters(ex)
 
     # Unknown function
     @test_throws Dolang.UnknownFunctionError Dolang.list_symbols(:(a+b(1)+c+foobar(c)))
 
     # now let the function be ok
-    out = Dolang.list_symbols(:(a+b(1)+c + foobar(c)), functions=[:foobar])
-    want = Set{Tuple{Symbol,Int}}(); push!(want, (:b, 1))
+    ex = :(a+b(1)+c + foobar(c))
+    out = Dolang.list_symbols(ex, functions=[:foobar])
     @test haskey(out, :variables)
-    @test out[:variables] == want
+    @test out[:variables] == Set([(:b, 1)])
     @test haskey(out, :parameters)
     @test out[:parameters] == Set{Symbol}([:a, :c])
+    @test out[:variables] == @inferred Dolang.list_variables(ex, functions=[:foobar])
+    @test out[:parameters] == @inferred Dolang.list_parameters(ex, functions=[:foobar])
+
 end
 
 @testset " csubs()" begin
@@ -244,19 +238,21 @@ end
     want = :(python(faster + more, eats))
     @test Dolang.csubs(:(monty(run + eat, eats)), d) == want
 
-    d = Dict(:b => :(c + d(1)))
-    ex = :(a + b + b(1))
-    want = :(a + (c + d(1)) + b(1))
-    @test Dolang.csubs(ex, d) == want
+    for ex in [:(a + b(0) + b(1)), :(a + b + b(1))]
+        for key in [:b, (:b, 0)]
+            d = Dict(key => :(c(0) + d(1)))
+            want = :(a + (c(0) + d(1)) + (c(1) + d(2)))
+            @test Dolang.csubs(ex, d) == want
 
-    d = Dict((:b, 0) => :(c + d(1)))
-    ex = :(a + b + b(1))
-    want = :(a + (c + d(1)) + b(1))
-    @test Dolang.csubs(ex, d) == want
+            d = Dict(key => :(c + d(1)))
+            want = :(a + (c + d(1)) + (c + d(2)))
+            @test Dolang.csubs(ex, d) == want
+        end
+    end
 
-    d = Dict((:b, 0) => :(c + d(1)), (:b, 1) => :(c(1) + d(2)))
+    d = Dict((:b, 0) => :(c + d(1)), (:b, 1) => :(c(100) + d(2)))
     ex = :(a + b + b(1))
-    want = :(a + (c + d(1)) + (c(1) + d(2)))
+    want = :(a + (c + d(1)) + (c(100) + d(2)))
     @test Dolang.csubs(ex, d) == want
 
     # case where subs and csubs aren't the same
@@ -281,11 +277,13 @@ end
             @test Dolang.arg_name((s, t)) == s
             @test Dolang.arg_time((s, t)) == t
             @test Dolang.arg_name_time((s, t)) == (s, t)
+            @test Dolang.arg_name(Expr(:call, s, t)) == s
+            @test Dolang.arg_time(Expr(:call, s, t)) == t
+            @test Dolang.arg_name_time(Expr(:call, s, t)) == (s, t)
         end
     end
 
     for f in (Dolang.arg_name, Dolang.arg_time, Dolang.arg_name_time, Dolang.arg_names)
-        @test_throws MethodError f(:(x(0)))  # Expr
         @test_throws MethodError f(1)        # Number
         @test_throws MethodError f([1])      # Array of number
     end
