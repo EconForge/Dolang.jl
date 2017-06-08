@@ -1,3 +1,4 @@
+# NOTE: for documentation on how this stuff works see docs/dev/compiler.md
 # --------- #
 # Utilities #
 # --------- #
@@ -39,45 +40,6 @@ _assign_var_expr(lhs, rhs, i) = :(Dolang._assign_var($lhs, $rhs, $i))
 # ----------------- #
 # Expression Blocks #
 # ----------------- #
-
-#=
-Each function is composed of multiple blocks. Each of these blocks is
-associated with a function that can be overloaded to customize behavior
-
-For a function that allocates memory for the output and returns the alloacted
-array, we have the following blocks (in this order):
-
-1. `allocate_block`: Allocates memory to hold the output of the evaluated
-equations. Memory is bound to a variable named `out`
-2. `param_block`: Unpacks items from the `params` field
-3. `arg_block`: Unpacks items from the `arg` field
-4. `equation_block`: uses the now locally defined variables from params and
-args to evaluate the equations
-5. `return_block`: Simply returns `out`
-
-For a mutating function that populates a pre-allocated array with the value
-of the function at specified values for the args and params we have:
-
-1. `sizecheck_block`: Checks that the size of the `out` argument that was
-passed into the function is conformable with the input args and parameters and
-the equations.
-2. `param_block`: Unpacks items from the `params` field
-3. `arg_block`: Unpacks items from the `arg` field
-4. `equation_block`: uses the now locally defined variables from params and
-args to evaluate the equations
-5. `return_block`: Simply returns `out`
-
-In both cases steps 2-5 are the same and are called the `body_block`
-
-The `allocate_block`, `size_checkblock`, and `equation_block` can all depend
-on the order of derivative to be computed. For that reason, the corresponding
-functions all have the signature `func{n}(::FunctionFactory, ::TDer{n})`. To
-implement the body of a function higher order derivatives, you only need to
-provide methods for these functions. Also, each of them has the second argument
-defaulting to `Der{0}`, so calling `func(ff)` will return the 0th order
-derivative (or level) version of that block.
-
-=#
 
 "Expression that allocates memory for variable `out` in non-mutating version"
 allocate_block(ff::FunctionFactory, ::TDer{0}=Der{0}) =
@@ -132,50 +94,6 @@ end
 # ------------------- #
 # Function Signatures #
 # ------------------- #
-
-#=
-In addition to the function blocks dicussed above, we also need to know the
-signature of each function so it can be defined.
-
-The signature of the generated function for `ff::FunctionFactory` has the
-following structure:
-
-`ff.funname([DERIVATIVE], [DISPATCH], arg_names(ff)..., param_names(ff)...)`
-
-Let's take it once piece at a time:
-
-- `ff.funname` is the provided function name
-- `DERIVATIVE` has the form `::Type{Dolang.Der{N}}`, where `N` is meant to
-specify the order(s) of the derivative to be evaluated. This allows you to use
-the same function name, but control which order of derivative is evaluated by
-passing `Der{N}` as the first argument to `ff.funname`. If `N == 0`, this
-section of the signature is skipped.
-- `DISPATCH` has the form `::Type{ff.dispatch}` where `ff.dispatch` should be
-a Julia `DataType`. This is used to create many methods for same function (i.e.
-mulitple versions of the function with the same name), but have them be
-distinguishable to the Julia compiler. See example usage to see how it works.
-By default `ff.dispatch` is set to `Dolang.SkipArg`. When
-`ff.dispatch == SkipArg`, the compiler completely skips the `[DISPATCH]`
-section of the signature
-- `arg_names(ff)...` is simply the name of the arguments from `ff.args`. If
-`ff.args` is a `Vector` (more specifically a `Dolang.FlatArgs`), then this will
-be `[:V]`. If `ff.args` is some `Associative` structure, then this will be the
-keys of that structure.
-- `param_names(ff)` is the same as `arg_names(ff)`, but applied to the
-`ff.params` field
-
-We also need a signature for the mutating version of the signature. This has
-the structure
-
-`ff.funname!([DERIVATIVE], [DISPATCH], out, arg_names(ff)..., param_names(ff)...)`
-
-Everything is the same as above, except that `ff.funname!` is now the original
-function name with `!` appended to it and there is an additional `out`
-argument. This is the array that should be filled with the evaluated equations
-and always comes _after_ arguments that drive dispatch (`DERIVATIVE` and
-`DISPATCH`), but _before_ args and params.
-
-=#
 
 arg_names{T1<:FlatArgs}(::FunctionFactory{T1}) = [:V]
 
@@ -345,10 +263,10 @@ function make_deriv_loop(i::Int, der_order::Int)
     # if i == der_order or it will differentiate the current expression wrt
     # the ith variable and recursively call this function with i = i+1
     if i == der_order
-        prev_diff_sym = Symbol("diff_v_", i-1)
+        sym_to_diff = i == 1 ? :eq_prepped : Symbol("diff_v_", i-1)
         index_tuple = Expr(:tuple, [Symbol("iv_", j) for j in 1:i]...)
         inner_loop_guts = quote
-            $diff_sym = deriv($prev_diff_sym, normalize(ff.args[$i_sym]))
+            $diff_sym = deriv($sym_to_diff, normalize(ff.args[$i_sym]))
 
             # might still be zero if terms were independent
             if $diff_sym != 0
