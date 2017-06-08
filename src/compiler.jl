@@ -299,7 +299,7 @@ end
 # code to generate derivative expressions. This could be put in the body of
 # the `@generated` function, but that makes it hard for me to see the code
 # that is generated, so I make it a standalone function.
-function derivative_exprs_impl{T<:FlatArgs,D}(::Type{<:FunctionFactory{T}}, ::TDer{D})
+@compat function derivative_exprs_impl{T<:FlatArgs,D}(::Type{<:FunctionFactory{T}}, ::TDer{D})
     # first, build the body of loops that differentiate an equation.
     body = make_deriv_loop(1, D)
     quote
