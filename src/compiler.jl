@@ -324,51 +324,78 @@ end
 allocate_block(ff::FunctionFactory, ::TDer{2}) = nothing
 sizecheck_block(ff::FunctionFactory, ::TDer{2}) = nothing
 
-function _hessian_exprs{T<:FlatArgs}(ff::FunctionFactory{T})
-    # NOTE: I'm starting with the easy version, where I just differentiate
-    #       with respect to all arguments in the order they were given. It
-    #       would be better if I went though `ff.incidence.by_var` and only
-    #       made columns for variables that appear in the equations
-    neq = length(ff.eqs)
-    nvar = nargs(ff)
+function make_deriv_loop(i::Int, der_order::Int)
+    i < 1 && error("i must be positive")
+    i_sym = Symbol("iv_", i)
+    var_sym = Symbol("v_", i)
+    shift_sym = Symbol("shift_", i)
+    diff_sym = Symbol("diff_v_", i)
 
-    # To do this we use linear indexing tricks to access `out` and `expr_mat`.
-    # Note the offset on the index to expr_args also (needed because allocating)
-    # is the first expression in the block
-    terms = Array{Tuple{Int,Tuple{Int,Int},Union{Expr,Symbol,Number}}}(0)
-    for i_eq in 1:neq
-        ex = _rhs_only(ff.eqs[i_eq])
-        eq_prepped = prep_deriv(ex)
-        eq_incidence = ff.incidence.by_eq[i_eq]
+    # build loop range
+    if i == 1
+        loop_range = :($i_sym = 1:nvar)
+    else
+        prev_i_sym = Symbol("iv_", i-1)
+        loop_range = :($i_sym = $prev_i_sym:nvar)
+    end
 
-        for i_v1 in 1:nvar
-            v1, shift1 = arg_name_time(ff.args[i_v1])
+    if i == der_order
+        prev_diff_sym = Symbol("diff_v_", i-1)
+        index_tuple = Expr(:tuple, [Symbol("iv_", j) for j in 1:i]...)
+        inner_loop_guts = quote
+            $diff_sym = deriv($prev_diff_sym, normalize(ff.args[$i_sym]))
 
-            if haskey(eq_incidence, v1) && in(shift1, eq_incidence[v1])
-                diff_v1 = deriv(eq_prepped, normalize(ff.args[i_v1]))
-
-                for i_v2 in i_v1:nvar
-                    v2, shift2 = arg_name_time(ff.args[i_v2])
-
-                    if haskey(eq_incidence, v2) && in(shift2, eq_incidence[v2])
-                        diff_v1v2 = deriv(diff_v1, normalize(ff.args[i_v2]))
-
-                        # might still be zero if terms were independent
-                        if diff_v1v2 != 0
-                            push!(terms, (i_eq, (i_v1, i_v2), post_deriv(diff_v1v2)))
-                        end
-                    end
-                end
+            # might still be zero if terms were independent
+            if $diff_sym != 0
+                push!(terms, (i_eq, $index_tuple, post_deriv($diff_sym)))
             end
+        end
+    else
+        inner_loop_guts = Expr(
+            :block,
+            :($diff_sym = deriv(eq_prepped, normalize(ff.args[$i_sym]))),
+            make_deriv_loop(i+1, der_order)
+        )
+    end
+
+    # build loop body
+    body = quote
+        $var_sym, $shift_sym = arg_name_time(ff.args[$i_sym])
+        if haskey(eq_incidence, $var_sym) && in($shift_sym, eq_incidence[$var_sym])
+            $inner_loop_guts
         end
     end
 
-    return terms
+    Expr(:for, loop_range, body)
+end
+
+function derivative_exprs_impl{T<:FlatArgs,D}(::Type{<:FunctionFactory{T}}, ::TDer{D})
+    body = make_deriv_loop(1, D)
+    quote
+        neq = length(ff.eqs)
+        nvar = nargs(ff)
+
+        terms = Vector{Tuple{Int,NTuple{$D,Int},Union{Expr,Symbol,Number}}}(0)
+
+        for i_eq in 1:neq
+            ex = _rhs_only(ff.eqs[i_eq])
+            eq_prepped = prep_deriv(ex)
+            eq_incidence = ff.incidence.by_eq[i_eq]
+
+            $body
+        end
+
+        return terms
+    end
+end
+
+@generated function derivative_exprs{T<:FlatArgs,D}(ff::FunctionFactory{T}, ::TDer{D})
+    derivative_exprs_impl(ff, Der{D})
 end
 
 # Ordering of hessian is H[eq, (v1,v2)]
 function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{2})
-    exprs = _hessian_exprs(ff)
+    exprs = derivative_exprs(ff, Der{2})
     n_expr = length(exprs)
     nvar = nargs(ff)
 
