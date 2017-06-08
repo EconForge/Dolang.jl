@@ -314,9 +314,9 @@ function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{1})
     out
 end
 
-# ----------------- #
-# Second derivative #
-# ----------------- #
+# ------------------------ #
+# Higher order derivatives #
+# ------------------------ #
 
 # NOTE: allocations for the hessian are done in in the equation_block because
 #       it requires us to know the number of non-zero hessian terms, which we
@@ -326,12 +326,14 @@ sizecheck_block(ff::FunctionFactory, ::TDer{2}) = nothing
 
 function make_deriv_loop(i::Int, der_order::Int)
     i < 1 && error("i must be positive")
+
+    # define symbols to be used in this loop
     i_sym = Symbol("iv_", i)
     var_sym = Symbol("v_", i)
     shift_sym = Symbol("shift_", i)
     diff_sym = Symbol("diff_v_", i)
 
-    # build loop range
+    # build loop range. Will be 1:nvar if i == 1 and iv_{i-1}:nvar if i > 1
     if i == 1
         loop_range = :($i_sym = 1:nvar)
     else
@@ -339,6 +341,9 @@ function make_deriv_loop(i::Int, der_order::Int)
         loop_range = :($i_sym = $prev_i_sym:nvar)
     end
 
+    # build _inner_part of the loop body. This will include the actual derivation
+    # if i == der_order or it will differentiate the current expression wrt
+    # the ith variable and recursively call this function with i = i+1
     if i == der_order
         prev_diff_sym = Symbol("diff_v_", i-1)
         index_tuple = Expr(:tuple, [Symbol("iv_", j) for j in 1:i]...)
@@ -358,7 +363,10 @@ function make_deriv_loop(i::Int, der_order::Int)
         )
     end
 
-    # build loop body
+    # build loop body. 3 steps:
+    # 1. extract variable/time shift
+    # 2. Check to make sure the variable appears at the time shift in the eq
+    # 3. put in the inner_loop_guts we created above
     body = quote
         $var_sym, $shift_sym = arg_name_time(ff.args[$i_sym])
         if haskey(eq_incidence, $var_sym) && in($shift_sym, eq_incidence[$var_sym])
@@ -366,17 +374,27 @@ function make_deriv_loop(i::Int, der_order::Int)
         end
     end
 
+    # put the loop range and body together
     Expr(:for, loop_range, body)
 end
 
+# code to generate derivative expressions. This could be put in the body of
+# the `@generated` function, but that makes it hard for me to see the code
+# that is generated, so I make it a standalone function.
 function derivative_exprs_impl{T<:FlatArgs,D}(::Type{<:FunctionFactory{T}}, ::TDer{D})
+    # first, build the body of loops that differentiate an equation.
     body = make_deriv_loop(1, D)
     quote
+
+        # get counter variables
         neq = length(ff.eqs)
         nvar = nargs(ff)
 
+        # instantiate the array that will hold the output
         terms = Vector{Tuple{Int,NTuple{$D,Int},Union{Expr,Symbol,Number}}}(0)
 
+        # loop over equations and call the body we built above to populate
+        # terms
         for i_eq in 1:neq
             ex = _rhs_only(ff.eqs[i_eq])
             eq_prepped = prep_deriv(ex)
@@ -385,6 +403,7 @@ function derivative_exprs_impl{T<:FlatArgs,D}(::Type{<:FunctionFactory{T}}, ::TD
             $body
         end
 
+        # return what we built
         return terms
     end
 end
