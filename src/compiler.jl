@@ -65,24 +65,31 @@ param_block(ff::FunctionFactory, vec::Symbol=:p) =
 arg_block(ff::FunctionFactory, vec::Symbol=:V) = _unpack_expr(ff.args, vec)
 
 "Evaluates main expressions in a function group and fills `out` with results"
-function equation_block(ff::FunctionFactory, ::TDer{0}=Der{0})
-    n_expr = length(ff.eqs)
-    func_block = Expr(:block)
+function equation_block end
 
-    if isempty(ff.targets)
-        # no targets, just set out = parsed_expr
-        assignments = map((rhs, i) -> _assign_var_expr(:out, rhs, i),
-                          ff.eqs, 1:n_expr)
-        func_block.args = assignments
-    else
-        # otherwise, need to parse the targets, evaluate them, and then set
-        # elements of out equal to the targets
-        assignments = map((rhs, i) -> _assign_var_expr(:out, rhs, i),
-                          ff.targets, 1:n_expr)
-        func_block.args = vcat(ff.eqs, assignments)
+# TODO: this loop is a hack to get around a method ambiguity error caused
+#       by the version of this function for arbitrary order derivative for
+#       FlatArg
+for T in (FlatArgs, GroupedArgs)
+    @eval function equation_block{T<:$(T)}(ff::FunctionFactory{T}, ::TDer{0}=Der{0})
+        n_expr = length(ff.eqs)
+        func_block = Expr(:block)
+
+        if isempty(ff.targets)
+            # no targets, just set out = parsed_expr
+            assignments = map((rhs, i) -> _assign_var_expr(:out, rhs, i),
+                              ff.eqs, 1:n_expr)
+            func_block.args = assignments
+        else
+            # otherwise, need to parse the targets, evaluate them, and then set
+            # elements of out equal to the targets
+            assignments = map((rhs, i) -> _assign_var_expr(:out, rhs, i),
+                              ff.targets, 1:n_expr)
+            func_block.args = vcat(ff.eqs, assignments)
+        end
+
+        return func_block
     end
-
-    return func_block
 end
 
 function body_block{n}(ff::FunctionFactory, ::TDer{n})
@@ -185,12 +192,12 @@ _output_size(ff::FunctionFactory, ::TDer{1}) =
     (length(ff.eqs), nargs(ff))
 
 # Now fill in FunctionFactory API
-function allocate_block{n}(ff::FunctionFactory, d::TDer{n})
+function allocate_block(ff::FunctionFactory, d::TDer{1})
     expected_size = _output_size(ff, d)
     :(out = zeros(Float64, $(expected_size)))
 end
 
-function sizecheck_block{n}(ff::FunctionFactory, d::TDer{n})
+function sizecheck_block(ff::FunctionFactory, d::TDer{1})
     expected_size = _output_size(ff, d)
     ex = quote
         if size(out) != $expected_size
@@ -236,11 +243,11 @@ end
 # Higher order derivatives #
 # ------------------------ #
 
-# NOTE: allocations for the hessian are done in in the equation_block because
-#       it requires us to know the number of non-zero hessian terms, which we
-#       only know after we have constructed them.
-allocate_block(ff::FunctionFactory, ::TDer{2}) = nothing
-sizecheck_block(ff::FunctionFactory, ::TDer{2}) = nothing
+# NOTE: allocations for the higher order derivatiaves are done in in the
+#       equation_block because it requires us to know the number of non-zero
+#       derivative terms, which we only know after we have constructed them.
+allocate_block{D}(ff::FunctionFactory, ::TDer{D}) = nothing
+sizecheck_block{D}(ff::FunctionFactory, ::TDer{D}) = nothing
 
 function make_deriv_loop(i::Int, der_order::Int)
     i < 1 && error("i must be positive")
@@ -334,9 +341,9 @@ end
     derivative_exprs_impl(ff, Der{D})
 end
 
-# function equation_block{T<:FlatArgs,D}(ff::FunctionFactory{T}, ::TDer{D})
-#     Expr(:return, derivative_exprs(ff, Der{D}))
-# end
+function equation_block{T<:FlatArgs,D}(ff::FunctionFactory{T}, ::TDer{D})
+    Expr(:(=), :out, derivative_exprs(ff, Der{D}))
+end
 
 # Ordering of hessian is H[eq, (v1,v2)]
 function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{2})
@@ -419,10 +426,6 @@ function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{2})
 
 end
 
-# we don't support non-allocating method for Hessians
-build_function!(ff::FunctionFactory, ::TDer{2}) =
-    warn("Non-allocating Hessians not supported")
-
 # -------------------------- #
 # Putting functions together #
 # -------------------------- #
@@ -458,8 +461,16 @@ build_function{n}(ff::FunctionFactory, d::TDer{n}) =
     _build_function(ff, d, signature, func_body)
 
 "Build non-allocating version of the method"
-build_function!{n}(ff::FunctionFactory, d::TDer{n}) =
-    _build_function(ff, d, signature!, func_body!)
+function build_function! end
+for D in [0, 1]
+    @eval function build_function!(ff::FunctionFactory, d::TDer{$D})
+        _build_function(ff, d, signature!, func_body!)
+    end
+end
+
+# we don't support non-allocating methods for derivatives above 1
+build_function!{D}(ff::FunctionFactory, ::TDer{D}) =
+    warn("Non-allocating order $(D) derivatives not supported")
 
 
 function _build_vectorized_function(ff::FunctionFactory, d::TDer{0},
