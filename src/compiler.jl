@@ -270,7 +270,7 @@ function make_deriv_loop(i::Int, der_order::Int)
 
             # might still be zero if terms were independent
             if $diff_sym != 0
-                push!(terms, (i_eq, $index_tuple, post_deriv($diff_sym)))
+                push!(eq_terms, ($index_tuple, post_deriv($diff_sym)))
             end
         end
     else
@@ -302,6 +302,7 @@ end
 @compat function derivative_exprs_impl{T<:FlatArgs,D}(::Type{<:FunctionFactory{T}}, ::TDer{D})
     # first, build the body of loops that differentiate an equation.
     body = make_deriv_loop(1, D)
+
     quote
 
         # get counter variables
@@ -309,16 +310,19 @@ end
         nvar = nargs(ff)
 
         # instantiate the array that will hold the output
-        terms = Vector{Tuple{Int,NTuple{$D,Int},Union{Expr,Symbol,Number}}}(0)
+        terms = Vector{Vector{Tuple{NTuple{$D,Int},Union{Expr,Symbol,Number}}}}(0)
 
         # loop over equations and call the body we built above to populate
         # terms
         for i_eq in 1:neq
+            eq_terms = Vector{Tuple{NTuple{$D,Int},Union{Expr,Symbol,Number}}}(0)
             ex = _rhs_only(ff.eqs[i_eq])
             eq_prepped = prep_deriv(ex)
             eq_incidence = ff.incidence.by_eq[i_eq]
 
             $body
+
+            push!(terms, eq_terms)
         end
 
         # return what we built
@@ -330,59 +334,70 @@ end
     derivative_exprs_impl(ff, Der{D})
 end
 
+# function equation_block{T<:FlatArgs,D}(ff::FunctionFactory{T}, ::TDer{D})
+#     Expr(:return, derivative_exprs(ff, Der{D}))
+# end
+
 # Ordering of hessian is H[eq, (v1,v2)]
 function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{2})
     exprs = derivative_exprs(ff, Der{2})
     n_expr = length(exprs)
     nvar = nargs(ff)
+    n_eqs = length(ff.eqs)
 
     n_terms = 0
-    for e in exprs
+    val_ix = 0
+    for i_eq in 1:n_eqs, e in exprs[i_eq]
         # if indices are the same, term is for (v[i], v[i]), so it only appears
         # one time. Otherwise, we need to account for symmetry and have two
         # terms
-        n_terms += e[2][1] == e[2][2] ? 1 : 2
+        n_terms += e[1][1] == e[1][2] ? 1 : 2
+        val_ix += 1
     end
-
-    # create expressions that define `_val_i`, which holds the numerical value
-    # associated with the `i`th expression
-    val_exprs = [Expr(:(=), Symbol("_val_$(i)"), exprs[i][3]) for i in 1:n_expr]
-    vals = Expr(:block)
-    vals.args = val_exprs
 
     # create expressions that fill in the correct elements of i, j, v based
     # on the data in `vals` and the indices in `exprs`
+    val_exprs = Union{Expr,Number,Symbol}[]
     pop_exprs = Array{Expr}(n_terms)
     ix = 0
-    for i_expr in 1:n_expr
-        i_eq, (i_v1, i_v2), _junk = exprs[i_expr]
-
-        # we definitely need to fill the `i_eq, (i_v1, i_v2)` element
-        ix += 1
-
-        # value of j
-        j = sub2ind((nvar, nvar), i_v1, i_v2)
-        pop_exprs[ix] = Expr(:block,
-            :(setindex!(i, $(i_eq), $(ix))),
-            :(setindex!(j, $(j), $(ix))),
-            :(setindex!(v, $(Symbol("_val_$(i_expr)")), $(ix)))
-        )
-
-        if i_v1 != i_v2
-            # here we also need to fill the symmetric off diagonal element
+    for (i_eq, stuff) in enumerate(exprs)
+        for ((i_v1, i_v2), _the_expr) in stuff
+            # we definitely need to fill the `i_eq, (i_v1, i_v2)` element
             ix += 1
-            j2 = sub2ind((nvar, nvar), i_v2, i_v1)
+
+            # create expressions that define `_val_eq_i1_i2`, which holds the
+            # numerical value associated with the `i`th expression. WE do this
+            # to avoid computing symmetric elements more than once.
+            val_sym = Symbol("_val_$(i_eq)_$(i_v1)_$(i_v2)")
+            push!(val_exprs, Expr(:(=), val_sym, _the_expr))
+
+            # value of j
+            j = sub2ind((nvar, nvar), i_v1, i_v2)
             pop_exprs[ix] = Expr(:block,
                 :(setindex!(i, $(i_eq), $(ix))),
-                :(setindex!(j, $(j2), $(ix))),
-                :(setindex!(v, $(Symbol("_val_$(i_expr)")), $(ix)))
+                :(setindex!(j, $(j), $(ix))),
+                :(setindex!(v, $(val_sym), $(ix)))
             )
+
+            if i_v1 != i_v2
+                # here we also need to fill the symmetric off diagonal element
+                ix += 1
+                j2 = sub2ind((nvar, nvar), i_v2, i_v1)
+                pop_exprs[ix] = Expr(:block,
+                    :(setindex!(i, $(i_eq), $(ix))),
+                    :(setindex!(j, $(j2), $(ix))),
+                    :(setindex!(v, $(val_sym), $(ix)))
+                )
+            end
         end
     end
 
     # gather these assignments into a block
     populate = Expr(:block)
     populate.args = pop_exprs
+
+    vals = Expr(:block)
+    vals.args = val_exprs
 
     # finally construct the whole blocks
     out = quote
