@@ -628,3 +628,40 @@ function make_function(
     make_method(ff; allocating=allocating, orders=orders)
 
 end
+
+
+function super_signature(ff::FunctionFactory, sig_func)
+    sig = sig_func(ff)
+    sig.args[1] = Expr(:curly, sig.args[1], :D)
+    sig.args[2] = :(::Dolang.TDer{D})
+    sig
+end
+
+function make_super_function(ff::FunctionFactory)
+    # make generated, allocating function
+    sig = super_signature(ff, signature)
+    body = Expr(:block, :(ff = $ff), :(func_body(ff, Der{D})))
+    gen_func_body = Expr(:function, sig, body)
+    generated_func = Expr(:macrocall, Symbol("@generated"), gen_func_body)
+
+    # make generated, mutating function
+    sig! = super_signature(ff, signature!)
+    body! = Expr(:block, :(ff = $ff), :(func_body!(ff, Der{D})))
+    gen_func!_body = Expr(:function, sig!, body!)
+    generated_func! = Expr(:macrocall, Symbol("@generated"), gen_func!_body)
+
+    out = Expr(:block, generated_func, generated_func!)
+
+    # also make a method(s) without the Der{0} for backwards compat
+    for sig_func in (signature, signature!)
+        sig = sig_func(ff, Der{0})
+        no_der_sig = deepcopy(sig)
+        splice!(no_der_sig.args, 2)
+        call_der0_sig = deepcopy(sig)
+        call_der0_sig.args[2] = :(Dolang.Der{0})
+        no_der_func = Expr(:function, no_der_sig, call_der0_sig)
+        push!(out.args, no_der_func)
+    end
+
+    out
+end
