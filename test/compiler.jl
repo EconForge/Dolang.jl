@@ -563,7 +563,7 @@ end
     end
 
     @testset " evaluating compiled code" begin
-        eval(current_module(), Dolang.make_method(ff, orders=[0,1]))
+        eval(current_module(), Dolang.make_method(ff, orders=[0,1,2]))
         u = rand()
         V = rand(6)+4
         am, a, b, c, cp, dp = V
@@ -612,6 +612,20 @@ end
         out2 = similar(want)
         myfun!(Der{1}, out2, V, p)
         @test want ≈ out2
+
+        # and second derivative code
+        want = zeros(Float64, 2, 6*6)
+        want[1, 1] = 2 * b * (1-c) / (am^3)  # ∂²foo/∂am²
+        want[1, 3] = -1 *(1-c)/ (am*am)  # ∂²foo/∂am ∂b
+        want[1, 4] = b /(am^2)  # ∂²foo/∂am ∂c
+        want[1, 8] = -1/(a^2)  # ∂²foo/∂a²
+        want[1, 13] = -(1-c)/(am^2)  # ∂²foo/∂c ∂am
+        want[1, 16] = -1/am  # ∂²foo/∂c²
+        want[1, 19] = b/(am^2)  # ∂²foo/∂b ∂am
+        want[1, 21] = -1/am  # ∂²foo/∂b²
+
+        @test want ≈ @inferred myfun(Der{2}, V, p)
+
 
     end
 end
