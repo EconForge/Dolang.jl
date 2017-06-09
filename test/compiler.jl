@@ -563,7 +563,7 @@ end
     end
 
     @testset " evaluating compiled code" begin
-        eval(current_module(), Dolang.make_method(ff, orders=[0,1,2]))
+        eval(current_module(), Dolang.make_method(ff, orders=[0,1,2,3]))
         u = rand()
         V = rand(6)+4
         am, a, b, c, cp, dp = V
@@ -615,16 +615,34 @@ end
 
         # and second derivative code
         want = zeros(Float64, 2, 6*6)
-        want[1, 1] = 2 * b * (1-c) / (am^3)  # ∂²foo/∂am²
-        want[1, 3] = -1 *(1-c)/ (am*am)  # ∂²foo/∂am ∂b
-        want[1, 4] = b /(am^2)  # ∂²foo/∂am ∂c
-        want[1, 8] = -1/(a^2)  # ∂²foo/∂a²
-        want[1, 13] = -(1-c)/(am^2)  # ∂²foo/∂c ∂am
-        want[1, 16] = -1/am  # ∂²foo/∂c²
-        want[1, 19] = b/(am^2)  # ∂²foo/∂b ∂am
-        want[1, 21] = -1/am  # ∂²foo/∂b²
+        want[1, 1]  = 2 * b * (1-c) / (am^3) # ∂²foo/∂am²   = (1,1)
+        want[1, 3]  = -1 *(1-c)/ (am*am)     # ∂²foo/∂am ∂b = (1,3)
+        want[1, 4]  = b /(am^2)              # ∂²foo/∂am ∂c = (1,4)
+        want[1, 8]  = -1/(a^2)               # ∂²foo/∂a²    = (2,2)
+        want[1, 13] = -(1-c)/(am^2)          # ∂²foo/∂b ∂am = (3,1)
+        want[1, 16] = -1/am                  # ∂²foo/∂b ∂c  = (3,4)
+        want[1, 19] = b/(am^2)               # ∂²foo/∂c ∂am = (4,1)
+        want[1, 21] = -1/am                  # ∂²foo/∂c ∂b  = (4,3)
 
         @test want ≈ @inferred myfun(Der{2}, V, p)
+
+        # and third derivative code
+        want = [Dict{NTuple{3,Int},Float64}(), Dict{NTuple{3,Int},Float64}()]
+        want[1][(1,1,1)] = -6 * b * (1-c) / (am^4) # ∂³foo/∂am³
+        want[1][(1,1,3)] = 2 * (1-c) / (am^3)      # ∂³foo/∂am²b
+        want[1][(1,1,4)] = -2 * b / (am^3)         # ∂³foo/∂am²c
+        want[1][(2,2,2)] = 2/(a^3)                 # ∂³foo/∂a³
+        want[1][(1,3,4)] = 1/(am^2)                # ∂³foo / ∂a ∂b ∂c
+
+        have = @inferred myfun(Der{3}, V, p)
+
+        @test length(have[1]) == 5
+        @test length(have[2]) == 0
+        for (k, v) in have[1]
+            @show k, v
+            @test v ≈ want[1][k]
+        end
+
 
 
     end
@@ -646,3 +664,4 @@ end
 
 
 end  # @testset "compiler"
+-
