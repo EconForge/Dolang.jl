@@ -342,7 +342,24 @@ end
 end
 
 function equation_block{T<:FlatArgs,D}(ff::FunctionFactory{T}, ::TDer{D})
-    Expr(:(=), :out, derivative_exprs(ff, Der{D}))
+    exprs = derivative_exprs(ff, Der{D})
+    n_eqs = length(exprs)
+    n_derivs_per_expr = map(length, exprs)
+    out_eq_T = Dict{NTuple{D,Int},Float64}
+    out_T = Vector{out_eq_T}
+
+    populate_exprs = Vector{Expr}(sum(n_derivs_per_expr))
+    ix = 0
+    for i_eq in 1:n_eqs
+        for (ind, val) in exprs[i_eq]
+            populate_exprs[ix+=1] = :(out[$i_eq][$ind] = $val)
+        end
+    end
+    Expr(:block,
+        :(out = $(out_eq_T)[$(out_eq_T)() for i in 1:$(n_eqs)]),
+        populate_exprs...,
+        :(return out),
+    )
 end
 
 # Ordering of hessian is H[eq, (v1,v2)]
