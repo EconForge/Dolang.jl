@@ -269,8 +269,8 @@ function make_deriv_loop(i::Int, der_order::Int)
     # build _inner_part of the loop body. This will include the actual derivation
     # if i == der_order or it will differentiate the current expression wrt
     # the ith variable and recursively call this function with i = i+1
+    sym_to_diff = i == 1 ? :eq_prepped : Symbol("diff_v_", i-1)
     if i == der_order
-        sym_to_diff = i == 1 ? :eq_prepped : Symbol("diff_v_", i-1)
         index_tuple = Expr(:tuple, [Symbol("iv_", j) for j in 1:i]...)
         inner_loop_guts = quote
             $diff_sym = deriv($sym_to_diff, normalize(ff.args[$i_sym]))
@@ -283,7 +283,7 @@ function make_deriv_loop(i::Int, der_order::Int)
     else
         inner_loop_guts = Expr(
             :block,
-            :($diff_sym = deriv(eq_prepped, normalize(ff.args[$i_sym]))),
+            :($diff_sym = deriv($sym_to_diff, normalize(ff.args[$i_sym]))),
             make_deriv_loop(i+1, der_order)
         )
     end
