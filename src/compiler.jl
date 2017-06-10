@@ -615,9 +615,7 @@ function make_function(
         eqs::Vector{Expr}, variables::AbstractVector,
         to_diff::AbstractVector=1:length(variables);
         dispatch::DataType=SkipArg,
-        targets=Symbol[],
-        orders::AbstractVector{Int}=[0, 1],
-        name::Symbol=:anon, allocating::Bool=true
+        targets=Symbol[], name::Symbol=:anon
     )
 
     args = variables[to_diff]
@@ -628,7 +626,7 @@ function make_function(
         dispatch, eqs, args, params; targets=targets, funname=name
     )
 
-    make_method(ff; allocating=allocating, orders=orders)
+    make_function(ff)
 
 end
 
@@ -640,7 +638,7 @@ function super_signature(ff::FunctionFactory, sig_func)
     sig
 end
 
-function make_super_function(ff::FunctionFactory)
+function make_function(ff::FunctionFactory)
     # make generated, allocating function
     sig = super_signature(ff, signature)
     body = Expr(:block, :(ff = $ff), :(func_body(ff, Der{D})))
@@ -665,6 +663,10 @@ function make_super_function(ff::FunctionFactory)
         no_der_func = Expr(:function, no_der_sig, call_der0_sig)
         push!(out.args, no_der_func)
     end
+
+    # also make vectorized functions for Der{0}
+    push!(out.args, build_vec_function(ff, Der{0}))
+    push!(out.args, build_vec_function!(ff, Der{0}))
 
     out
 end

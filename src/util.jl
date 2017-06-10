@@ -6,8 +6,11 @@
 # extract a single element. If `x` is a Matrix then extract one column of the
 # matrix
 @inline _unpack_var(x::AbstractVector, i::Integer) = x[i]
-
 @inline _unpack_var(x::AbstractMatrix, i::Integer) = view(x, :, i)
+
+# inlined function to extract a single observations of a vector fo variables.
+@inline _unpack_obs(x::AbstractMatrix, i::Integer) = view(x, i, :)
+@inline _unpack_obs(x::AbstractVector, i::Integer) = x
 
 # similar to _unpack_var, but instead assigns one element of a vector or one
 # column of a matrix
