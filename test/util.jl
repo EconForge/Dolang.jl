@@ -75,5 +75,25 @@
         @test Dolang.inf_to_Inf(:(x-inf)) == :(x-$(Inf))
     end
 
+    @testset "solve_triangular_system" begin
+        # very simple case
+        d1 = Dict(:x => 1.0, :y => :(x+1))
+        sol1 = OrderedDict{Symbol,Number}(:x => 1.0, :y => 2.0)
+        @test Dolang.solve_triangular_system(d1) == sol1
+
+        # fully specified numerical dict
+        d2 = Dict(:x => 1.0, :y => 2.0)
+        sol2 = OrderedDict{Symbol,Number}(:x => 1.0, :y => 2.0)
+        @test Dolang.solve_triangular_system(d2) == sol2
+
+        # unknown variable w
+        d3 = Dict(:x => 1.0, :y => :(x+1), :z=> :(100*w))
+        @test_throws ErrorException Dolang.solve_triangular_system(d3)
+
+        # non-triangular system
+        d4 = Dict(:x => :(y+1), :y => :(x-1))
+        @test_throws ErrorException Dolang.solve_triangular_system(d4)
+    end
+
 
 end  # @testset "util"

@@ -365,6 +365,27 @@ function equation_block{T<:FlatArgs,D}(ff::FunctionFactory{T}, ::TDer{D})
     )
 end
 
+
+# function Base.SparseArrays.sparse{N}(data::Vector{Dict{NTuple{N,Int},Float64}}, nvariables::Int)
+#     nrow = length(data)
+#     rows = Vector{Int}()
+#     cols = Vector{Int}()
+#     vals = Vector{Float64}()
+#
+#     sz = ntuple(i -> nvariables, N)::NTuple{N,Int}
+#     col(i) = sub2ind(sz, i...)
+#     for i in 1:nrow
+#         for (k, v) in data[i]
+#             for actual_k in Combinatorics.multiset_permutations(k, N)
+#                 push!(rows, i)
+#                 push!(cols, col(actual_k))
+#                 push!(vals, v)
+#             end
+#         end
+#     end
+#     sparse(rows, cols, vals, nrow, prod(sz))
+# end
+
 # Ordering of hessian is H[eq, (v1,v2)]
 function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{2})
     exprs = derivative_exprs(ff, Der{2})
@@ -482,6 +503,7 @@ build_function{n}(ff::FunctionFactory, d::TDer{n}) =
 
 "Build non-allocating version of the method"
 function build_function! end
+
 for D in [0, 1]
     @eval function build_function!(ff::FunctionFactory, d::TDer{$D})
         _build_function(ff, d, signature!, func_body!)
@@ -550,72 +572,12 @@ build_vec_function!{n}(ff::FunctionFactory, d::TDer{n}) =
 # -------- #
 # User API #
 # -------- #
-# This is the main method that does the work.
-function make_method{n}(d::TDer{n}, ff::FunctionFactory; mutating::Bool=true,
-                        allocating::Bool=true)
-
-    out = Expr(:block)
-    if mutating
-        push!(out.args, build_function!(ff, d))
-        n == 0 && push!(out.args, build_vec_function!(ff, d))
-    end
-    if allocating
-        push!(out.args, build_function(ff, d))
-        n == 0 && push!(out.args, build_vec_function(ff, d))
-    end
-    out
-end
-
-# accept derivative order(s) as keyword argument
-function make_method(ff::FunctionFactory;
-                     mutating::Bool=true,
-                     allocating::Bool=true,
-                     orders=0)
-    out = Expr(:block)
-    for i in orders
-        out_i = make_method(Der{i}, ff; mutating=mutating, allocating=allocating)
-        append!(out.args, out_i.args)
-    end
-    out
-end
-
-# Method without `dispatch` argument and with orders as kwarg
-function make_method(eqs::Vector{Expr},
-                     arguments::ArgType,
-                     params::ParamType;
-                     targets=Symbol[],
-                     defs::Associative=Dict(),
-                     funname::Symbol=gensym(:anonymous),
-                     mutating::Bool=true,
-                     allocating::Bool=true,
-                     orders=0)
-    ff = FunctionFactory(eqs, arguments, params,
-                         targets=targets, defs=defs, funname=funname)
-
-    make_method(ff; mutating=mutating, allocating=allocating, orders=orders)
-end
-
-# Method with `dispatch` argument and with orders as kwarg
-function make_method{T}(::Type{T}, eqs::Vector{Expr},
-                        arguments::ArgType,
-                        params::ParamType;
-                        targets=Symbol[],
-                        defs::Associative=Dict(),
-                        funname::Symbol=gensym(:anonymous),
-                        mutating::Bool=true,
-                        allocating::Bool=true, orders=0)
-    ff = FunctionFactory(T, eqs, arguments, params,
-                         targets=targets, defs=defs, funname=funname)
-
-    make_method(ff; mutating=mutating, allocating=allocating, orders=orders)
-end
-
-
 function make_function(
         eqs::Vector{Expr}, variables::AbstractVector,
         to_diff::AbstractVector=1:length(variables);
         dispatch::DataType=SkipArg,
-        targets=Symbol[], name::Symbol=:anon
+        targets=Symbol[], name::Symbol=:anon,
+        defs=Dict()
     )
 
     args = variables[to_diff]
@@ -623,13 +585,12 @@ function make_function(
     params = variables[not_to_diff]
 
     ff = FunctionFactory(
-        dispatch, eqs, args, params; targets=targets, funname=name
+        dispatch, eqs, args, params; targets=targets, funname=name, defs=defs
     )
 
     make_function(ff)
 
 end
-
 
 function super_signature(ff::FunctionFactory, sig_func)
     sig = sig_func(ff)
@@ -639,19 +600,30 @@ function super_signature(ff::FunctionFactory, sig_func)
 end
 
 function make_function(ff::FunctionFactory)
+    out = Expr(:block)
     # make generated, allocating function
     sig = super_signature(ff, signature)
-    body = Expr(:block, :(ff = $ff), :(func_body(ff, Der{D})))
+    body = Expr(:block, :(ff = $ff), :(Dolang.func_body(ff, Der{D})))
     gen_func_body = Expr(:function, sig, body)
-    generated_func = Expr(:macrocall, Symbol("@generated"), gen_func_body)
+    push!(out.args, Expr(:macrocall, Symbol("@generated"), gen_func_body))
 
     # make generated, mutating function
     sig! = super_signature(ff, signature!)
-    body! = Expr(:block, :(ff = $ff), :(func_body!(ff, Der{D})))
+    body! = Expr(:block, :(ff = $ff), :(Dolang.func_body!(ff, Der{D})))
     gen_func!_body = Expr(:function, sig!, body!)
-    generated_func! = Expr(:macrocall, Symbol("@generated"), gen_func!_body)
+    push!(out.args, Expr(:macrocall, Symbol("@generated"), gen_func!_body))
 
-    out = Expr(:block, generated_func, generated_func!)
+    # NOTE: I add these specializations to overcome method abiguity introduced
+    #       by the vectorized routines below
+    sig0 = signature(ff, Der{0})
+    body0 = Expr(:block, :(ff = $ff), :(Dolang.func_body(ff, Der{0})))
+    func_body0 = Expr(:function, sig0, body0)
+    push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0))
+
+    sig0! = signature!(ff, Der{0})
+    body0! = Expr(:block, :(ff = $ff), :(Dolang.func_body!(ff, Der{0})))
+    func_body0! = Expr(:function, sig0!, body0!)
+    push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0!))
 
     # also make a method(s) without the Der{0} for backwards compat
     for sig_func in (signature, signature!)
