@@ -34,7 +34,7 @@ using Compat: view, String, @compat
 
 import Base: ==, normalize
 
-export make_method, Der, FunctionFactory, normalize, is_time_shift, time_shift,
+export make_function, Der, FunctionFactory, normalize, is_time_shift, time_shift,
        subs, csubs
 
 # come convenience methods
