@@ -493,59 +493,59 @@ build_function!{D}(ff::FunctionFactory, ::TDer{D}) =
     warn("Non-allocating order $(D) derivatives not supported")
 
 
-function _build_vectorized_function(ff::FunctionFactory, d::TDer{0},
-                                    allocating::Bool)
+# -------------------- #
+# Vectorized functions #
+# -------------------- #
 
-    sig = allocating ? signature(ff, d) : signature!(ff, d)
-    n_args = length(arg_names(ff))
-    #= We need to adjust sig.args so that all function args (except der,
-    dispatch, and params) have type AbstractMatrix instead of AbstractVector
+vec_signature!{n}(ff::FunctionFactory, d::TDer{n}=Der{0}) = signature!(ff, d, :AbstractArray)
+vec_signature{n}(ff::FunctionFactory, d::TDer{n}=Der{0}) = signature(ff, d, :AbstractArray)
 
-    These will always be sig.args[end-1-length(arg_names(ff)):end-1]
-    =#
-    start_ix = length(sig.args) - n_args
-    end_ix = length(sig.args) - 1
-    for (i, name) in zip(start_ix:end_ix, arg_names(ff))
-        sig.args[i] = Expr(:(::), name, :AbstractMatrix)
-    end
-    sig
-
+function vec_body_block(ff::FunctionFactory, d::TDer{0})
     # use signature to figure out how to call non-vectorized version within the
     # loop
-    row_i_sig = signature(ff, d)
+    row_i_sig = signature!(ff, d)
+
+    # we will change arguments in the signature to be __V__row instead of
+    # V::AbstractVector. we also need to unpack the __V__row variables
+    start_ix = length(row_i_sig.args) - length(arg_names(ff))
+    end_ix = length(row_i_sig.args) - 1
+    unpack_obs_i = Expr[:(__out__row = view(out, _row, :))]
     row_i_sig.args[2] = :($(d))
-    if !allocating
-        start_ix -= 1
-        end_ix -= 1
-    end
+    row_i_sig.args[start_ix-1] = :__out__row
     for (i, name) in zip(start_ix:end_ix, arg_names(ff))
-        row_i_sig.args[i] = Expr(:call, :view, name, :_row, :(:))
+        sym_name_row = Symbol("__", name, "__row")
+        push!(
+            unpack_obs_i,
+            Expr(:(=), sym_name_row, :(Dolang._unpack_obs($name, _row)))
+        )
+        row_i_sig.args[i] = sym_name_row
     end
 
+    # the body of the function just just allocates, then loops over the number
+    # of ros
     body = Expr(:block,
-        allocating ? allocate_block(ff, d) : sizecheck_block(ff, d),
-        :(nrow = size($(arg_names(ff)[1]), 1)),
+        :(nrow = size(out, 1)),
         Expr(:for, :(_row = 1:nrow),
             Expr(:block,
-            :(@inbounds out[_row, :] = $(row_i_sig))
+            unpack_obs_i...,
+            row_i_sig
             )
         ),
         :(return out)
     )
-
-    no_der_sig = deepcopy(sig)
-    splice!(no_der_sig.args, 2)
-    Expr(:block,
-         Expr(:function, sig, body),
-         Expr(:function, no_der_sig, body)
-         )
 end
 
-build_vectorized_function{n}(ff::FunctionFactory, d::TDer{n}) =
-    _build_vectorized_function(ff, d, true)
+vec_func_body{n}(ff::FunctionFactory, d::TDer{n}) =
+    Expr(:block, allocate_block(ff, d), vec_body_block(ff, d))
 
-build_vectorized_function!{n}(ff::FunctionFactory, d::TDer{n}) =
-    _build_vectorized_function(ff, d, false)
+vec_func_body!{n}(ff::FunctionFactory, d::TDer{n}) =
+    Expr(:block, sizecheck_block(ff, d), vec_body_block(ff, d))
+
+build_vec_function{n}(ff::FunctionFactory, d::TDer{n}) =
+    _build_function(ff, d, vec_signature, vec_func_body)
+
+build_vec_function!{n}(ff::FunctionFactory, d::TDer{n}) =
+    _build_function(ff, d, vec_signature!, vec_func_body!)
 
 # -------- #
 # User API #
@@ -557,11 +557,11 @@ function make_method{n}(d::TDer{n}, ff::FunctionFactory; mutating::Bool=true,
     out = Expr(:block)
     if mutating
         push!(out.args, build_function!(ff, d))
-        n == 0 && push!(out.args, build_vectorized_function!(ff, d))
+        n == 0 && push!(out.args, build_vec_function!(ff, d))
     end
     if allocating
         push!(out.args, build_function(ff, d))
-        n == 0 && push!(out.args, build_vectorized_function(ff, d))
+        n == 0 && push!(out.args, build_vec_function(ff, d))
     end
     out
 end
