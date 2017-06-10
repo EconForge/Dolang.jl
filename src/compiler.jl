@@ -121,29 +121,32 @@ _extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
                                 [:(::Dolang.TDer{$n}),
                                  :($(DISPATCH_ARG)::$(ff.dispatch))]
 
-function signature{n,T1<:FlatArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0})
+function signature{n,T1<:FlatArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0},
+                                   argtype::Symbol=:AbstractVector)
     Expr(
         :call,
         ff.funname,
         _extra_args(ff, d)...,
-        :(V::AbstractVector),
+        Expr(:(::), :V, argtype),
         param_names(ff)...
     )
 end
 
-function signature{n,T1<:GroupedArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0})
+function signature{n,T1<:GroupedArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0},
+                                      argtype::Symbol=:AbstractVector)
     Expr(
         :call,
         ff.funname,
         _extra_args(ff, d)...,
-        [:($(k)::AbstractVector) for k in keys(ff.args)]...,
+        [Expr(:(::), k, argtype) for k in keys(ff.args)]...,
         param_names(ff)...
     )
 end
 
 "Method signature for mutating version of the function"
-function signature!{n}(ff::FunctionFactory, d::TDer{n}=Der{0})
-    sig = signature(ff, d)
+function signature!{n}(ff::FunctionFactory, d::TDer{n}=Der{0},
+                       argtype::Symbol=:AbstractVector)
+    sig = signature(ff, d, argtype)
 
     # convert name to `!` version and insert `out` as first argument
     sig.args[1] = Symbol(sig.args[1], "!")
