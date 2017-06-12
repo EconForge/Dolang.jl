@@ -563,7 +563,7 @@ end
             @test want ≈ @inferred fun(Der{2}, V, p)
 
             # and third derivative code
-            if DOLANG.HAVE_SYMENGINE
+            if Dolang.HAVE_SYMENGINE
                 want = [Dict{NTuple{3,Int},Float64}(), Dict{NTuple{3,Int},Float64}()]
                 want[1][(1, 1, 1)] = -6 * b * (1-c) / (am^4) # ∂³foo/∂am³
                 want[1][(1, 1, 3)] = 2 * (1-c) / (am^3)      # ∂³foo/∂am²b
