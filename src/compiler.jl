@@ -572,6 +572,31 @@ build_vec_function!{n}(ff::FunctionFactory, d::TDer{n}) =
 # -------- #
 # User API #
 # -------- #
+"""
+    make_function(
+        eqs::Vector{Expr}, variables::AbstractVector,
+        to_diff::AbstractVector=1:length(variables);
+        dispatch::DataType=SkipArg,
+        targets=Symbol[], name::Symbol=:anon,
+        defs=Dict()
+    )
+
+Compile a Julia function by first constructing a `FunctionFactory` instance
+where
+
+- `args` is equal to `variables[to_diff]`
+- `params` is equal to `variables[setdiff(to_diff, 1:length(variables))]`
+- `eqs`, `dispatch`, `defs`, `targets`, and `name` are passed along to the
+  `FunctionFactory` as arguments with the same name (except `name`, which
+  becomes the `funname` argument to `FunctionFactory`)
+
+See [`make_function(ff::FunctionFactory)`](@ref) for more details.
+
+This method is less flexible than constructing the `FunctionFactory` by hand
+because you can only create that have one vector for arguments and one vector
+for symbols. Meaning you cannot construct an associative mapping for `args` or
+`params` that groups symbols together.
+"""
 function make_function(
         eqs::Vector{Expr}, variables::AbstractVector,
         to_diff::AbstractVector=1:length(variables);
@@ -599,6 +624,41 @@ function super_signature(ff::FunctionFactory, sig_func)
     sig
 end
 
+"""
+    make_function(ff::FunctionFactory)
+
+Compile a function using data in `ff`; with methods for
+
+- various order of derivative
+- Allocating output arguments
+- Non-allocating functions that mutate the input argument
+- (partially-)Vectorized evaluation
+
+See [`FunctionFactory`](@ref) for a description of how the fields of `ff`
+impact the generated code.
+
+In non-vectorized evaluation, all function arguments should be vectors and will
+be unpacked into scalars according to `ff.args` and `ff.params`. If any
+argument is an  `AbstractMatrix`, then each column of the matrix is assumed to
+be multiple observations of a single variable. All matrix arguments must have
+the same number of rows. Let this number be `n`. Any arguments passed as
+vectors will be implicitly repeated `n` times and the function will be
+evaluated with these vectors and the `n` observations of each matrix argument.
+
+## Note
+
+If `SymEngine.jl` is installed, the output will be an `@generated` function
+that can be evaluated at arbitrary order of analytical derivative -- with
+derivative computation and function compilation happening at runtime upon the
+user's first request to evaluate that order derivative.
+
+Otherwise, `Calculus.jl` will be used for symbolic differentiation and the
+output of this function will be methods to evaluate the function at orders 0,
+1, and 2. The reason for the difference is that the differentiation code in
+Calculus.jl calls the Julia `eval` function, which is not allowed in
+`@generated` functions.
+
+"""
 function make_function(ff::FunctionFactory)
     out = Expr(:block)
     # make generated, allocating function

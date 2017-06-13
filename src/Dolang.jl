@@ -35,7 +35,8 @@ using Compat: view, String, @compat
 import Base: ==, normalize
 
 export make_function, Der, FunctionFactory, normalize, is_time_shift, time_shift,
-       subs, csubs
+       subs, csubs, steady_state, list_symbols, list_symbols!, list_variables,
+       list_parameters
 
 # come convenience methods
 _replace_star_star(s::AbstractString) = replace(s, "**", "^")

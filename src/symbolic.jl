@@ -31,14 +31,11 @@ end
 _empty_normalizer(e) = Nullable{Expr}()
 
 """
-```julia
-normalize(var::Union{String,Symbol}, n::Integer)
-```
+    normalize(var::Union{String,Symbol}, n::Integer)
 
 Normalize the string or symbol in the following way:
 
-- if `n == 0` return `_var_`
-- if `n > 0` return `_var__n_`
+- if `n >= 0` return `_var__n_`
 - if `n < 0` return `_var_mn_`
 
 """
@@ -47,18 +44,14 @@ function normalize(var::Union{String,Symbol}, n::Integer; custom=nothing)
 end
 
 """
-```julia
-normalize(x::Tuple{Symbol,Integer})
-```
+    normalize(x::Tuple{Symbol,Integer})
 
 Same as `normalize(x[1], x[2])`
 """
 normalize{T<:Integer}(x::Tuple{Symbol,T}; custom=nothing) = normalize(x[1], x[2])
 
 """
-```julia
-normalize(x::Symbol)
-```
+    normalize(x::Symbol)
 
 Normalize the symbol by returning `_x_` if `x` doesn't alread have leading
 and trailling `_` characters
@@ -73,18 +66,14 @@ function normalize(x::Symbol; custom=nothing)
 end
 
 """
-```julia
-normalize(x::Number)
-```
+    normalize(x::Number)
 
 Just return `x`
 """
 normalize(x::Number; custom=nothing) = x
 
 """
-```julia
-normalize(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
-```
+    normalize(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
 
 Recursively normalize `ex` according to the following rules (structure of list
 below is `input form of ex: returned expression`):
@@ -190,18 +179,14 @@ function normalize(
 end
 
 """
-```julia
-normalize(s::AbstractString; kwargs...)
-```
+    normalize(s::AbstractString; kwargs...)
 
 Call `normalize(parse(s)::Expr; kwargs...)`
 """
 normalize(s::String; kwargs...) = normalize(parse(s); kwargs...)
 
 """
-```julia
-normalize(exs::Vector{Expr}; kwargs...)
-```
+    normalize(exs::Vector{Expr}; kwargs...)
 
 Construct a `begin`/`end` block formed by calling `normalize(i; kwargs...)` for
 all `i` in `exs`
@@ -220,11 +205,9 @@ normalize(exs::Vector{Expr}; kwargs...) =
 # TODO: make `time_shift(x, shift; args, shfit, defs) = time_shift(subs(x, defs), args, shift)`
 
 """
-```julia
-time_shift(s::Symbol, shift::Integer,
-           functions::Set{Symbol}=Set{Symbol}(),
-           defs::Associative=Dict())
-```
+    time_shift(s::Symbol, shift::Integer,
+               functions::Set{Symbol}=Set{Symbol}(),
+               defs::Associative=Dict())
 
 If `s` is in `defs`, then return the shifted version of the definition
 
@@ -263,7 +246,8 @@ on the form of `ex` (list below has the form "contents of ex: return expr"):
 - `f(other...)`: if `f` is in `functions` or is a known dolang funciton (see
   `Dolang.DOLANG_FUNCTIONS`) return
   `f(map(i -> time_shift(i, args, shift, defs), other))`, otherwise error
-- Any other `Expr`: `Expr(ex.head, map(i -> time_shift(i, args, shift, defs), ex.args))`
+- Any other `Expr`: Return an `Expr` with the same `head`, with `time_shift`
+  applied on each of `ex.args`
 """
 function time_shift(ex::Expr, shift::Integer,
                     functions::Set{Symbol},
@@ -331,9 +315,13 @@ end
 steady_state(s, functions::Set{Symbol}, defs::Associative)
 ```
 
-Return the steady state version of the Symbol `x` (essentially x(0))
+If `s` is not a key in `defs`, return the steady state version of the  `s`
+(essentially s(0)).
+
+Otherwise, return `steady_state(defs[s], functions, defs)`
+
 """
-function steady_state(s, functions::Set{Symbol}, defs::Associative)
+function steady_state(s::Union{Symbol,Number}, functions::Set{Symbol}, defs::Associative)
 
     if haskey(defs, s)
         steady_state(defs[s], functions, defs)
@@ -395,6 +383,12 @@ end
 # list_symbols #
 # ------------ #
 
+"""
+    list_symbols(::Expr;
+                 functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
+
+Construct an empty `Dict{Symbol,Any}` and call `list_symbols!` to populate it
+"""
 function list_symbols(ex::Expr;
                       functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
     out = Dict{Symbol,Any}()
@@ -464,6 +458,16 @@ end
 # list_variables #
 # -------------- #
 
+"""
+    list_variables(
+        arg;
+        functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}()
+    )
+
+Return the `:variables` key that results from calling `list_symbols`. The type
+of the returned object will be a `Set` of `Tuple{Symbol,Int}`, where each item
+describes the symbol that appeared and the corresponding date.
+"""
 function list_variables(
         arg;
         functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}()
@@ -471,7 +475,16 @@ function list_variables(
     list_symbols(arg, functions=functions)[:variables]
 end
 
+"""
+    list_parameters(
+        arg;
+        functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}()
+    )
 
+Return the `:parameters` key that results from calling `list_symbols`. The
+returned object will be `Set{Symbol}` where each item represents the symbol
+that appeared without a date.
+"""
 function list_parameters(
         arg;
         functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}()
@@ -539,7 +552,7 @@ end
 
 """
 ```julia
-subs(ex::Union{Expr,Symbol,Number}, from, to::Union{Symbol,Expr,Number})
+subs(ex::Union{Expr,Symbol,Number}, from, to::Union{Symbol,Expr,Number}, funcs::Set{Symbol})
 ```
 
 Apply a substituion where all occurances of `from` in `ex` are replaced by `to`.
