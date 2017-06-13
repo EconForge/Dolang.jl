@@ -287,6 +287,10 @@ end
         @test_throws MethodError f(1)        # Number
         @test_throws MethodError f([1])      # Array of number
     end
+
+    @test Dolang.arg_name_time(:_x__1_) == (:x, 1)
+    @test Dolang.arg_name_time(:_x_m100_) == (:x, -100)
+    @test Dolang.arg_name_time(:_this_is_x_m100_) == (:this_is_x, -100)
 end
 
 end  # @testset "symbolic"

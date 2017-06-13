@@ -640,7 +640,20 @@ end
 # arg_name #
 # ---------#
 
-arg_name(s::Symbol) = s
+function arg_name(s::Symbol)::Symbol
+    # is the symbol already normalized?
+    str_s = string(s)
+    if str_s[1] == str_s[end] == '_'
+        parts = match(r"^_(.+)_[m_]\d+_$", str_s)
+        if parts === nothing
+            return s
+        else
+            return Symbol(parts[1])
+        end
+    else
+        return s
+    end
+end
 arg_name(s::Tuple{Symbol,Int}) = s[1]
 function arg_name(ex::Expr)::Symbol
     if is_time_shift(ex)
@@ -654,7 +667,24 @@ function arg_name(ex::Expr)::Symbol
     end
 end
 
-arg_time(s::Symbol) = 0
+function arg_time(s::Symbol)::Int
+    # is the symbol already normalized?
+    str_s = string(s)
+    if str_s[1] == str_s[end] == '_'
+        # yep, we are already normalized, need to extract the
+        r = r"(m)?(\d+)_$"
+        parts = match(r, str_s)
+        if parts === nothing
+            # not a match
+            return 0
+        else
+            shift = parse(Int, parts[2])
+            return parts[1] === nothing ? shift : -shift
+        end
+    else
+        return 0
+    end
+end
 arg_time(s::Tuple{Symbol,Int}) = s[2]
 function arg_time(ex::Expr)::Int
     if is_time_shift(ex)
