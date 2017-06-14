@@ -27,7 +27,7 @@ makedocs(
 )
 
 deploydocs(
-    repo   = "github.com/EconForge/Dolang.git",
+    repo   = "github.com/EconForge/Dolang.jl.git",
     julia  = "0.6",
     target = "build",
     deps   = nothing,
