@@ -14,5 +14,5 @@ notifications:
 #  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
 #  - julia -e 'Pkg.clone(pwd()); Pkg.build("Dolang"); Pkg.test("Dolang"; coverage=true)'
 after_success:
-  - julia -e 'Pkg.add("Documenter"); Pkg.add("SymEngine")'
+  - julia -e 'Pkg.add("Documenter"); Pkg.add("SymEngine"); Base.compilecache("Dolang")'
   - julia -e 'cd(Pkg.dir("Dolang")); include(joinpath("docs", "make.jl"))'

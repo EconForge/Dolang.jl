@@ -25,31 +25,26 @@ _to_expr(x::Expr) = x
 _to_expr(x::Union{Symbol,Number}) = Expr(:block, x)
 _to_expr(x::AbstractString) = _to_expr(parse(_replace_star_star(x)))
 
-function __init__()
-    # check for SymEngine in the __init__ so it doesn't get baked in to the
-    # precompiled image and return false for a user who recently installed it
-    global const HAVE_SYMENGINE = try
-        @eval import SymEngine;
-        true
-    catch
-        false
-    end::Bool
+const HAVE_SYMENGINE = try
+    eval(Dolang, :(import SymEngine))
+    true
+catch
+    false
+end::Bool
 
-    @eval begin
-        if HAVE_SYMENGINE
-            import SymEngine
-            deriv(eq::SymEngine.Basic, x) = SymEngine.diff(eq, x)
-            @inline prep_deriv(eq) = SymEngine.Basic(eq)
-            @inline post_deriv(eq) = SymEngine.walk_expression(eq)
-        else
-            import Calculus
-            warn("Using Calculus.jl for symbolic differentiation. This will be slower",
-                 " than SymEngine.jl\n. To use SymEngine call Pkg.add(\"SymEngine\")")
-            deriv(eq, x) = Calculus.differentiate(eq, x)
-            @inline prep_deriv(eq) = eq
-            @inline post_deriv(eq) = eq
-        end
-    end
+if HAVE_SYMENGINE
+    import SymEngine
+    deriv(eq::SymEngine.Basic, x) = SymEngine.diff(eq, x)
+    @inline prep_deriv(eq) = SymEngine.Basic(eq)
+    @inline post_deriv(eq) = SymEngine.walk_expression(eq)
+else
+    import Calculus
+    warn("Using Calculus.jl for symbolic differentiation. This will be slower",
+         " than SymEngine.jl\n. To use SymEngine run the following code: ",
+         "`Pkg.add(\"SymEngine\"); Base.compilecache(\"Dolang\")`")
+    deriv(eq, x) = Calculus.differentiate(eq, x)
+    @inline prep_deriv(eq) = eq
+    @inline post_deriv(eq) = eq
 end
 
 
