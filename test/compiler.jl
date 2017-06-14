@@ -1,5 +1,7 @@
 @testset "compiler" begin
 
+using Dolang, DataStructures, Base.Test
+
 eqs = [:(foo(0) = log(a(0))+b(0)/x(-1)), :(bar(0) = c(1)+u*d(1))]
 args = [(:a, -1), (:a, 0), (:b, 0), (:c, 0), (:c, 1), (:d, 1)]
 params = [:u]
@@ -24,7 +26,30 @@ ffnt = Dolang.FunctionFactory(eqs, args2, params, defs=defs, funname=funname)
 ffd = Dolang.FunctionFactory(Int, eqs, args, params, targets=targets,
                              defs=defs, funname=funname)
 
-# TODO: test grouped argument style
+ff_grouped = let
+    _eqs = [
+        :(chi*n(0)^eta*c(0)^sigma - w(0)),
+        :(1 - beta*(c(0)/c(1))^(sigma)*(1-delta+rk(1)))
+    ]
+
+    _defs = Dict(
+        :y => :(exp(z(0))*k(0)^alpha*n(0)^(1-alpha)),
+        :c => :(y(0) - i(0)),
+        :rk => :(alpha*y(0)/k(0)),
+        :w => :((1-alpha)*y(0)/n(0)),
+    )
+
+    _args = DataStructures.OrderedDict(
+        :m => [(:z, 0), (:z2, 0)],
+        :s => [(:k, 0)],
+        :x => [(:n, 0), (:i, 0)],
+        :M => [(:z, 1), (:z2, 1)],
+        :S => [(:k, 1)],
+        :X => [(:n, 1), (:i, 1)]
+    )
+    _params = [:beta, :sigma, :eta, :chi, :delta, :alpha, :rho, :zbar, :sig_z]
+    FunctionFactory(_eqs, _args, _params, defs=_defs)
+end
 
 
 @testset " _unpack_expr" begin
@@ -591,6 +616,61 @@ end
     ff = Dolang.FunctionFactory(eqs, ss_args, p_args, funname=:f_s)
     # just make sure this runs
     Dolang.func_body(ff, Dolang.Der{2})
+end
+
+@testset "grouped version" begin
+
+    m = [0.0, 0.0]
+    s = [9.35498]
+    x = [0.33, 0.233874]
+    p = [0.99, 5.0, 1.0, 23.9579, 0.025, 0.33, 0.8, 0.0, 0.016]
+
+    eval(current_module(), make_function(ff_grouped))
+
+    # allocating
+    want = [1.0123335492995267e-5, 4.255452989987418e-9]
+    @test want ≈ @inferred anon(m, s, x, m, s, x, p)
+
+    # mutating
+    out = zeros(2)
+    @inferred anon!(out, m, s, x, m, s, x, p)
+    @test want ≈ out
+
+    # allocating vectorized
+    want2 = [want want]'
+    @test want2 ≈ @inferred anon([m m]', s, x, m, s, x, p)
+
+    # mutating vectorized
+    out2 = zeros(2, 2)
+    want2 = [want want]'
+    @inferred anon!(out2, [m m]', s, x, m, s, x, p)
+    @test want2 ≈ out2
+
+    # alllocating first derivative
+    want3 = ([11.1848 0.0; -6.53625 0.0],
+            reshape([0.394547; -0.230568], (2, 1)),
+            [34.9526 -13.2706; -13.2706 6.56871],
+            [0.0 0.0; 6.5015 0.0],
+            reshape([0.0; 0.233057], (2, 1)),
+            [0.0 0.0; 13.2 -6.56871])
+    @test begin
+        out = @inferred anon(Der{1}, m, s, x, m, s, x, p)
+        true
+    end
+    for i in 1:length(want3)
+        @test isapprox(want3[i], out[i], atol=1e-4)
+    end
+
+    # mutating first derivative
+    out3 = deepcopy(want3)
+    map(_x -> fill!(_x, 0.0), out3)
+    @test begin
+        @inferred anon!(Der{1}, out3, m, s, x, m, s, x, p)
+        true
+    end
+    for i in 1:length(want3)
+        @test isapprox(want3[i], out3[i], atol=1e-4)
+    end
 end
 
 

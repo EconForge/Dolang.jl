@@ -195,12 +195,12 @@ _output_size(ff::FunctionFactory, ::TDer{1}) =
     (length(ff.eqs), nargs(ff))
 
 # Now fill in FunctionFactory API
-function allocate_block(ff::FunctionFactory, d::TDer{1})
+function allocate_block{T<:FlatArgs}(ff::FunctionFactory{T}, d::TDer{1})
     expected_size = _output_size(ff, d)
     :(out = zeros(Float64, $(expected_size)))
 end
 
-function sizecheck_block(ff::FunctionFactory, d::TDer{1})
+function sizecheck_block{T<:FlatArgs}(ff::FunctionFactory{T}, d::TDer{1})
     expected_size = _output_size(ff, d)
     ex = quote
         if size(out) != $expected_size
@@ -231,6 +231,97 @@ function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{1})
     for ii in eachindex(expr_mat)
         if expr_mat[ii] != 0
             expr_args[ix+=1] = :(out[$(ii)] = $(expr_mat[ii]))
+        end
+    end
+
+    out = Expr(:block)
+
+    # when we populated expr_args we skipped terms that were equal to zero.
+    # here we trim expr_args to be the length of the number of non-zero terms
+    out.args = expr_args[1:ix]
+    out
+end
+
+function _jacobian_expr_mat{T<:GroupedArgs}(ff::FunctionFactory{T})
+    # NOTE: I'm starting with the easy version, where I just differentiate
+    #       with respect to all arguments in the order they were given. It
+    #       would be better if I went though `ff.incidence.by_var` and only
+    #       made columns for variables that appear in the equations
+    args = ff.args
+    neq = length(ff.eqs)
+
+    all_exprs = [Array{Union{Symbol,Expr,Number}}(neq, length(v)) for v in values(args)]
+    map(x -> fill!(x, 0), all_exprs)
+
+    non_zero = fill(0, length(all_exprs))
+    for i_eq = 1:neq
+        eq = _rhs_only(ff.eqs[i_eq])
+        eq_prepped = prep_deriv(eq)
+        eq_incidence = ff.incidence.by_eq[i_eq]
+
+        for (i, (group_name, group_vars)) in enumerate(args)
+            for (i_var, var) in enumerate(group_vars)
+                v, shift = arg_name_time(var)
+
+                if haskey(eq_incidence, v) && in(shift, eq_incidence[v])
+                    non_zero[i] += 1
+                    my_deriv = deriv(eq_prepped, normalize(var))
+                    all_exprs[i][i_eq, i_var] = post_deriv(my_deriv)
+                end
+            end
+        end
+    end
+    all_exprs, non_zero
+end
+
+_output_sizes{T<:GroupedArgs}(ff::FunctionFactory{T}, ::TDer{1}) =
+    [(length(ff.eqs), length(v)) for v in values(ff.args)]
+
+# Now fill in FunctionFactory API
+function allocate_block(ff::FunctionFactory, d::TDer{1})
+    expected_sizes = _output_sizes(ff, d)
+    Expr(:(=), :out,
+        Expr(:tuple, [:(zeros(Float64, $sz)) for sz in expected_sizes]...)
+    )
+end
+
+function sizecheck_block(ff::FunctionFactory, d::TDer{1})
+    expected_sizes = _output_sizes(ff, d)
+    n_arrays = length(expected_sizes)
+    err_msg = "Out must contain $n_arrays arrays with sizes $(join(expected_sizes, ", "))"
+    ex = quote
+        if length(out) != $n_arrays
+            error($err_msg)
+        end
+        for i in 1:$(n_arrays)
+            if size(out[i]) != $(expected_sizes)[i]
+                error($err_msg)
+            end
+            # populate with zeros, because we assume everything is zeroed and
+            # only fill in non-zero elements
+            fill!(out[i], zero(eltype(out[i])))
+        end
+    end
+    _filter_lines!(ex)
+    ex
+end
+
+function equation_block{T<:GroupedArgs}(ff::FunctionFactory{T}, ::TDer{1})
+    expr_mats, non_zero = _jacobian_expr_mat(ff)
+
+    # construct expressions that define the body of this function.
+    # we need neq*nvar of them
+    expr_args = Array{Expr}(sum(non_zero))
+
+    # To do this we use linear indexing tricks to access `out` and `expr_mat`.
+    # Note the offset on the index to expr_args also (needed because allocating)
+    # is the first expression in the block
+    ix = 0
+    for (i_group, expr_mat) in enumerate(expr_mats)
+        for ii in eachindex(expr_mat)
+            if expr_mat[ii] != 0
+                expr_args[ix+=1] = :(out[$i_group][$(ii)] = $(expr_mat[ii]))
+            end
         end
     end
 
@@ -711,7 +802,18 @@ function make_function(ff::FunctionFactory)
     return out
 end
 
-extra_methods(ff::FunctionFactory) = Expr[]
+function extra_methods(ff::FunctionFactory)
+    out = Expr[]
+    if !HAVE_SYMENGINE
+        # for Calculus.jl the @generated functions do not work -- we need to
+        # construct code for levels 0, 1, and 2 here instead of at call time
+        push!(out, build_function(ff, Der{0}))  # allocating levels
+        push!(out, build_function(ff, Der{1}))  # allocating jacobian
+        push!(out, build_function!(ff, Der{0}))  # mutating levels
+        push!(out, build_function!(ff, Der{1}))  # mutating jacobian
+    end
+    return out
+end
 function extra_methods{T<:FlatArgs}(ff::FunctionFactory{T})
     out = Expr[]
     if !HAVE_SYMENGINE
