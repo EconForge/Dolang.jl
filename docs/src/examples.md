@@ -242,11 +242,18 @@ grouped_args!(out, a, b, p)
 @show out
 ```
 
-As of today (2017-06-13) derivative code does not work for functions with
-grouped args. Trying to evaluate a derivative will result in an error that
+As of today (2017-06-13) only first order derivative code has been implemented
+for functions with grouped args. Trying to evaluate a derivative will result in
+an error that looks like this:
+
+```@example ff3
+grouped_args(Der{1}, a, b, p)
+```
+
+Trying to evaluate any higher order derivative will result in an error that
 looks like this:
 
 ```
-julia> grouped_args(Der{1}, a, b, p)
-ERROR: MethodError: no method matching equation_block(::Dolang.FunctionFactory{Dict{Symbol,Array{Tuple{Symbol,Int64},1}},Array{Symbol,1},Dict{Symbol,Any},DataType}, ::Type{Dolang.Der{1}})
+julia> grouped_args(Der{2}, a, b, p)
+ERROR: MethodError: no method matching equation_block(::Dolang.FunctionFactory{Dict{Symbol,Array{Tuple{Symbol,Int64},1}},Array{Symbol,1},Dict{Symbol,Any},DataType}, ::Type{Dolang.Der{2}})
 ```
