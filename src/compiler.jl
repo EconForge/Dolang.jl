@@ -700,16 +700,24 @@ function make_function(ff::FunctionFactory)
     push!(out.args, build_vec_function(ff, Der{0}))
     push!(out.args, build_vec_function!(ff, Der{0}))
 
+    extras = extra_methods(ff)
+    if !isempty(extras)
+        append!(out.args, extras)
+    end
+    return out
+end
 
+extra_methods(ff::FunctionFactory) = Expr[]
+function extra_methods{T<:FlatArgs}(ff::FunctionFactory{T})
+    out = Expr[]
     if !HAVE_SYMENGINE
         # for Calculus.jl the @generated functions do not work -- we need to
         # construct code for levels 0, 1, and 2 here instead of at call time
-        push!(out.args, build_function(ff, Der{0}))  # allocating levels
-        push!(out.args, build_function(ff, Der{1}))  # allocating jacobian
-        push!(out.args, build_function(ff, Der{2}))  # allocating hessian
-        push!(out.args, build_function!(ff, Der{0}))  # mutating levels
-        push!(out.args, build_function!(ff, Der{1}))  # mutating jacobian
+        push!(out, build_function(ff, Der{0}))  # allocating levels
+        push!(out, build_function(ff, Der{1}))  # allocating jacobian
+        push!(out, build_function(ff, Der{2}))  # allocating hessian
+        push!(out, build_function!(ff, Der{0}))  # mutating levels
+        push!(out, build_function!(ff, Der{1}))  # mutating jacobian
     end
-
-    out
+    return out
 end
