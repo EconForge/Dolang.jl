@@ -704,6 +704,10 @@ function make_function(ff::FunctionFactory)
     if !isempty(extras)
         append!(out.args, extras)
     end
+
+    # make sure we return both the mutating and allocating function names
+    # so both can be used directly
+    push!(out.args, Expr(:tuple, ff.funname, Symbol(ff.funname, "!")))
     return out
 end
 
