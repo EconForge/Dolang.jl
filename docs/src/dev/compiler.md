@@ -1,4 +1,9 @@
-# The Dolang.jl compiler
+# Compiler internals
+
+**NOTE: 2017-06-13**: These docs might be slightly out of date. They should
+still serve as a helpful reference if you are totally lost when reading the
+code, but the best way to understand what is going on is to read the code in
+`src/symbolic.jl` and `src/compiler.jl`
 
 These are some developer notes about the compiler inside Dolang.jl
 

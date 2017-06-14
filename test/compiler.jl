@@ -12,7 +12,6 @@ const grouped_args = OrderedDict(:x=>[(:a, -1),], :y=>[(:a, 0), (:b, 0), (:c, 0)
 const flat_params = [:beta, :delta]
 const grouped_params = Dict(:p => [:u])
 
-
 args2 = vcat(args, targets)::Vector{Tuple{Symbol,Int}}
 
 ff = Dolang.FunctionFactory(eqs, args, params, targets=targets, defs=defs,
@@ -176,21 +175,29 @@ end
     end))
 
     want_vec = Dolang._filter_lines!(:(begin
-        function myfun(::Dolang.TDer{0},V::AbstractMatrix,p)
+        function myfun(::Dolang.TDer{0},V::AbstractArray,p)
             out = Dolang._allocate_out(eltype(V),2,V)
-            nrow = size(V,1)
-            for _row = 1:nrow
-                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),view(V,_row,:),p)
+            begin
+                nrow = size(out,1)
+                for _row = 1:nrow
+                    __out__row = view(out, _row, :)
+                    __V__row = Dolang._unpack_obs(V, _row)
+                    myfun!($(Dolang.Der{0}),__out__row, __V__row, p)
+                end
+                return out
             end
-            return out
         end
-        function myfun(V::AbstractMatrix,p)
+        function myfun(V::AbstractArray,p)
             out = Dolang._allocate_out(eltype(V),2,V)
-            nrow = size(V,1)
-            for _row = 1:nrow
-                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),view(V,_row,:),p)
+            begin
+                nrow = size(out,1)
+                for _row = 1:nrow
+                    __out__row = view(out, _row, :)
+                    __V__row = Dolang._unpack_obs(V, _row)
+                    myfun!($(Dolang.Der{0}),__out__row, __V__row, p)
+                end
+                return out
             end
-            return out
         end
     end
     ))
@@ -257,7 +264,7 @@ end
     end))
 
     want!_vec = Dolang._filter_lines!(:(begin
-        function myfun!(::Dolang.TDer{0},out,V::AbstractMatrix,p)
+        function myfun!(::Dolang.TDer{0},out,V::AbstractArray,p)
             begin
                 expected_size = Dolang._output_size(2,V)
                 if size(out) != expected_size
@@ -265,13 +272,17 @@ end
                     throw(DimensionMismatch(msg))
                 end
             end
-            nrow = size(V,1)
-            for _row = 1:nrow
-                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),view(V,_row,:),p)
+            begin
+                nrow = size(out,1)
+                for _row = 1:nrow
+                    __out__row = view(out, _row, :)
+                    __V__row = Dolang._unpack_obs(V, _row)
+                    myfun!($(Dolang.Der{0}),__out__row, __V__row, p)
+                end
+                return out
             end
-            return out
         end
-        function myfun!(out,V::AbstractMatrix,p)
+        function myfun!(out,V::AbstractArray,p)
             begin
                 expected_size = Dolang._output_size(2,V)
                 if size(out) != expected_size
@@ -279,11 +290,15 @@ end
                     throw(DimensionMismatch(msg))
                 end
             end
-            nrow = size(V,1)
-            for _row = 1:nrow
-                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),view(V,_row,:),p)
+            begin
+                nrow = size(out,1)
+                for _row = 1:nrow
+                    __out__row = view(out, _row, :)
+                    __V__row = Dolang._unpack_obs(V, _row)
+                    myfun!($(Dolang.Der{0}),__out__row, __V__row, p)
+                end
+                return out
             end
-            return out
         end
     end
     ))
@@ -338,21 +353,29 @@ end
     end))
 
     want_d_vec = Dolang._filter_lines(:(begin
-        function myfun(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),V::AbstractMatrix,p)
+        function myfun(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),V::AbstractArray,p)
             out = Dolang._allocate_out(eltype(V),2,V)
-            nrow = size(V,1)
-            for _row = 1:nrow
-                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int),view(V,_row,:),p)
+            begin
+                nrow = size(out, 1)
+                for _row = 1:nrow
+                    __out__row = view(out, _row, :)
+                    __V__row = Dolang._unpack_obs(V, _row)
+                    myfun!($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int), __out__row, __V__row, p)
+                end
+                return out
             end
-            return out
         end
-        function myfun($(Dolang.DISPATCH_ARG)::$(Int),V::AbstractMatrix,p)
+        function myfun($(Dolang.DISPATCH_ARG)::$(Int),V::AbstractArray,p)
             out = Dolang._allocate_out(eltype(V),2,V)
-            nrow = size(V,1)
-            for _row = 1:nrow
-                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int),view(V,_row,:),p)
+            begin
+                nrow = size(out, 1)
+                for _row = 1:nrow
+                    __out__row = view(out, _row, :)
+                    __V__row = Dolang._unpack_obs(V, _row)
+                    myfun!($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int), __out__row, __V__row, p)
+                end
+                return out
             end
-            return out
         end
     end))
 
@@ -418,7 +441,7 @@ end
     end))
 
     want_d!_vec = Dolang._filter_lines(:(begin
-        function myfun!(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),out,V::AbstractMatrix,p)
+        function myfun!(::Dolang.TDer{0},$(Dolang.DISPATCH_ARG)::$(Int),out,V::AbstractArray,p)
             begin
                 expected_size = Dolang._output_size(2,V)
                 if size(out) != expected_size
@@ -426,13 +449,17 @@ end
                     throw(DimensionMismatch(msg))
                 end
             end
-            nrow = size(V,1)
-            for _row = 1:nrow
-                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int),view(V,_row,:),p)
+            begin
+                nrow = size(out, 1)
+                for _row = 1:nrow
+                    __out__row = view(out, _row, :)
+                    __V__row = Dolang._unpack_obs(V, _row)
+                    myfun!($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int), __out__row, __V__row, p)
+                end
+                return out
             end
-            return out
         end
-        function myfun!($(Dolang.DISPATCH_ARG)::$(Int),out,V::AbstractMatrix,p)
+        function myfun!($(Dolang.DISPATCH_ARG)::$(Int),out,V::AbstractArray,p)
             begin
                 expected_size = Dolang._output_size(2,V)
                 if size(out) != expected_size
@@ -440,11 +467,15 @@ end
                     throw(DimensionMismatch(msg))
                 end
             end
-            nrow = size(V,1)
-            for _row = 1:nrow
-                @inbounds out[_row,:] = myfun($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int),view(V,_row,:),p)
+            begin
+                nrow = size(out, 1)
+                for _row = 1:nrow
+                    __out__row = view(out, _row, :)
+                    __V__row = Dolang._unpack_obs(V, _row)
+                    myfun!($(Dolang.Der{0}),$(Dolang.DISPATCH_ARG)::$(Int), __out__row, __V__row, p)
+                end
+                return out
             end
-            return out
         end
     end))
 
@@ -455,179 +486,111 @@ end
         @test want_d == Dolang.build_function(ffd, Der{0})
         @test want_d! == Dolang.build_function!(ffd, Der{0})
 
-        @test want_vec == Dolang.build_vectorized_function(ff, Der{0})
-        @test want!_vec == Dolang.build_vectorized_function!(ff, Der{0})
-        @test want_d_vec == Dolang.build_vectorized_function(ffd, Der{0})
-        @test want_d!_vec == Dolang.build_vectorized_function!(ffd, Der{0})
-    end
-
-    @testset "  make_method" begin
-        @test make_method(ff) == Expr(:block, want!, want!_vec, want, want_vec)
-        @test make_method(ff; mutating=false) == Expr(:block, want, want_vec)
-        @test make_method(ff; allocating=false) == Expr(:block, want!, want!_vec)
-
-        # test version where you pass args and it makes ff for you
-        have1 = make_method(eqs, args, params, targets=targets, defs=defs,
-                            funname=funname)
-        have2 = make_method(eqs, args, params, targets=targets, defs=defs,
-                            funname=funname, mutating=false)
-        have3 = make_method(eqs, args, params, targets=targets, defs=defs,
-                            funname=funname, allocating=false)
-
-        @test have1 == Expr(:block, want!, want!_vec, want, want_vec)
-        @test have2 == Expr(:block, want, want_vec)
-        @test have3 == Expr(:block, want!, want!_vec)
-
-        # now dispatch version
-        @test make_method(ffd) == Expr(:block, want_d!, want_d!_vec , want_d, want_d_vec)
-        @test make_method(ffd; mutating=false) == Expr(:block, want_d, want_d_vec)
-        @test make_method(ffd; allocating=false) == Expr(:block, want_d!, want_d!_vec)
-
-        # # test version where you pass args and it makes ffd for you
-        have1 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
-                            funname=funname)
-        have2 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
-                            funname=funname, mutating=false)
-        have3 = make_method(Int, eqs, args, params, targets=targets, defs=defs,
-                            funname=funname, allocating=false)
-
-        @test have1 == Expr(:block, want_d!, want_d!_vec, want_d, want_d_vec)
-        @test have2 == Expr(:block, want_d, want_d_vec)
-        @test have3 == Expr(:block, want_d!, want_d!_vec)
-    end
-
-
-    @testset " make_function" begin
-        eqs = [:(a(0)*p^2+b(0))]
-        variables = [(:a, 0), (:b, 0), :p]
-
-        for (to_diff, args, params) in [
-                ([1, 2], [(:a, 0), (:b, 0)], [:p]),
-                ([1], [(:a, 0)], [(:b, 0), :p]),
-                ([1, 3], [(:a, 0), :p], [(:b ,0)])
-            ]
-
-            ff1 = Dolang.FunctionFactory(eqs, args, params)
-            @test ==(
-                Dolang.make_function(eqs, variables, to_diff),
-                Dolang.make_method(ff1, orders=[0, 1])
-            )
-
-            # test orders argument
-            @test ==(
-                Dolang.make_function(eqs, variables, to_diff, orders=[0]),
-                Dolang.make_method(ff1, orders=[0])
-            )
-            @test ==(
-                Dolang.make_function(eqs, variables, to_diff, orders=[0, 1]),
-                Dolang.make_method(ff1, orders=[0, 1])
-            )
-            @test ==(
-                Dolang.make_function(eqs, variables, to_diff, orders=[1]),
-                Dolang.make_method(ff1, orders=[1])
-            )
-            @test ==(
-                Dolang.make_function(eqs, variables, to_diff, orders=[2]),
-                Dolang.make_method(ff1, orders=[2])
-            )
-
-            # test dispatch arugment
-            ff2 = Dolang.FunctionFactory(Int, eqs, args, params)
-            @test ==(
-                Dolang.make_function(eqs, variables, to_diff, dispatch=Int),
-                Dolang.make_method(ff2, orders=[0, 1])
-            )
-
-            # test name argument
-            ff3 = Dolang.FunctionFactory(eqs, args, params, funname=:slick)
-            @test ==(
-                Dolang.make_function(eqs, variables, to_diff, name=:slick),
-                Dolang.make_method(ff3, orders=[0, 1])
-            )
-
-            # test allocating arg
-            @test ==(
-                Dolang.make_function(eqs, variables, to_diff, allocating=false),
-                Dolang.make_method(ff1, orders=[0, 1], allocating=false)
-            )
-
-            # test targets argument
-            eqs2 = eqs = [:(x(0) = a(0)*p^2+b(0))]
-            targets = [(:x, 0)]
-            ff4 = Dolang.FunctionFactory(eqs2, args, params, targets=targets)
-            @test ==(
-                Dolang.make_function(eqs, variables, to_diff, targets=targets),
-                Dolang.make_method(ff4, orders=[0, 1])
-            )
-        end
+        @test want_vec == Dolang.build_vec_function(ff, Der{0})
+        @test want!_vec == Dolang.build_vec_function!(ff, Der{0})
+        @test want_d_vec == Dolang.build_vec_function(ffd, Der{0})
+        @test want_d!_vec == Dolang.build_vec_function!(ffd, Der{0})
     end
 
     @testset " evaluating compiled code" begin
-        eval(current_module(), Dolang.make_method(ff, orders=[0,1]))
-        u = rand()
-        V = rand(6)+4
-        am, a, b, c, cp, dp = V
-        p = [u]
+        # prep convenience make_function method arguments
+        variables = vcat(args, :u)
+        to_diff = 1:length(args)
+        conv_code = make_function(eqs, variables, to_diff, name=:anon, targets=targets, defs=defs)
+        eval(current_module(), conv_code)
+        eval(current_module(), Dolang.make_function(ff))
+        for (fun, fun!) in [(myfun, myfun!), (anon, anon!)]
+            u = rand()
+            V = rand(6)+4
+            am, a, b, c, cp, dp = V
+            p = [u]
 
-        want = [log(a) + b/(am / (1-c)), cp + u*dp]
-        out = similar(want)
+            want = [log(a) + b/(am / (1-c)), cp + u*dp]
+            out = similar(want)
 
-        # test scalar, allocating version
-        @test want ≈ @inferred myfun(V, p)
-        @test want ≈ @inferred myfun(Dolang.Der{0}, V, p)
+            # test scalar, allocating version
+            @test want ≈ @inferred fun(V, p)
+            @test want ≈ @inferred fun(Dolang.Der{0}, V, p)
 
-        # test scalar, mutating version
-        myfun!(out, V, p)
-        @test want ≈ out
+            # test scalar, mutating version
+            fun!(out, V, p)
+            @test want ≈ out
 
-        myfun!(Dolang.Der{0}, out, V, p)
-        @test want ≈ out
+            fun!(Dolang.Der{0}, out, V, p)
+            @test want ≈ out
 
-        # test vectorized version
-        Vmat = repmat(V', 40, 1)
-        @test maximum(abs, want' .- myfun(Vmat, p)) < 1e-15
-        @test maximum(abs, want' .- myfun(Dolang.Der{0}, Vmat, p)) < 1e-15
+            # test vectorized version
+            Vmat = repmat(V', 40, 1)
+            @test maximum(abs, want' .- fun(Vmat, p)) < 1e-15
+            @test maximum(abs, want' .- fun(Dolang.Der{0}, Vmat, p)) < 1e-15
 
-        # test vectorized mutating version
-        out_mat = Array{Float64}(40, 2)
-        myfun!(out_mat, Vmat, p)
-        @test maximum(abs, want' .- out_mat) < 1e-15
+            # test vectorized mutating version
+            out_mat = Array{Float64}(40, 2)
+            fun!(out_mat, Vmat, p)
+            @test maximum(abs, want' .- out_mat) < 1e-15
 
-        myfun!(Dolang.Der{0}, out_mat, Vmat, p)
-        @test maximum(abs, want' .- out_mat) < 1e-15
+            fun!(Dolang.Der{0}, out_mat, Vmat, p)
+            @test maximum(abs, want' .- out_mat) < 1e-15
 
-        ## Now test derivative code!
-        want = zeros(Float64, 2, 6)
-        want[1, 1] = -1 * b *(1-c)/ (am*am)  # ∂foo/∂am
-        want[1, 2] = 1/a  # ∂foo/∂a
-        want[1, 3] = (1-c) / (am)  # ∂foo/∂b
-        want[1, 4] = -b/am  # ∂foo/∂b
-        want[2, 5] = 1.0  # ∂bar/∂cp
-        want[2, 6] = u # # ∂bar/∂dp
+            ## Now test derivative code!
+            want = zeros(Float64, 2, 6)
+            want[1, 1] = -1 * b *(1-c)/ (am*am)  # ∂foo/∂am
+            want[1, 2] = 1/a  # ∂foo/∂a
+            want[1, 3] = (1-c) / (am)  # ∂foo/∂b
+            want[1, 4] = -b/am  # ∂foo/∂b
+            want[2, 5] = 1.0  # ∂bar/∂cp
+            want[2, 6] = u # # ∂bar/∂dp
 
-        # allocating version
-        @test want ≈ @inferred myfun(Der{1}, V, p)
+            # allocating version
+            @test want ≈ @inferred fun(Der{1}, V, p)
 
-        # non-alocating version
-        out2 = similar(want)
-        myfun!(Der{1}, out2, V, p)
-        @test want ≈ out2
+            # non-alocating version
+            out2 = similar(want)
+            fun!(Der{1}, out2, V, p)
+            @test want ≈ out2
 
+            # and second derivative code
+            want = zeros(Float64, 2, 6*6)
+            want[1, 1]  = 2 * b * (1-c) / (am^3) # ∂²foo/∂am²   = (1,1)
+            want[1, 3]  = -1 *(1-c)/ (am*am)     # ∂²foo/∂am ∂b = (1,3)
+            want[1, 4]  = b /(am^2)              # ∂²foo/∂am ∂c = (1,4)
+            want[1, 8]  = -1/(a^2)               # ∂²foo/∂a²    = (2,2)
+            want[1, 13] = -(1-c)/(am^2)          # ∂²foo/∂b ∂am = (3,1)
+            want[1, 16] = -1/am                  # ∂²foo/∂b ∂c  = (3,4)
+            want[1, 19] = b/(am^2)               # ∂²foo/∂c ∂am = (4,1)
+            want[1, 21] = -1/am                  # ∂²foo/∂c ∂b  = (4,3)
+
+            @test want ≈ @inferred fun(Der{2}, V, p)
+
+            # and third derivative code
+            if Dolang.HAVE_SYMENGINE
+                want = [Dict{NTuple{3,Int},Float64}(), Dict{NTuple{3,Int},Float64}()]
+                want[1][(1, 1, 1)] = -6 * b * (1-c) / (am^4) # ∂³foo/∂am³
+                want[1][(1, 1, 3)] = 2 * (1-c) / (am^3)      # ∂³foo/∂am²b
+                want[1][(1, 1, 4)] = -2 * b / (am^3)         # ∂³foo/∂am²c
+                want[1][(2, 2, 2)] = 2/(a^3)                 # ∂³foo/∂a³
+                want[1][(1, 3, 4)] = 1/(am^2)                # ∂³foo / ∂a ∂b ∂c
+
+                have = @inferred fun(Der{3}, V, p)
+
+                @test length(have[1]) == 5
+                @test length(have[2]) == 0
+                for (k, v) in have[1]
+                    @test v ≈ want[1][k]
+                end
+            end
+        end
     end
 end
-
-@testset "derivative code runs" begin
-    @test (Dolang.build_function(ff, Der{1}); true)
-    @test (Dolang.build_function(ff, Der{2}); true)
-end  # @testset "derivative code runs"
 
 @testset "issue #14" begin
     eqs = Expr[:(1+a-a)]
     ss_args = Tuple{Symbol,Int64}[(:a,0)]
     p_args = Symbol[:q]
 
+    ff = Dolang.FunctionFactory(eqs, ss_args, p_args, funname=:f_s)
     # just make sure this runs
-    Dolang.make_method(eqs, ss_args, p_args, funname=:f_s, orders=[0, 1])
+    Dolang.func_body(ff, Dolang.Der{2})
 end
 
 
