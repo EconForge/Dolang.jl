@@ -3,14 +3,7 @@ module DolangTests
 using Dolang
 using Compat
 using DataStructures
-
-
-if VERSION >= v"0.5-"
-    using Base.Test
-else
-    using BaseTestNext
-    const Test = BaseTestNext
-end
+using Base.Test
 
 tests = length(ARGS) > 0 ? ARGS : [
                                    "symbolic",
