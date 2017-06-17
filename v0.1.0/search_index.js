@@ -33,62 +33,6 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "symbolic.html#Base.LinAlg.normalize-Tuple{Symbol}",
-    "page": "Symbolic manipulation",
-    "title": "Base.LinAlg.normalize",
-    "category": "Method",
-    "text": "normalize(x::Symbol)\n\nNormalize the symbol by returning _x_ if x doesn't alread have leading and trailling _ characters\n\n\n\n"
-},
-
-{
-    "location": "symbolic.html#Base.LinAlg.normalize-Tuple{Number}",
-    "page": "Symbolic manipulation",
-    "title": "Base.LinAlg.normalize",
-    "category": "Method",
-    "text": "normalize(x::Number)\n\nJust return x\n\n\n\n"
-},
-
-{
-    "location": "symbolic.html#Base.LinAlg.normalize-Tuple{Symbol,Integer}",
-    "page": "Symbolic manipulation",
-    "title": "Base.LinAlg.normalize",
-    "category": "Method",
-    "text": "normalize(var::Union{String,Symbol}, n::Integer)\n\nNormalize the string or symbol in the following way:\n\nif n >= 0 return _var__n_\nif n < 0 return _var_mn_\n\n\n\n"
-},
-
-{
-    "location": "symbolic.html#Base.LinAlg.normalize-Tuple{Tuple{Symbol,Integer}}",
-    "page": "Symbolic manipulation",
-    "title": "Base.LinAlg.normalize",
-    "category": "Method",
-    "text": "normalize(x::Tuple{Symbol,Integer})\n\nSame as normalize(x[1], x[2])\n\n\n\n"
-},
-
-{
-    "location": "symbolic.html#Base.LinAlg.normalize-Tuple{Expr}",
-    "page": "Symbolic manipulation",
-    "title": "Base.LinAlg.normalize",
-    "category": "Method",
-    "text": "normalize(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])\n\nRecursively normalize ex according to the following rules (structure of list below is input form of ex: returned expression):\n\nlhs = rhs and targets is not empty: normalize(lhs) = normalize(rhs), where lhs must be one of the symbols in targets\nquote ex end:  normalize(ex)\nvar(n::Integer): normalize(var, n)\na ⚡ b and ⚡ one of +, *, -, /, ^, +, *: normalize(a) ⚡ normalize(b)\nf(args...): f(map(normalize, args)...)\n\n\n\n"
-},
-
-{
-    "location": "symbolic.html#Base.LinAlg.normalize-Tuple{String}",
-    "page": "Symbolic manipulation",
-    "title": "Base.LinAlg.normalize",
-    "category": "Method",
-    "text": "normalize(s::AbstractString; kwargs...)\n\nCall normalize(parse(s)::Expr; kwargs...)\n\n\n\n"
-},
-
-{
-    "location": "symbolic.html#Base.LinAlg.normalize-Tuple{Array{Expr,1}}",
-    "page": "Symbolic manipulation",
-    "title": "Base.LinAlg.normalize",
-    "category": "Method",
-    "text": "normalize(exs::Vector{Expr}; kwargs...)\n\nConstruct a begin/end block formed by calling normalize(i; kwargs...) for all i in exs\n\n\n\n"
-},
-
-{
     "location": "symbolic.html#normalize-1",
     "page": "Symbolic manipulation",
     "title": "normalize",
