@@ -12,7 +12,7 @@ push!(DOLANG_FUNCTIONS, ARITH_SYMBOLS...)
 
 using Compat: view, String, @compat
 
-import Base: ==, normalize
+import Base: ==
 
 export make_function, Der, FunctionFactory, normalize, is_time_shift, time_shift,
        subs, csubs, steady_state, list_symbols, list_symbols!, list_variables,
