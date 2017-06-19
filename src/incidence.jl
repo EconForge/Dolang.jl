@@ -14,14 +14,15 @@ function IncidenceTable(eqs::AbstractVector, skip::AbstractVector=Symbol[])
     it = IncidenceTable()
     for (i, eq) in enumerate(eqs)
         visit!(it, eq, i, 0, skip)
+        # make sure the Dict by_eq has an entry for this equation, even if it
+        # is empty.
+        get!(it.by_eq, i, Dict{Symbol,Set{Int}}())
     end
     it
 end
 
 function IncidenceTable(eq::Expr, skip::AbstractVector=Symbol[])
-    it = IncidenceTable()
-    visit!(it, eq, 1, 0, skip)
-    it
+    it = IncidenceTable([eq], skip)
 end
 
 Base.getindex(it::IncidenceTable, i::Int) = it.by_date[i]
@@ -55,6 +56,12 @@ end
 
 function visit!(it::IncidenceTable, ex::Expr, n::Int, shift::Int,
                 skip::AbstractVector=Symbol[])
+
+    if ex.head == :line
+        # this is a line number node in a quoted expression. There is nothing
+        # for us to do here.
+        return nothing
+    end
     if is_time_shift(ex)
         var = ex.args[1]
         i = ex.args[2]

@@ -82,3 +82,24 @@
     @test it[1] == it.by_date[1]
     @test it[:foo] == it.by_var[:foo]
 end
+
+@testset "by_eq always created -- even for empty eqs" begin
+    # ff is controls_lb for rbc_dtcc_iid.yaml
+    args = DataStructures.OrderedDict(:m=>Tuple{Symbol,Int64}[(:e_z,
+    0)],:s=>Tuple{Symbol,Int64}[(:z, 0), (:k, 0)])
+
+    params = Symbol[:beta, :sigma, :eta, :chi, :delta, :alpha, :rho, :zbar, :sig_z]
+    eqs = Expr[quote 0.0 end, quote 0.0 end]
+
+    defs = DataStructures.OrderedDict(:w=>:(((1 - alpha) * y(0)) /
+    n(0)),:rk=>:((alpha * y(0)) / k(0)),:y=>:(exp(z(0)) * k(0) ^ alpha * n(0) ^
+    (1 - alpha)),:c=>:(y(0) - i(0)))
+
+    ff = FunctionFactory(eqs, args, params, defs=defs)
+
+    @test length(ff.incidence.by_eq) == 2
+    @test haskey(ff.incidence.by_eq, 1)
+    @test haskey(ff.incidence.by_eq, 2)
+    @test length(ff.incidence.by_eq[1]) == 0
+    @test length(ff.incidence.by_eq[2]) == 0
+end
