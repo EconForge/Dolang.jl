@@ -807,9 +807,7 @@ function extra_methods(ff::FunctionFactory)
     if !HAVE_SYMENGINE
         # for Calculus.jl the @generated functions do not work -- we need to
         # construct code for levels 0, 1, and 2 here instead of at call time
-        push!(out, build_function(ff, Der{0}))  # allocating levels
         push!(out, build_function(ff, Der{1}))  # allocating jacobian
-        push!(out, build_function!(ff, Der{0}))  # mutating levels
         push!(out, build_function!(ff, Der{1}))  # mutating jacobian
     end
     return out
@@ -819,10 +817,8 @@ function extra_methods{T<:FlatArgs}(ff::FunctionFactory{T})
     if !HAVE_SYMENGINE
         # for Calculus.jl the @generated functions do not work -- we need to
         # construct code for levels 0, 1, and 2 here instead of at call time
-        push!(out, build_function(ff, Der{0}))  # allocating levels
         push!(out, build_function(ff, Der{1}))  # allocating jacobian
         push!(out, build_function(ff, Der{2}))  # allocating hessian
-        push!(out, build_function!(ff, Der{0}))  # mutating levels
         push!(out, build_function!(ff, Der{1}))  # mutating jacobian
     end
     return out
