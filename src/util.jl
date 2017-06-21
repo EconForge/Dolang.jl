@@ -72,7 +72,7 @@ inf_to_Inf(ex::Expr) = Expr(ex.head, map(inf_to_Inf, ex.args)...)
 _to_Float64(x::Real) = convert(Float64, x)
 _to_Float64(x::AbstractArray) = map(Float64, x)
 
-function solution_order(d::OrderedDict, it::IncidenceTable)
+function solution_order(d::OrderedDict, it::IncidenceTable, pre_solved::Vector{Symbol}=Symbol[])
     # unpack some data
     vars = collect(keys(d))
     n = length(d)
@@ -83,12 +83,12 @@ function solution_order(d::OrderedDict, it::IncidenceTable)
     # Start with indices for equations that are purely numerical
     front = setdiff(1:n, keys(it.by_eq))
     out[front] = 1:length(front)
-    solved = vars[front]
+    solved = vcat(pre_solved, vars[front])
     to_solve = deepcopy(it.by_eq)
 
     # now start stepping through equations
     ix = length(front)
-    for _junk in 2:n
+    for _junk in 2:n+1
         for (eq, eq_vars) in to_solve
             can_solve = true
             for (var, dates) in eq_vars
@@ -111,10 +111,10 @@ function solution_order(d::OrderedDict, it::IncidenceTable)
 end
 
 
-function solution_order(_d::Associative)
+function solution_order(_d::Associative, pre_solved::Vector{Symbol}=Symbol[])
     d = OrderedDict(_d)
     it = Dolang.IncidenceTable(collect(values(d)))
-    solution_order(d, it)
+    solution_order(d, it, pre_solved)
 end
 
 solve_triangular_system(d::Associative) = solve_triangular_system(OrderedDict(d))
