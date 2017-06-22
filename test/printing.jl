@@ -12,7 +12,8 @@
         ("abar_xdot(1)", "\\overline{a}_{\\dot{x},t+1}"),
         ("adot_xdot(1)", "\\dot{a}_{\\dot{x},t+1}"),
         ("abar_i_jstar__k(1)", "\\overline{a}_{i,j^{\\star},t+1}^{k}"),
-        ("a__p1_p2(1)", "a_{p2,t+1}^{p1}")
+        ("a__p1_p2(1)", "a_{p2,t+1}^{p1}"),
+        ("(1 - delta) * k", "\\left(1-\\delta\\right) k")
     ]
 
     for (have, want) in tests

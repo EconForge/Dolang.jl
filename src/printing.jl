@@ -12,8 +12,6 @@ const latex_subs = let
     merge(unicode, tex_name)
 end
 
-v = :a__k_i_j
-
 function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
     # split the symbol into parts
     v_string = string(v)
@@ -111,6 +109,12 @@ function _latex!(io::IO, ex::Expr)
         _latex!(io, :($(ex.args[1]) == $(ex.args[2]) ))
         return
     end
+
+    if ex.head == :block && length(ex.args) == 1  # quoted expression
+        _latex!(io, ex.args[1])
+        return
+    end
+
     if ex.head == :call
         if ex.args[1] == :(==)
             _latex!(io, ex.args[2])
@@ -143,6 +147,12 @@ function _latex!(io::IO, ex::Expr)
                     _latex!(io, ex.args[2])
                     print(io, " ")
                     _latex!(io, ex.args[3])
+                elseif f == :-
+                    print(io, "\\left(")
+                    _latex!(io, ex.args[2])
+                    print(io, f)
+                    _latex!(io, ex.args[3])
+                    print(io, "\\right)")
                 else
                     _latex!(io, ex.args[2])
                     print(io, f)
