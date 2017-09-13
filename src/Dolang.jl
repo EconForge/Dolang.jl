@@ -1,9 +1,11 @@
-__precompile__(false)
+# __precompile__(true)
 
 module Dolang
 
 using DataStructures
 
+abstract type Horizontal end
+abstract type Vertical end
 
 const ARITH_SYMBOLS = Set([:+, :-, :*, :/, :^])
 const DOLANG_FUNCTIONS = Set([:sin, :cos, :tan, :exp, :log, :log10])
@@ -16,7 +18,7 @@ import Base: ==
 
 export make_function, Der, FunctionFactory, normalize, is_time_shift, time_shift,
        subs, csubs, steady_state, list_symbols, list_symbols!, list_variables,
-       list_parameters
+       list_parameters, Vertical, Horizontal
 
 # come convenience methods
 _replace_star_star(s::AbstractString) = replace(s, "**", "^")

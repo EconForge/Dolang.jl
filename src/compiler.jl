@@ -43,15 +43,15 @@ _assign_var_expr(lhs, rhs, i) = :(Dolang._assign_var($lhs, $rhs, $i))
 
 "Expression that allocates memory for variable `out` in non-mutating version"
 allocate_block(ff::FunctionFactory, ::TDer{0}=Der{0}) =
-    :(out = Dolang._allocate_out(eltype($(arg_names(ff)[1])), $(length(ff.eqs)),
-                                 $(arg_names(ff)...)))
+    :(out = Dolang._allocate_out(orientation, eltype($(arg_names(ff)[1])), $(length(ff.eqs)),
+                            $(arg_names(ff)...)))
 
 "Expression that checks the size of `out` in mutating version"
 function sizecheck_block(ff::FunctionFactory, ::TDer{0}=Der{0})
     ex = quote
-        expected_size = Dolang._output_size($(length(ff.eqs)), $(arg_names(ff)...))
-        if size(out) != expected_size
-            msg = "Expected out to be size $(expected_size), found $(size(out))"
+        expected_size = Dolang._output_size(orientation, $(length(ff.eqs)), $(arg_names(ff)...))
+        if Dolang._nobs(orientation, out) != expected_size
+            msg = "Expected out to be size $(expected_size), found $(Dolang._nobs(orientation, out))"
             throw(DimensionMismatch(msg))
         end
     end
@@ -128,7 +128,7 @@ function signature{n,T1<:FlatArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0},
         ff.funname,
         _extra_args(ff, d)...,
         Expr(:(::), :V, argtype),
-        param_names(ff)...
+        param_names(ff)...,
     )
 end
 
@@ -139,7 +139,8 @@ function signature{n,T1<:GroupedArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0}
         ff.funname,
         _extra_args(ff, d)...,
         [Expr(:(::), k, argtype) for k in keys(ff.args)]...,
-        param_names(ff)...
+        param_names(ff)...,
+
     )
 end
 
@@ -203,8 +204,8 @@ end
 function sizecheck_block{T<:FlatArgs}(ff::FunctionFactory{T}, d::TDer{1})
     expected_size = _output_size(ff, d)
     ex = quote
-        if size(out) != $expected_size
-            msg = "Expected out to be size $($(expected_size)), found $(size(out))"
+        if Dolang._nobs(orientation, out) != $expected_size
+            msg = "Expected out to be size $($(expected_size)), found $(Dolang._nobs(orientation, out))"
             throw(DimensionMismatch(msg))
         end
         # populate with zeros, because we assume everything is zeroed and
@@ -578,7 +579,7 @@ function _build_function(ff::FunctionFactory, d::TDer{0}, sig_func::Function,
     body = body_func(ff, d)
     sig = sig_func(ff, d)
     no_der_sig = deepcopy(sig)
-    splice!(no_der_sig.args, 2)
+    splice!(no_der_sig.args, 3) ####
     Expr(:block,
          Expr(:function, sig, body),
          Expr(:function, no_der_sig, body)
@@ -610,6 +611,17 @@ build_function!{D}(ff::FunctionFactory, ::TDer{D}) =
 # Vectorized functions #
 # -------------------- #
 
+function vec_signature!(ff::FunctionFactory, d::TDer{0})
+    sig = signature!(ff, d, :AbstractArray)
+    insert!(sig.args, 2, Expr(:parameters, Expr(:kw,:orientation,:Vertical)))
+    sig
+end
+function vec_signature(ff::FunctionFactory, d::TDer{0})
+    sig = signature(ff, d, :AbstractArray)
+    insert!(sig.args, 2, Expr(:parameters, Expr(:kw,:orientation,:Vertical)))
+    sig
+end
+
 vec_signature!{n}(ff::FunctionFactory, d::TDer{n}=Der{0}) = signature!(ff, d, :AbstractArray)
 vec_signature{n}(ff::FunctionFactory, d::TDer{n}=Der{0}) = signature(ff, d, :AbstractArray)
 
@@ -622,22 +634,23 @@ function vec_body_block(ff::FunctionFactory, d::TDer{0})
     # V::AbstractVector. we also need to unpack the __V__row variables
     start_ix = length(row_i_sig.args) - length(arg_names(ff))
     end_ix = length(row_i_sig.args) - 1
-    unpack_obs_i = Expr[:(__out__row = view(out, _row, :))]
+    unpack_obs_i = Expr[:(__out__row = Dolang._unpack_out(orientation, out, _row))]
     row_i_sig.args[2] = :($(d))
     row_i_sig.args[start_ix-1] = :__out__row
     for (i, name) in zip(start_ix:end_ix, arg_names(ff))
         sym_name_row = Symbol("__", name, "__row")
         push!(
             unpack_obs_i,
-            Expr(:(=), sym_name_row, :(Dolang._unpack_obs($name, _row)))
+            Expr(:(=), sym_name_row, :(Dolang._unpack_obs(orientation, $name, _row)))
         )
         row_i_sig.args[i] = sym_name_row
     end
 
+
     # the body of the function just just allocates, then loops over the number
     # of ros
     body = Expr(:block,
-        :(nrow = size(out, 1)),
+        :(nrow = Dolang._nobs(orientation, out)),
         Expr(:for, :(_row = 1:nrow),
             Expr(:block,
             unpack_obs_i...,

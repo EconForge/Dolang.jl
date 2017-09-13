@@ -7,24 +7,44 @@
 # matrix
 @inline _unpack_var(x::AbstractVector, i::Integer) = x[i]
 @inline _unpack_var(x::AbstractMatrix, i::Integer) = view(x, :, i)
+@inline _unpack_var(x::AbstractMatrix, i::Integer, orientation::Type{Vertical}) = view(x, :, i)
+@inline _unpack_var(x::AbstractMatrix, i::Integer, orientation::Type{Horizontal}) = view(x, i, :)
+
 
 # inlined function to extract a single observations of a vector fo variables.
 @inline _unpack_obs(x::AbstractMatrix, i::Integer) = view(x, i, :)
+@inline _unpack_obs(orientation::Type{Horizontal}, x::AbstractMatrix, i::Integer) = view(x, :, i)
+@inline _unpack_obs(orientation::Type{Vertical}, x::AbstractMatrix, i::Integer) = view(x, i, :)
+@inline _unpack_obs(orientation::Type{Horizontal}, x::AbstractVector, i::Integer) = x
+@inline _unpack_obs(orientation::Type{Vertical}, x::AbstractVector, i::Integer) = x
 @inline _unpack_obs(x::AbstractVector, i::Integer) = x
+
+@inline _unpack_out(orientation::Type{Vertical}, x::AbstractVector, i::Integer) = x
+@inline _unpack_out(orientation::Type{Horizontal}, x::AbstractVector, i::Integer) = x
+@inline _unpack_out(orientation::Type{Vertical}, x::AbstractMatrix, i::Integer) = view(x, :, i)
+@inline _unpack_out(orientation::Type{Horizontal}, x::AbstractMatrix, i::Integer) = view(x, i, :)
+
+_nobs(orientation::Type{Vertical}, out::AbstractVector) = 1
+_nobs(orientation::Type{Horizontal}, out::AbstractVector) = 1
+
+_nobs(orientation::Type{Vertical}, out::AbstractMatrix) = size(out,1)
+_nobs(orientation::Type{Horizontal}, out::AbstractMatrix) = size(out,2)
 
 # similar to _unpack_var, but instead assigns one element of a vector or one
 # column of a matrix
 @inline _assign_var(lhs::AbstractVector, rhs::Number, i) = setindex!(lhs, rhs, i)
-
 @inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i) = setindex!(lhs, rhs, :, i)
 
 # determine the size of the output variable, given the number of expressions
 # in the equation and all the input arguments
 _output_size(n_expr::Int, args::AbstractVector...) = (n_expr,)
 
-_output_size(n_expr::Int, arg::AbstractMatrix) = (size(arg, 1), n_expr)
+_output_size(::Type(Vertical), n_expr::Int, arg::AbstractMatrix) = (size(arg, 1), n_expr)
+_output_size( ::Type(Horizontal), n_expr::Int, arg::AbstractMatrix) = (n_expr, size(arg, 2))
+_output_size(n_expr::Int, args...) = _output_size(Vertical, n_expr::Int, args...)
 
-function _output_size(n_expr::Int, args...)
+
+function _output_size(::Type(Vertical), n_expr::Int, args...)
     n_row = 0
     # get maximum number of rows among matrix arguments
     for a in args
@@ -51,14 +71,13 @@ end
 # Allocate an array of eltype `T` for `n_expr` variables that corresponds
 # to input arguments `args...`
 _allocate_out(T::Type, n_expr::Int, args::AbstractVector...) = Array{T}(n_expr)
+_allocate_out(orientation::Union{Type{Horizontal},Type{Vertical}},T::Type, n_expr::Int, args::AbstractVector...) = Array{T}(n_expr)
+
+_allocate_out(orientation::Union{Type{Horizontal},Type{Vertical}}, T::Type, n_expr::Int, arg::AbstractMatrix) =
+    Array{T}(_output_size(orientation, n_expr, arg))
 
 _allocate_out(T::Type, n_expr::Int, arg::AbstractMatrix) =
-    Array{T}(_output_size(n_expr, arg))
-
-function _allocate_out(T::Type, n_expr::Int, args...)
-    sz = _output_size(n_expr, args...)
-    Array{T}(sz[1], sz[2])
-end
+    Array{T}(_output_size(Vertical, n_expr, arg))
 
 ## Triangular solver
 
