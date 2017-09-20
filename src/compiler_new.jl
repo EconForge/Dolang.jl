@@ -64,9 +64,6 @@ function gen_fun(fff::FlatFunctionFactory, diff::Vector{Int})
     # diff indices of vars to differentiate
     # 0 for residuals, i for i-th argument
 
-
-
-
     # prepare equations to write
     outputs = OrderedDict()
     targets = OrderedDict()
@@ -93,24 +90,21 @@ function gen_fun(fff::FlatFunctionFactory, diff::Vector{Int})
     end
 
 
+    # create function block
     code = []
-
     for (k,args) in fff.arguments
         for (i,a) in enumerate(args)
             push!(code, :($a = ($k)[$i]))
         end
     end
-
     for (k,v) in fff.preamble
         push!(code, :($k = $v))
     end
-
     for (d,out) in outputs
         for k in out[:]
             push!(code, :($(k[1])=$(k[2])))
         end
     end
-
     return_args = []
     for (d,out) in outputs
         names = get_first.(out)
@@ -118,7 +112,14 @@ function gen_fun(fff::FlatFunctionFactory, diff::Vector{Int})
         push!(code, :($outname = $(sym_to_sarray(names))))
         push!(return_args, outname)
     end
-
     push!(code, Expr(:return, Expr(:tuple, return_args...)))
 
+    # now we construct the function
+
+    # not clear whether we really want to specify staticarrays here
+    # it makes everything uselessly painful
+    # typed_args = [keys(fff.arguments)...]
+    typed_args = [:($k::SVector{$(length(v))}) for (k,v) in fff.arguments]
+    fun_args = Expr(:call, fff.funname, typed_args...)
+    Expr(:function, fun_args, Expr(:block, code...))
 end
