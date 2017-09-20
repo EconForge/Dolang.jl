@@ -157,7 +157,14 @@ function gen_fun(fff::FlatFunctionFactory, diff::Vector{Int})
     # not clear whether we really want to specify staticarrays here
     # it makes everything uselessly painful
     # typed_args = [keys(fff.arguments)...]
-    typed_args = [:($k::SVector{$(length(v))}) for (k,v) in fff.arguments]
+    typed_args = [:($k::SVector{$(length(v)), Float64}) for (k,v) in fff.arguments]
     fun_args = Expr(:call, fff.funname, typed_args...)
-    Expr(:function, fun_args, Expr(:block, code...))
+    # Expr(:function, fun_args, Expr(:block, code...))
+    Expr(:macrocall,
+        Symbol("@inline"),
+        Expr(:function, fun_args, Expr(:block, code...))
+    )
+
+
+
 end
