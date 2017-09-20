@@ -56,6 +56,8 @@ include("incidence.jl")
 include("factory.jl")
 include("util.jl")
 include("compiler.jl")
+include("compiler_new.jl")
+
 include("printing.jl")
 
 

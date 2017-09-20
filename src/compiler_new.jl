@@ -1,3 +1,29 @@
+function solve_dependency(dd::Dict{T,Set{T}}) where T # is hashable
+    solved = T[]
+    deps = deepcopy(dd)
+    p = length(deps)
+    it = 0
+    while length(deps)>0 && it<=p
+        it+=1
+        for (k,dep) in deps
+            if length(dep)==0
+                push!(solved,k)
+                pop!(deps,k)
+                for (l,ldeps) in deps
+                    if k in ldeps
+                        pop!(ldeps,k)
+                    end
+                end
+            end
+        end
+    end
+    if it==p+1
+        throw("Non triangular system")
+    end
+    return solved
+end
+
+
 immutable FlatFunctionFactory
         # normalized equations
         equations::Vector{Expr}
@@ -35,11 +61,23 @@ function FlatFunctionFactory(ff::FunctionFactory)
     end
     arguments[:p] = [Dolang.normalize(p) for p in ff.params]
 
-    targets = ff.targets
+    if length(ff.targets)==0
+        targets = [Symbol(string("outv_",i)) for i=1:length(ff.eqs)]
+    else
+        targets = ff.targets
+    end
 
-    preamble = OrderedDict{Symbol, Expr}()
+    npreamble = Dict{Symbol, Expr}()
     for k in keys(ff.defs)
-        preamble[Dolang.normalize(k)] = Dolang.normalize(ff.defs[k])
+        npreamble[Dolang.normalize((k,0))] = Dolang.normalize(ff.defs[k])
+    end
+    unknown = [keys(npreamble)...]
+    depends  = [Set(intersect(Dolang.list_symbols(eq)[:parameters], unknown)) for eq in values(npreamble)]
+    deps = Dict(zip(unknown,depends))
+    order = solve_dependency(deps)
+    preamble = OrderedDict{Symbol, Expr}()
+    for k in order
+        preamble[k] = npreamble[k]
     end
 
     funname = ff.funname
