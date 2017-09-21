@@ -38,46 +38,16 @@ println(code)
 
 # we need a module to evaluate the function in
 module TestMe
-    import Dolang: _get_size, _getobs
     using StaticArrays
+    import Dolang: _getsize, _getobs
+
 end
+
 import TestMe
 
-eval(TestMe,
-    quote
-
-        # slow and fails shamelessly if only Vectors are supplied
-        function _getsize(arrays::Union{Vector,<:SVector}...)
-            vectors_length = Int[length(a) for a in arrays if isa(a,Vector)]
-            @assert length(vectors_length)>0
-            maximum(vectors_length)
-        end
-        @inline _getobs(x::Vector{<:SVector},i::Int) = x[i]
-        @inline _getobs(x::SVector,i::Int) = x
-
-    end
-)
 
 
-eval(TestMe,
-    quote
-
-        # slow and fails shamelessly if only Vectors are supplied
-        function _getsize(arrays::Union{Vector,<:SVector}...)
-            vectors_length = Int[length(a) for a in arrays if isa(a,Vector)]
-            @assert length(vectors_length)>0
-            maximum(vectors_length)
-        end
-        @inline _getobs(x::Vector{<:SVector},i::Int) = x[i]
-        @inline _getobs(x::SVector,i::Int) = x
-
-    end
-)
-
-
-
-
-code = Dolang.gen_gufun(fff, [1,2,3])
+code = Dolang.gen_gufun(fff, [0,1,3])
 print(code)
 
 
@@ -89,59 +59,64 @@ x = @SVector [1.0]
 y = @SVector [2.0, 0.5, 0.3]
 z = @SVector [0.4, 0.2]
 p = @SVector [0.1]
-# res = TestMe.myfun(x,y,z,p);
+res = TestMe.myfun(x,y,z,p);
+#
+# # now vector
 
-# now vector
-N=10000000
+xx = Vector(x)
+yy = Vector(y)
+zz = Vector(z)
+pp = Vector(p)
+TestMe.myfun(xx, yy, zz, pp)
+
+
+N=1000000
 # and test speed
 x_vec = reinterpret(SVector{1,Float64}, 1+rand(1,N), (N,))
 y_vec = reinterpret(SVector{3,Float64}, rand(3,N), (N,))
 z_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
 p_vec = reinterpret(SVector{1,Float64}, rand(1,N), (N,))
-out_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
 
 
-xx = Vector(x)
-yy = Vector(y)
-zz = Vector(z)
-pp = Vector(p)
-TestMe.myfun(xx, yy, zz, pp)
-
-TestMe.myfun(x_vec, y_vec, z_vec, p_vec)
+@time TestMe.myfun(x_vec, y_vec, z_vec, p_vec)
+@time TestMe.myfun(x_vec, y_vec, z_vec, p_vec)
+# mix both
+TestMe.myfun(x_vec, y, z_vec, p)
 
 
 
-function test_perf(x, y, z, p, out, k=10)
+# now compare with old implementation (nodiff)
 
+
+code = Dolang.gen_gufun(fff, [0])
+myfun = eval(TestMe, code)
+
+function test_perf(;N=1000, k=10)
+
+    # and test speed
+    x_vec = reinterpret(SVector{1,Float64}, 1+rand(1,N), (N,))
+    y_vec = reinterpret(SVector{3,Float64}, rand(3,N), (N,))
+    z_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
+    p_vec = reinterpret(SVector{1,Float64}, rand(1,N), (N,))
+    out_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
     for i in 1:k
-        TestMe.myfun(x, y, z, p, out)
+        TestMe.myfun(x_vec, y_vec, z_vec, p_vec, (out_vec,))
     end
 end
 
-print(code)
-@time test_perf(x, y, z_vec, p, (out_vec,), k=100);
+N = 1000000
+@time test_perf(N=N, k=100);
+@time test_perf(N=N, k=100);
 
-
-xx = Vector(x)
-yy = Vector(y)
-zz = Vector(z)
-pp = Vector(p)
-TestMe.myfun(xx, yy, zz, pp)
-
-TestMe.myfun(x, y, z, p)
-
-@time
-
-
-
-@time TestMe.myfun( x_vec, y_vec, z_vec, p_vec)
-
-TestMe.myfun!(out_vec, x, y_vec, z_vec, p)
-out2 = TestMe.myfun(x, y_vec, z_vec, p)
-@assert ( maximum( [maximum(e) for e in (out_vec-out2)] ) )<1e-8
-
-print("Static vectors")
-@time TestMe.myfun!(out_vec, x_vec, y_vec, z_vec, p)
+# exit()
+# @time TestMe.myfun( x_vec, y_vec, z_vec, p_vec)
+#
+# TestMe.myfun!(out_vec, x, y_vec, z_vec, p)
+# out2 = TestMe.myfun(x, y_vec, z_vec, p)
+# @assert ( maximum( [maximum(e) for e in (out_vec-out2)] ) )<1e-8
+#
+# print("Static vectors")
+# @time TestMe.myfun!(out_vec, x_vec, y_vec, z_vec, p)
 
 
 # compare with old version
@@ -149,18 +124,24 @@ print("Static vectors")
 code_old = Dolang.make_function(ff2)
 my_fun, my_fun! = eval(Dolang, code_old)
 
-x_vec   = 1+rand(N,1)
-y_vec   = rand(N,3)
-z_vec   = rand(N,2)
-p_vec   = rand(N,1)
-out_vec = rand(N,2)
 
-my_fun!(out_vec, x_vec, y_vec, z_vec, p)
+function test_old(;N=1000, k=10)
+
+    # and test speed
+    x_vec   = 1+rand(N,1)
+    y_vec   = rand(N,3)
+    z_vec   = rand(N,2)
+    p   = rand(1)
+    out_vec = rand(N,2)
+    for i in 1:k
+        my_fun!(out_vec, x_vec, y_vec, z_vec, p)
+    end
+end
+
+
 print("Old version")
 
-import Dolang: Der, TDer
-# @time my_fun(Der{1}, x_vec, y_vec, z_vec, p)
 
 
-@time my_fun!(out_vec, x_vec, y_vec, z_vec, p)
-@time my_fun!(out_vec, x_vec, y_vec, z_vec, p)
+@time test_old(N=N, k=100)
+@time test_old(N=N, k=100)

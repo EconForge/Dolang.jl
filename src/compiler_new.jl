@@ -85,6 +85,16 @@ function FlatFunctionFactory(ff::FunctionFactory)
 
 end
 
+using StaticArrays
+# slow and fails shamelessly if only Vectors are supplied
+function _getsize(arrays::Union{Vector,<:SVector}...)
+    vectors_length = Int[length(a) for a in arrays if isa(a,Vector)]
+    @assert length(vectors_length)>0
+    maximum(vectors_length)
+end
+@inline _getobs(x::Vector{<:SVector},i::Int) = x[i]
+@inline _getobs(x::SVector,i::Int) = x
+
 
 function sym_to_sarray(v::Vector{Symbol})
     Expr(:call,:SVector, v...)
@@ -145,7 +155,7 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=nothing
     return_args = []
     for (d,out) in outputs
         names = get_first.(out)
-        outname = Symbol(string("out_",d))
+        outname = Symbol(string("oo_",d))
         push!(code, :($outname = $(sym_to_sarray(names))))
         push!(return_args, outname)
     end
@@ -206,7 +216,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int})
                 ret = kernel($(args...))
                 return $(to_diff isa Int? :(ret[1]) :  :(ret) )
             end
-            if (($(args...)),) isa Tuple{$([:(Vector) for i=1:length(args)]...)}
+            if (($(args...)),) isa Tuple{$([:(Vector{Float64}) for i=1:length(args)]...)}
                 oo = kernel( $( [ :(SVector( $(e)...)) for e in args]...) )
                 ret = ( $( [:(Array(oo[$i])) for i=1:length(args_out)]...),)
                 return $(to_diff isa Int? :(ret[1]) :  :(ret) )
