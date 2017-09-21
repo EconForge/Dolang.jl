@@ -80,9 +80,8 @@ function FlatFunctionFactory(ff::FunctionFactory)
         preamble[k] = npreamble[k]
     end
 
-    funname = ff.funname
     # return equations, arguments, targets, preamble, funname
-    FlatFunctionFactory(equations, arguments, targets, preamble, funname)
+    FlatFunctionFactory(equations, arguments, targets, preamble, ff.funname)
 
 end
 
@@ -98,7 +97,7 @@ end
 
 get_first(x) = x[1]
 
-function gen_fun(fff::FlatFunctionFactory, diff::Vector{Int})
+function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=nothing)
     # diff indices of vars to differentiate
     # 0 for residuals, i for i-th argument
 
@@ -154,17 +153,84 @@ function gen_fun(fff::FlatFunctionFactory, diff::Vector{Int})
 
     # now we construct the function
 
+
+    if isa(funname, Void)
+        funname = fff.funname
+    end
+
     # not clear whether we really want to specify staticarrays here
     # it makes everything uselessly painful
     # typed_args = [keys(fff.arguments)...]
     typed_args = [:($k::SVector{$(length(v)), Float64}) for (k,v) in fff.arguments]
-    fun_args = Expr(:call, fff.funname, typed_args...)
-    # Expr(:function, fun_args, Expr(:block, code...))
-    Expr(:macrocall,
-        Symbol("@inline"),
-        Expr(:function, fun_args, Expr(:block, code...))
-    )
+    fun_args = Expr(:call, funname, typed_args...)
 
+    Expr(:function, fun_args, Expr(:block, code...))
 
+end
+
+function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int})
+
+    if to_diff isa Int
+        diff = [to_diff]::Array{Int}
+    else
+        diff = to_diff::Array{Int}
+    end
+
+    kernel_code = gen_kernel(fff, diff; funname=:kernel)
+    funname = fff.funname
+
+    args = [keys(fff.arguments)...]
+    args_scalar = [Symbol(string(e,"_")) for e in keys(fff.arguments)]
+    args_out = [Symbol(string("out_",i)) for i in 1:length(diff)]
+    args_length = [length(v) for v in values(fff.arguments)]
+
+    out_types = []
+    p = length(fff.targets)
+    for d in diff
+        if d==0
+            push!(out_types, :(SVector{$p,Float64}))
+        else
+            q = args_length[d]
+            push!(out_types, :(SMatrix{$p,$q,Float64,$(p*q)}))
+        end
+    end
+
+    code = quote
+        function $funname($(args...),out=nothing)
+
+            @inline $kernel_code
+
+            ### if all arguments are 1d.vectors we do vector things
+
+            if (($(args...)),) isa Tuple{$([:(SVector) for i=1:length(args)]...)}
+                ret = kernel($(args...))
+                return $(to_diff isa Int? :(ret[1]) :  :(ret) )
+            end
+            if (($(args...)),) isa Tuple{$([:(Vector) for i=1:length(args)]...)}
+                oo = kernel( $( [ :(SVector( $(e)...)) for e in args]...) )
+                ret = ( $( [:(Array(oo[$i])) for i=1:length(args_out)]...),)
+                return $(to_diff isa Int? :(ret[1]) :  :(ret) )
+            end
+
+            N = _getsize($(args...))::Int
+
+            if isa(out,Void)
+                $([:($a=zeros($t,N)) for (a,t) in zip(args_out,out_types)]...)
+            else
+                $([:($a=out[$i]::Vector{$t}) for (i,(a,t)) in enumerate(zip(args_out,out_types))]...)
+            end
+
+            @inbounds @simd for n=1:N
+                $([:($a_=_getobs($a,n)) for (a_,a) in zip(args_scalar,args)]...)
+                res_ = kernel($(args_scalar...))
+                $([:($a[n] = res_[$i]) for (i,a) in enumerate(args_out)]...)
+            end
+
+            ret = ($(args_out...),)
+            return $(to_diff isa Int? :(ret[1]) :  :(ret) )
+        end
+    end
+
+    return code
 
 end

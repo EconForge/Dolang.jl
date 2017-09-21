@@ -29,72 +29,112 @@ fff = Dolang.FlatFunctionFactory(ff2)
 using StaticArrays
 
 
-code = Dolang.gen_fun(fff,[0,1,2]) # residual then derivative w.r.t. first and second
+code = Dolang.gen_kernel(fff,[0,1,2]) # residual then derivative w.r.t. first and second
 println(code)
-code = Dolang.gen_fun(fff,[0])
+code = Dolang.gen_kernel(fff,[0])
 println(code)
+
+
 
 # we need a module to evaluate the function in
 module TestMe
+    import Dolang: _get_size, _getobs
     using StaticArrays
 end
 import TestMe
-fun = eval(TestMe, code)
+
+eval(TestMe,
+    quote
+
+        # slow and fails shamelessly if only Vectors are supplied
+        function _getsize(arrays::Union{Vector,<:SVector}...)
+            vectors_length = Int[length(a) for a in arrays if isa(a,Vector)]
+            @assert length(vectors_length)>0
+            maximum(vectors_length)
+        end
+        @inline _getobs(x::Vector{<:SVector},i::Int) = x[i]
+        @inline _getobs(x::SVector,i::Int) = x
+
+    end
+)
 
 
+eval(TestMe,
+    quote
+
+        # slow and fails shamelessly if only Vectors are supplied
+        function _getsize(arrays::Union{Vector,<:SVector}...)
+            vectors_length = Int[length(a) for a in arrays if isa(a,Vector)]
+            @assert length(vectors_length)>0
+            maximum(vectors_length)
+        end
+        @inline _getobs(x::Vector{<:SVector},i::Int) = x[i]
+        @inline _getobs(x::SVector,i::Int) = x
+
+    end
+)
+
+
+
+
+code = Dolang.gen_gufun(fff, [1,2,3])
+print(code)
+
+
+myfun = eval(TestMe, code)
+
+
+#
 x = @SVector [1.0]
 y = @SVector [2.0, 0.5, 0.3]
 z = @SVector [0.4, 0.2]
 p = @SVector [0.1]
-res = TestMe.myfun(x,y,z,p);
+# res = TestMe.myfun(x,y,z,p);
 
-
-# now vectorize the function
-eval(TestMe,
-    quote
-        function _getsize(arrays::Union{Vector,<:SVector}...)
-            vectors = [a for a in arrays if isa(a,Vector)]
-            @assert length(vectors)>0
-            max([length(v) for v in vectors]...)
-        end
-        _getobs(x::Vector{<:SVector},i::Int) = x[i]
-        _getobs(x::SVector,i::Int) = x
-        function myfun!(out::Vector{SVector{2,Float64}},x,y,z,p)
-            N = size(out,1)
-            @inbounds @simd for n=1:N
-                x_ = _getobs(x,n)
-                y_ = _getobs(y,n)
-                z_ = _getobs(z,n)
-                p_ = _getobs(p,n)
-                _res = (myfun(x_,y_,z_,p_))
-                out[n] = _res[1]
-                # out[n] = (fun(x,y,z,p_))[1]
-            end
-        end
-        function myfun(arrays...)
-            N = _getsize(arrays...)
-            out = zeros(SVector{2,Float64}, N)
-            myfun!(out,arrays...)
-            return out
-        end
-    end
-)
-
+# now vector
+N=10000000
 # and test speed
-
-N = 1000000
 x_vec = reinterpret(SVector{1,Float64}, 1+rand(1,N), (N,))
 y_vec = reinterpret(SVector{3,Float64}, rand(3,N), (N,))
 z_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
 p_vec = reinterpret(SVector{1,Float64}, rand(1,N), (N,))
 out_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
 
-isa(out_vec[1], AbstractVector)
+
+xx = Vector(x)
+yy = Vector(y)
+zz = Vector(z)
+pp = Vector(p)
+TestMe.myfun(xx, yy, zz, pp)
+
+TestMe.myfun(x_vec, y_vec, z_vec, p_vec)
 
 
 
-TestMe.myfun!(out_vec, x_vec, y_vec, z_vec, p)
-TestMe.myfun!(out_vec, x_vec, y_vec, z_vec, p_vec)
+function test_perf(x, y, z, p, out, k=10)
+
+    for i in 1:k
+        TestMe.myfun(x, y, z, p, out)
+    end
+end
+
+print(code)
+@time test_perf(x, y, z_vec, p, (out_vec,), k=100);
+
+
+xx = Vector(x)
+yy = Vector(y)
+zz = Vector(z)
+pp = Vector(p)
+TestMe.myfun(xx, yy, zz, pp)
+
+TestMe.myfun(x, y, z, p)
+
+@time
+
+
+
+@time TestMe.myfun( x_vec, y_vec, z_vec, p_vec)
 
 TestMe.myfun!(out_vec, x, y_vec, z_vec, p)
 out2 = TestMe.myfun(x, y_vec, z_vec, p)
@@ -117,4 +157,10 @@ out_vec = rand(N,2)
 
 my_fun!(out_vec, x_vec, y_vec, z_vec, p)
 print("Old version")
+
+import Dolang: Der, TDer
+# @time my_fun(Der{1}, x_vec, y_vec, z_vec, p)
+
+
+@time my_fun!(out_vec, x_vec, y_vec, z_vec, p)
 @time my_fun!(out_vec, x_vec, y_vec, z_vec, p)
