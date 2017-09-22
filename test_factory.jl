@@ -28,30 +28,123 @@ fff = Dolang.FlatFunctionFactory(ff2)
 
 using StaticArrays
 
-
-code = Dolang.gen_kernel(fff,[0,1,2]) # residual then derivative w.r.t. first and second
-println(code)
-code = Dolang.gen_kernel(fff,[0])
-println(code)
-
+x = @SVector [1.0]
+y = @SVector [2.0, 0.5, 0.3]
+z = @SVector [0.4, 0.2]
+p = @SVector [0.1]
 
 
-# we need a module to evaluate the function in
-module TestMe
-    using StaticArrays
-    import Dolang: _getsize, _getobs
-
-end
-
-import TestMe
+# cc = Dolang.gen_kernel(fff, [0])
+import Dolang
 
 
+
+code_gen = Dolang.gen_kernel(fff, [0,1]; )
+print(code_gen)
+
+
+code_gen = Dolang.gen_gufun(fff, [0,1,2])
+print(code_gen)
+myfun = eval(Dolang,code_gen)
+#
+N=5
+x_vec = reinterpret(SVector{1,Float64}, 1+rand(1,N), (N,))
+y_vec = reinterpret(SVector{3,Float64}, rand(3,N), (N,))
+z_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
+p_vec = reinterpret(SVector{1,Float64}, rand(1,N), (N,))
+
+myfun(x_vec, y_vec, z_vec, p_vec)
+
+
+
+code_gen = Dolang.gen_generated_gufun(fff)
+print(code_gen)
+my_gengufun = eval( Dolang, code_gen )
+# out = my_gengufun( (Val(0), Val(3)), x, y, z, p )
+out = my_gengufun( (Val(0),), x_vec, y_vec, z_vec, p_vec )
+
+
+
+
+
+
+
+
+
+code_gen = Dolang.gen_generated_kernel(fff)
+print(code_gen)
+my_genkernel = eval( Dolang, code_gen )
+out = my_genkernel( (Val(0), Val(3)), x, y, z, p )
+
+
+
+
+cc = Dolang.gen_kernel(fff, [0])
+
+
+cc = Dolang.gen_gufun(fff, [0])
+print(cc)
+
+
+my_gengufun( (Val(0), Val(3)), x_vec, y_vec, z_vec, p_vec )
 
 code = Dolang.gen_gufun(fff, [0,1,3])
 print(code)
-
-
 myfun = eval(TestMe, code)
+
+
+code_gen = Dolang.gen_generated_gufun(fff)
+my_genfun = eval( Dolang, code_gen )
+print(code_gen)
+my_genfun( (Val(0),), x, y, z, p, p )
+
+
+
+my_genkernel( (Val(4),), x, y, z, p )
+
+print( Dolang.gen_kernel(fff, [0,3]) )
+
+s = quote
+     function testme()
+         4+3
+     end
+end
+
+s
+
+
+@generated function testgen(a)
+    body = quote
+        # s = sum([t for t=1:a])
+        s = 0.0
+        for t=1:a
+            s +=t
+        end
+        return s
+    end
+end
+
+testgen(1)
+
+
+
+
+
+
+
+
+
+tt.types
+
+fieldnames(tt)
+
+sdt = getfield(tt,4)
+
+sdt[1].size
+
+fieldnames(dt)
+getfield(tt,4)
+
 
 
 #
