@@ -165,10 +165,6 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
     push!(code, :(return res_))
 
     # now we construct the function
-
-    # not clear whether we really want to specify staticarrays here
-    # it makes everything uselessly painful
-    # typed_args = [keys(fff.arguments)...]
     typed_args = [:($k::SVector{$(length(v)), Float64}) for (k,v) in arguments]
     fun_args = Expr(:call, funname, typed_args...)
 
@@ -176,14 +172,14 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
 
 end
 
-function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int})
+function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
+    funname=fff.funname)
 
     if to_diff isa Int
         diff = [to_diff]::Array{Int}
     else
         diff = to_diff::Array{Int}
     end
-
 
     # Generate the code for the kernel
     # change arguments in the kernel to avoid clashes
@@ -194,13 +190,6 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int})
     # remove function def and return statement
     kernel_code_stripped = kernel_code.args[2].args[1:end-1]
 
-    # same with original names
-    kernel_code_0 = gen_kernel(fff, diff; funname=:kernel)
-    # remove function def and return statement
-    kernel_code_stripped_0 = kernel_code_0.args[2].args[1:end-1]
-
-
-    funname = fff.funname
 
     args = [keys(fff.arguments)...]
     args_scalar = [keys(arguments_)...]
@@ -229,7 +218,8 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int})
             if (($(args...)),) isa Tuple{$([:(SVector) for i=1:length(args)]...)}
                 # ret = kernel($(args...))
                 # return $(to_diff isa Int? :(ret[1]) :  :(ret) )
-                $(kernel_code_stripped_0...)
+                $([:($_a=$a) for (_a,a) in zip(args_scalar,args)]...)
+                $(kernel_code_stripped...)
                 return $(to_diff isa Int? :(res_[1]) :  :(res_) )
             end
             # if they are arrays
@@ -266,10 +256,6 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int})
     return code
 
 end
-
-
-#### The following is
-
 
 
 

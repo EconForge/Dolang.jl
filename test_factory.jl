@@ -27,9 +27,39 @@ ff2 = Dolang.FunctionFactory(eqs, grouped_args, params, targets=targets, defs=de
 fff = Dolang.FlatFunctionFactory(ff2)
 
 
+
+# we're all static arrays
+x = @SVector [1.0]
+y = @SVector [2.0, 0.5, 0.3]
+z = @SVector [0.4, 0.2]
+p = @SVector [0.1]
+#
+# we're all vectors
+xv = Vector(x)
+yv = Vector(y)
+zv = Vector(z)
+pv = Vector(p)
+
+# we're list of points
+N=5
+x_vec = reinterpret(SVector{1,Float64}, 1+rand(1,N), (N,))
+y_vec = reinterpret(SVector{3,Float64}, rand(3,N), (N,))
+z_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
+p_vec = reinterpret(SVector{1,Float64}, rand(1,N), (N,))
+
+
 # I am the generated function
+
+code = Dolang.gen_gufun(fff, [0,1]; funname=:gufun)
+gufun = eval(Dolang, code)
+
+gufun(x,y,z,p)
+gufun(xv,yv,zv,pv)
+gufun(x_vec, y_vec, z_vec, p_vec)
+gufun(x, y_vec, z, p_vec)
+
+
 code_gen = Dolang.gen_generated_gufun(fff, funname=:genfun)
-print(code_gen)
 genfun = eval( Dolang, code_gen )
 
 # it works on static arrays
@@ -44,25 +74,6 @@ genfun( (Val(0),Val(1),Val(3)), x, y, z, p )
 # cc = Dolang.gen_kernel(fff, [0])
 import Dolang
 
-
-# we're all static arrays
-x = @SVector [1.0]
-y = @SVector [2.0, 0.5, 0.3]
-z = @SVector [0.4, 0.2]
-p = @SVector [0.1]
-#
-# we're all vectors
-x = Vector(x)
-y = Vector(y)
-z = Vector(z)
-p = Vector(p)
-
-# we're list of points
-N=5
-x_vec = reinterpret(SVector{1,Float64}, 1+rand(1,N), (N,))
-y_vec = reinterpret(SVector{3,Float64}, rand(3,N), (N,))
-z_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
-p_vec = reinterpret(SVector{1,Float64}, rand(1,N), (N,))
 
 # myfun(x_vec, y_vec, z_vec, p_vec)
 
