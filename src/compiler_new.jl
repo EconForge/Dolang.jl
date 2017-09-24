@@ -194,6 +194,12 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int})
     # remove function def and return statement
     kernel_code_stripped = kernel_code.args[2].args[1:end-1]
 
+    # same with original names
+    kernel_code_0 = gen_kernel(fff, diff; funname=:kernel)
+    # remove function def and return statement
+    kernel_code_stripped_0 = kernel_code_0.args[2].args[1:end-1]
+
+
     funname = fff.funname
 
     args = [keys(fff.arguments)...]
@@ -219,17 +225,22 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int})
             # @inline $kernel_code # unpure...
 
             ### if all arguments are 1d.vectors we do vector things
-            #
-            # if (($(args...)),) isa Tuple{$([:(SVector) for i=1:length(args)]...)}
-            #     ret = kernel($(args...))
-            #     # $kernel_code_stripped
-            #     return $(to_diff isa Int? :(ret[1]) :  :(ret) )
-            # end
-            # if (($(args...)),) isa Tuple{$([:(Vector{Float64}) for i=1:length(args)]...)}
-            #     oo = kernel( $( [ :(SVector( $(e)...)) for e in args]...) )
-            #     ret = ( $( [:(Array(oo[$i])) for i=1:length(args_out)]...),)
-            #     return $(to_diff isa Int? :(ret[1]) :  :(ret) )
-            # end
+            # if they are static
+            if (($(args...)),) isa Tuple{$([:(SVector) for i=1:length(args)]...)}
+                # ret = kernel($(args...))
+                # return $(to_diff isa Int? :(ret[1]) :  :(ret) )
+                $(kernel_code_stripped_0...)
+                return $(to_diff isa Int? :(res_[1]) :  :(res_) )
+            end
+            # if they are arrays
+            if (($(args...)),) isa Tuple{$([:(Vector{Float64}) for i=1:length(args)]...)}
+                # oo = kernel( $( [ :(SVector( $(e)...)) for e in args]...) )
+                $([:($_a=$a) for (_a,a) in zip(args_scalar,args)]...)
+                $(kernel_code_stripped...)
+                ret = ( $( [:(Array(res_[$i])) for i=1:length(args_out)]...),)
+                return $(to_diff isa Int? :(ret[1]) :  :(ret) )
+
+            end
 
             N = _getsize($(args...))::Int
 
@@ -290,19 +301,16 @@ function gen_generated_kernel(fff::FlatFunctionFactory)
 end
 
 
-function gen_generated_gufun(fff::FlatFunctionFactory)
+function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname)
 
-    funname = fff.funname
-
+    args = collect(keys(fff.arguments))
     meta_code = quote
-        @generated function $funname(orders, x,y,z,p)
+        @generated function $funname(orders, $(args...), out=nothing)
             fff = $(fff) # this is amazing !
-            # oorders = get_nums(orders) # convert into tuples
-            oorders =[0,1]
+            oorders = get_nums(orders) # convert into tuples
             code = gen_gufun(fff, oorders)
-            code.args[2]
+            code.args[2].args[2]
         end
     end
-    println(meta_code)
     meta_code
 end

@@ -26,70 +26,48 @@ ff2 = Dolang.FunctionFactory(eqs, grouped_args, params, targets=targets, defs=de
                             funname=funname)
 fff = Dolang.FlatFunctionFactory(ff2)
 
-using StaticArrays
 
-x = @SVector [1.0]
-y = @SVector [2.0, 0.5, 0.3]
-z = @SVector [0.4, 0.2]
-p = @SVector [0.1]
+# I am the generated function
+code_gen = Dolang.gen_generated_gufun(fff, funname=:genfun)
+print(code_gen)
+genfun = eval( Dolang, code_gen )
+
+# it works on static arrays
+out_static = genfun( (Val(0),Val(1),Val(3)), x, y, z, p )
+typeof(out_static) <: Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}}
+
+genfun( (Val(0),), x, y_vec, z_vec, p)
+genfun( (Val(0),Val(1),Val(3)), x, y, z, p )
+
 
 
 # cc = Dolang.gen_kernel(fff, [0])
 import Dolang
 
 
-
-code_gen = Dolang.gen_kernel(fff, [0,1]; )
-print(code_gen)
-
-
-code_gen = Dolang.gen_gufun(fff, [0,1,2])
-print(code_gen)
-myfun = eval(Dolang,code_gen)
+# we're all static arrays
+x = @SVector [1.0]
+y = @SVector [2.0, 0.5, 0.3]
+z = @SVector [0.4, 0.2]
+p = @SVector [0.1]
 #
+# we're all vectors
+x = Vector(x)
+y = Vector(y)
+z = Vector(z)
+p = Vector(p)
+
+# we're list of points
 N=5
 x_vec = reinterpret(SVector{1,Float64}, 1+rand(1,N), (N,))
 y_vec = reinterpret(SVector{3,Float64}, rand(3,N), (N,))
 z_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
 p_vec = reinterpret(SVector{1,Float64}, rand(1,N), (N,))
 
-myfun(x_vec, y_vec, z_vec, p_vec)
+# myfun(x_vec, y_vec, z_vec, p_vec)
 
 
 
-code_gen = Dolang.gen_generated_gufun(fff)
-print(code_gen)
-my_gengufun = eval( Dolang, code_gen )
-# out = my_gengufun( (Val(0), Val(3)), x, y, z, p )
-out = my_gengufun( (Val(0),), x_vec, y_vec, z_vec, p_vec )
-
-
-
-
-
-
-
-
-
-code_gen = Dolang.gen_generated_kernel(fff)
-print(code_gen)
-my_genkernel = eval( Dolang, code_gen )
-out = my_genkernel( (Val(0), Val(3)), x, y, z, p )
-
-
-
-
-cc = Dolang.gen_kernel(fff, [0])
-
-
-cc = Dolang.gen_gufun(fff, [0])
-print(cc)
-
-
-my_gengufun( (Val(0), Val(3)), x_vec, y_vec, z_vec, p_vec )
-
-code = Dolang.gen_gufun(fff, [0,1,3])
-print(code)
 myfun = eval(TestMe, code)
 
 
