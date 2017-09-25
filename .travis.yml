@@ -5,7 +5,6 @@ os:
   - linux
   # - osx  # we don't do any binary dependencies or OS specific magic
 julia:
-  - 0.5
   - 0.6
 notifications:
   email: false
