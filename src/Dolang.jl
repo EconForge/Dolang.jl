@@ -3,6 +3,7 @@ __precompile__(false)
 module Dolang
 
 using DataStructures
+using StaticArrays
 
 
 const ARITH_SYMBOLS = Set([:+, :-, :*, :/, :^])
@@ -35,6 +36,8 @@ end::Bool
 if HAVE_SYMENGINE
     import SymEngine
     deriv(eq::SymEngine.Basic, x) = SymEngine.diff(eq, x)
+    # somebody will probably object to it:
+    deriv(eq::Expr, x::Symbol) = parse(string(SymEngine.diff(SymEngine.Basic(eq), SymEngine.Basic(x))))
     @inline prep_deriv(eq) = SymEngine.Basic(eq)
     @inline post_deriv(eq) = SymEngine.walk_expression(eq)
 else

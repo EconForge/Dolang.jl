@@ -1,93 +1,7 @@
-function solve_dependency(dd::Dict{T,Set{T}}) where T # is hashable
-    solved = T[]
-    deps = deepcopy(dd)
-    p = length(deps)
-    it = 0
-    while length(deps)>0 && it<=p
-        it+=1
-        for (k,dep) in deps
-            if length(dep)==0
-                push!(solved,k)
-                pop!(deps,k)
-                for (l,ldeps) in deps
-                    if k in ldeps
-                        pop!(ldeps,k)
-                    end
-                end
-            end
-        end
-    end
-    if it==p+1
-        throw("Non triangular system")
-    end
-    return solved
-end
-
-
-immutable FlatFunctionFactory
-        # normalized equations
-        equations::Vector{Expr}
-        # list of group of (normalized) variables
-        arguments::OrderedDict{Symbol, Vector{Symbol}}
-        # list of assigned variables
-        targets::Vector{Symbol}
-        # preamble: definitions
-        preamble::OrderedDict{Symbol, Expr}
-        # name of function
-        funname::Symbol
-end
-
-function FlatFunctionFactory(ff::FunctionFactory)
-
-    equations = Expr[]
-    for eq in ff.eqs
-        # we remove lhs if it is there
-        if eq.head == :(=)
-            ee = eq.args[2]
-        else
-            ee = eq
-        end
-        push!(equations, ee)
-    end
-
-    arguments = OrderedDict{Symbol, Vector{Symbol}}()
-    # we assume silently :p is not given as an argument in ff
-    if isa(ff.args, OrderedDict)
-        for k in keys(ff.args)
-            arguments[k] = [Dolang.normalize(e) for e in ff.args[k]]
-        end
-    else
-        arguments[:x] = [Dolang.normalize(e) for e in ff.args]
-    end
-    arguments[:p] = [Dolang.normalize(p) for p in ff.params]
-
-    if length(ff.targets)==0
-        targets = [Symbol(string("outv_",i)) for i=1:length(ff.eqs)]
-    else
-        targets = ff.targets
-    end
-
-    npreamble = Dict{Symbol, Expr}()
-    for k in keys(ff.defs)
-        npreamble[Dolang.normalize((k,0))] = Dolang.normalize(ff.defs[k])
-    end
-    unknown = [keys(npreamble)...]
-    depends  = [Set(intersect(Dolang.list_symbols(eq)[:parameters], unknown)) for eq in values(npreamble)]
-    deps = Dict(zip(unknown,depends))
-    order = solve_dependency(deps)
-    preamble = OrderedDict{Symbol, Expr}()
-    for k in order
-        preamble[k] = npreamble[k]
-    end
-
-    # return equations, arguments, targets, preamble, funname
-    FlatFunctionFactory(equations, arguments, targets, preamble, ff.funname)
-
-end
-
-using StaticArrays
-
-# slow and fails shamelessly if only Vectors are supplied
+# finds the longest number of observations in arguments like
+# x::Svector{2}, y::Vector{SVector{2}}, z::SVector{3}
+# (in this case, length of y)
+# slow and fails shamelessly if only SVectors are supplied
 function _getsize(arrays::Union{Vector,<:SVector}...)
     vectors_length = Int[length(a) for a in arrays if isa(a,Vector)]
     @assert length(vectors_length)>0
@@ -96,30 +10,56 @@ end
 @inline _getobs(x::Vector{<:SVector},i::Int) = x[i]
 @inline _getobs(x::SVector,i::Int) = x
 
-
-function sym_to_sarray(v::Vector{Symbol})
+# constructs expression SVector(a,b,c) from [:a,:b,:c]
+function _sym_sarray(v::Vector{Symbol})
     Expr(:call,:SVector, v...)
 end
-
-function sym_to_sarray(v::Matrix{Symbol})
+function _sym_sarray(v::Matrix{Symbol})
     p,q = size(v)
     Expr(:call,:(SMatrix{$p,$q}), v[:]...)
 end
 
-get_first(x) = x[1]
+_get_first(x) = x[1]
 
+"""
+Create a non allocating kernel from the function factory.
+
+`fff`: assumed to be a `FlatFunctionFactory` object with empty preamble.
+`diff`: index of variables to differentiate with or list of indices of variables positions.
+
+The generated kernel looks like (diff=[0,1])
+```
+function myfun(x::SVector{1, Float64}, y::SVector{3, Float64}, z::SVector{2, Float64}, p::SVector{1, Float64})
+    _a_m1_ = x[1]
+    _a__0_ = y[1]
+    _b__0_ = y[2]
+    _c__0_ = y[3]
+    _c__1_ = z[1]
+    _d__1_ = z[2]
+    _u_ = p[1]
+    _foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
+    _bar__0_ = _c__1_ + _u_ * _d__1_
+    d__foo__0__d__a_m1_ = (-(1 / (1 - _c__0_)) * _b__0_) / (_a_m1_ / (1 - _c__0_)) ^ 2
+    d__bar__0__d__a_m1_ = 0
+    oo_0 = SVector(_foo__0_, _bar__0_)
+    oo_1 = SMatrix{2, 1}(d__foo__0__d__a_m1_, d__bar__0__d__a_m1_)
+    res_ = (oo_0, oo_1)
+    return res_
+end
+```
+
+If diff is a scalar, the result of the kernel is a static vector (or a static matrix).
+If diff is a list, the result is a tuple.
+"""
 function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.funname, arguments=fff.arguments)
-    # diff indices of vars to differentiate
-    # 0 for residuals, i for i-th argument
 
-    # prepare equations to write
+    # prepare list of equations to write in `outputs`
     outputs = OrderedDict()
     targets = OrderedDict()
     if 0 in diff
         outputs[0] = collect(zip(fff.targets, fff.equations))
     end
     p = length(fff.targets)
-
     argnames = collect(keys(arguments))
     for d in filter(x->x!=0, diff)
         argname = argnames[d]
@@ -145,8 +85,12 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
             push!(code, :($a = ($k)[$i]))
         end
     end
-    for (k,v) in fff.preamble
-        push!(code, :($k = $v))
+    # we add preamble in case in contains function definitions
+    # but don't differentiate w.r.t. it.
+    if length(fff.preamble)>0
+        for (k,v) in fff.preamble
+            push!(code, :($k = $v))
+        end
     end
     for (d,out) in outputs
         for k in out[:]
@@ -155,12 +99,13 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
     end
     return_args = []
     for (d,out) in outputs
-        names = get_first.(out)
+        names = _get_first.(out)
         outname = Symbol(string("oo_",d))
-        push!(code, :($outname = $(sym_to_sarray(names))))
+        push!(code, :($outname = $(_sym_sarray(names))))
         push!(return_args, outname)
     end
 
+    # this is to make inserting the resulting code in another function easier
     push!(code, :(res_=$(Expr(:tuple, return_args...))))
     push!(code, :(return res_))
 
@@ -172,6 +117,17 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
 
 end
 
+
+"""
+Creates a vectorized function, which can accept points or list-of-points as arguments.
+
+`fff``: assumed to be a `FlatFunctionFactory` object with empty preamble.
+`diff`: index of variables to differentiate with or list of indices of variables positions.
+`out`: optional preallocated output
+
+If at least one of the arguments is a list of points, the result is a list of points (or a tuple mad of lists of points).
+In this case preallocated structures can be passed as `out`.
+"""
 function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
     funname=fff.funname)
 
@@ -207,11 +163,11 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
         end
     end
 
-
     code = quote
         function $funname($(args...),out=nothing)
 
             # @inline $kernel_code # unpure...
+            # revisit in the future
 
             ### if all arguments are 1d.vectors we do vector things
             # if they are static
@@ -244,7 +200,6 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
                 $([:($a_=_getobs($a,n)) for (a_,a) in zip(args_scalar,args)]...)
                 # res_ = kernel($(args_scalar...))
                 $(kernel_code_stripped...)
-
                 $([:($a[n] = res_[$i]) for (i,a) in enumerate(args_out)]...)
             end
 
@@ -257,15 +212,19 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
 
 end
 
+# We now produce the code for generated functions.
+# The generated functions have a signature like:
+# genfun((Val(1),Val(2)), x,y,z,p, out=)
+# where the first argument denotes the arguments to differentiate with (0, is zero-order diff)
 
-
-function get_nums(t)
+function _get_nums(t)
+    # reads deritative types
     # return (2,3,4) for Tuple{Val{2},Val{3},Val{4}}
     n = length(fieldnames(t)) # inconsistent with what follows!
     svec = getfield(t, 3)
     res = zeros(Int,n)
     for i=1:n
-    res[i] = svec[i].parameters[1]
+        res[i] = svec[i].parameters[1]
     end
     return res
 end
@@ -275,11 +234,10 @@ end
 function gen_generated_kernel(fff::FlatFunctionFactory)
 
     funname = fff.funname
-
     meta_code = quote
         @generated function $funname(orders, x, y, z, p, out=nothing)
             fff = $(fff) # this is amazing !
-            oorders = get_nums(orders) # convert into tuples
+            oorders = _get_nums(orders) # convert into tuples
             code = gen_kernel(fff, oorders)
             code.args[2]
         end
@@ -293,10 +251,9 @@ function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname)
     meta_code = quote
         @generated function $funname(orders, $(args...), out=nothing)
             fff = $(fff) # this is amazing !
-            oorders = get_nums(orders) # convert into tuples
+            oorders = _get_nums(orders) # convert into tuples
             code = gen_gufun(fff, oorders)
             code.args[2].args[2]
         end
     end
-    meta_code
 end
