@@ -328,7 +328,13 @@ function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname, disp
     args = collect(keys(fff.arguments))
     dispatch_argument = parse(string(dispatch))
     meta_code = quote
-        @generated function $funname($((dispatch==nothing?[]:[:(::$dispatch_argument)])...), orders,  $(args...), out=nothing)
+        # basic fun for compat
+        @generated function $funname($((dispatch==nothing?[]:[:(::$dispatch_argument)])...), $(args...), out=nothing)
+            fff = $(fff) # this is amazing !
+            code = gen_gufun(fff, 0)
+            code.args[2].args[2]
+        end
+        @generated function $funname($((dispatch==nothing?[]:[:(::$dispatch_argument)])...), orders::Tuple,  $(args...), out=nothing)
             fff = $(fff) # this is amazing !
             oorders = _get_nums(orders) # convert into tuples
             code = gen_gufun(fff, oorders)

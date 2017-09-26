@@ -100,6 +100,9 @@ p_mat = Dolang.from_SA(p_vec)
         cc = Dolang.gen_generated_gufun(fff; funname=:gengufun)
         gengufun = eval(Dolang, cc)
         # behaves like a kernel
+        res0 = gengufun(x,y,z,p)
+        @test typeof(res0) <: SVector{2,Float64}
+
         res = gengufun((Val(0),Val(1),Val(3)),x,y,z,p)
         @test typeof(res) <: Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}}
         # doesn't like allocated vectors but does it anyway
