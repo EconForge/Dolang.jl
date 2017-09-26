@@ -19,8 +19,6 @@ function _sym_sarray(v::Matrix{Symbol})
     Expr(:call,:(SMatrix{$p,$q}), v[:]...)
 end
 
-_get_first(x) = x[1]
-
 list_syms(eq) = Dolang.list_symbols(eq)[:parameters]
 
 diff_symbol(k::Symbol,j::Symbol) = Symbol(string("∂",k,"_∂",j))
