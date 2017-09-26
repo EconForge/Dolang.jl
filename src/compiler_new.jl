@@ -245,11 +245,12 @@ function gen_generated_kernel(fff::FlatFunctionFactory)
 end
 
 
-function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname)
+function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname, dispatch=nothing)
 
     args = collect(keys(fff.arguments))
+    dispatch_argument = parse(string(dispatch))
     meta_code = quote
-        @generated function $funname(orders, $(args...), out=nothing)
+        @generated function $funname($((dispatch==nothing?[]:[:(::$dispatch_argument)])...), orders,  $(args...), out=nothing)
             fff = $(fff) # this is amazing !
             oorders = _get_nums(orders) # convert into tuples
             code = gen_gufun(fff, oorders)
