@@ -286,7 +286,7 @@ FunctionFactory
 
 immutable FlatFunctionFactory
         # normalized equations
-        equations::Vector{Expr}
+        equations::Vector{Union{Expr,Symbol}}
         # list of group of (normalized) variables
         arguments::OrderedDict{Symbol, Vector{Symbol}}
         # list of assigned variables
@@ -299,7 +299,7 @@ end
 
 function FlatFunctionFactory(ff::FunctionFactory; eliminate_definitions=false)
 
-    equations = Expr[]
+    equations = Union{Expr,Symbol}[]
     for eq in ff.eqs
         # we remove lhs if it is there
         if eq.head == :(=)

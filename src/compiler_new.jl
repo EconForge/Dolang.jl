@@ -19,7 +19,15 @@ function _sym_sarray(v::Matrix{Symbol})
     Expr(:call,:(SMatrix{$p,$q}), v[:]...)
 end
 
-list_syms(eq) = Dolang.list_symbols(eq)[:parameters]
+function list_syms(eq::Expr)
+    syms = Dolang.list_symbols(eq)
+    if :parameters in keys(syms)
+        return syms[:parameters]
+    else
+        return Symbol[]
+    end
+end
+list_syms(eq::Symbol) = [eq]
 
 diff_symbol(k::Symbol,j::Symbol) = Symbol(string("∂",k,"_∂",j))
 
@@ -129,7 +137,10 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
     jac_args = Symbol[j for j in jac_args]
 
     # concatenate preamble and equations (doesn't make much sense...)
-    dd = deepcopy(fff.preamble)
+    dd = OrderedDict()
+    for (k,v) in (fff.preamble)
+        dd[k] = v
+    end
     for (i,eq) in enumerate(fff.equations)
         dd[fff.targets[i]] = eq
     end
@@ -177,7 +188,7 @@ end
 to_SA(v::Vector{Float64}) = SVector(v...)
 to_SA(v::Matrix{Float64}) = reinterpret(SVector{size(v,2),Float64}, v', (size(v,1),))
 function from_SA(v::Vector{SMatrix{p,q,Float64,k}}) where p where q where k
-    permutedims( reinterpret(Float64, v, (size(v,1),p,q)), [2,3,1])
+    permutedims( reinterpret(Float64, v, (p,q,size(v,1))), [3,1,2])
 end
 from_SA(v::Vector{SVector{d,Float64}}) where d  = reinterpret(Float64, v, (d,size(v,1)))'
 from_SA(v::SVector{d,Float64}) where d = Vector(v)
@@ -257,11 +268,11 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
             # if arguments are array vectors and one of them is not a vector (plausibly a matrix then...)
             hackish = ( (($(args...)),) isa Tuple{$([:(Array{Float64}) for i=1:length(args)]...)} )
             if hackish
-                $([:($a = to_SA($a)) for a in args]...)
+                $([:($a = Dolang.to_SA($a)) for a in args]...)
             end
 
 
-            N = _getsize($(args...))::Int
+            N = Dolang._getsize($(args...))::Int
 
             if isa(out,Void)
                 $([:($a=zeros($t,N)) for (a,t) in zip(args_out,out_types)]...)
@@ -270,7 +281,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
             end
 
             @inbounds @simd for n=1:N
-                $([:($a_=_getobs($a,n)) for (a_,a) in zip(args_scalar,args)]...)
+                $([:($a_ = Dolang._getobs($a,n)) for (a_,a) in zip(args_scalar,args)]...)
                 # res_ = kernel($(args_scalar...))
                 $(kernel_code_stripped...)
                 $([:($a[n] = res_[$i]) for (i,a) in enumerate(args_out)]...)
@@ -279,7 +290,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
             ret = ($(args_out...),)
 
             if hackish
-                ret = from_SA(ret)
+                ret = Dolang.from_SA(ret)
             end
 
             return $(to_diff isa Int? :(ret[1]) :  :(ret) )
@@ -315,8 +326,8 @@ function gen_generated_kernel(fff::FlatFunctionFactory)
     meta_code = quote
         @generated function $funname(orders, x, y, z, p, out=nothing)
             fff = $(fff) # this is amazing !
-            oorders = _get_nums(orders) # convert into tuples
-            code = gen_kernel(fff, oorders)
+            oorders = Dolang._get_nums(orders) # convert into tuples
+            code = Dolang.gen_kernel(fff, oorders)
             code.args[2]
         end
     end
@@ -331,13 +342,13 @@ function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname, disp
         # basic fun for compat
         @generated function $funname($((dispatch==nothing?[]:[:(::$dispatch_argument)])...), $(args...), out=nothing)
             fff = $(fff) # this is amazing !
-            code = gen_gufun(fff, 0)
+            code = Dolang.gen_gufun(fff, 0)
             code.args[2].args[2]
         end
         @generated function $funname($((dispatch==nothing?[]:[:(::$dispatch_argument)])...), orders::Tuple,  $(args...), out=nothing)
             fff = $(fff) # this is amazing !
-            oorders = _get_nums(orders) # convert into tuples
-            code = gen_gufun(fff, oorders)
+            oorders = Dolang._get_nums(orders) # convert into tuples
+            code = Dolang.gen_gufun(fff, oorders)
             code.args[2].args[2]
         end
     end
