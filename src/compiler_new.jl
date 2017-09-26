@@ -133,7 +133,6 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
     for (i,eq) in enumerate(fff.equations)
         dd[fff.targets[i]] = eq
     end
-    println(jac_args)
     # compute all equations to write
     diff_eqs = add_derivatives(dd, jac_args)
     for out in output_names
@@ -175,16 +174,20 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
 end
 
 
-to_LOP(v::Vector{Float64}) = SVector(v...)
-to_LOP(v::Matrix{Float64}) = reinterpret(SVector{size(v,2),Float64}, v', (size(v,1),))
-from_JLOP(v::Vector{SMatrix{p,q,Float64,k}}) where p where q where k = permutedims( reinterpret(Float64, v, (p,q,size(v,1))), [3,1,2])
-from_JLOP(v::Vector{SVector{d,Float64}}) where d  = reinterpret(Float64, v, (d,size(v,1)))'
-from_JLOP(v::SVector{d,Float64}) where d = Vector(v)
-from_JLOP(v::Tuple) = tuple([from_JLOP(e) for e in v]...)
+to_SA(v::Vector{Float64}) = SVector(v...)
+to_SA(v::Matrix{Float64}) = reinterpret(SVector{size(v,2),Float64}, v', (size(v,1),))
+function from_SA(v::Vector{SMatrix{p,q,Float64,k}}) where p where q where k
+    permutedims( reinterpret(Float64, v, (size(v,1),p,q)), [2,3,1])
+end
+from_SA(v::Vector{SVector{d,Float64}}) where d  = reinterpret(Float64, v, (d,size(v,1)))'
+from_SA(v::SVector{d,Float64}) where d = Vector(v)
+
+# that one is a bit risky as from_SA(to_SA(mat)) != mat
+from_SA(v::SMatrix{p,q,Float64,k}) where p where q where k = Matrix(v)
+from_SA(v::Tuple) = tuple([from_SA(e) for e in v]...)
 
 
-"""
-Creates a vectorized function, which can accept points or list-of-points as arguments.
+"""Creates a vectorized function, which can accept points or list-of-points as arguments.
 
 `fff``: assumed to be a `FlatFunctionFactory` object with empty preamble.
 `diff`: index of variables to differentiate with or list of indices of variables positions.
@@ -243,23 +246,18 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
                 $(kernel_code_stripped...)
                 return $(to_diff isa Int? :(res_[1]) :  :(res_) )
             end
-
-            # compatibility calls
-            # if they are array vectors
+            # if all arguments are array vectors
             if (($(args...)),) isa Tuple{$([:(Vector{Float64}) for i=1:length(args)]...)}
-                # oo = kernel( $( [ :(SVector( $(e)...)) for e in args]...) )
-                $([:($_a=$a) for (_a,a) in zip(args_scalar,args)]...)
-                $(kernel_code_stripped...)
-                ret = ( $( [:(Array(res_[$i])) for i=1:length(args_out)]...),)
-                return $(to_diff isa Int? :(ret[1]) :  :(ret) )
-            end
+                 # oo = kernel( $( [ :(SVector( $(e)...)) for e in args]...) )
+                 $([:($_a=$a) for (_a,a) in zip(args_scalar,args)]...)
+                 $(kernel_code_stripped...)
+                 ret = ( $( [:(Array(res_[$i])) for i=1:length(args_out)]...),)
+                 return $(to_diff isa Int? :(ret[1]) :  :(ret) )
+             end
             # if arguments are array vectors and one of them is not a vector (plausibly a matrix then...)
-            if ( (($(args...)),) isa Tuple{$([:(Array{Float64}) for i=1:length(args)]...)} ) &&
-                 !( (($(args...)),) isa Tuple{$([:(Vector{Float64}) for i=1:length(args)]...)} )
-                 res = $funname( $([:(to_LOP($a)) for a in args]...) )
-                 return from_JLOP(res)
-                #  ret ( $([:(from_JLOP(res[$i])) for i=1:length(out_types)]...), )
-                #  return $(to_diff isa Int? :(ret[1]) :  :(ret) )
+            hackish = ( (($(args...)),) isa Tuple{$([:(Array{Float64}) for i=1:length(args)]...)} )
+            if hackish
+                $([:($a = to_SA($a)) for a in args]...)
             end
 
 
@@ -279,6 +277,11 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
             end
 
             ret = ($(args_out...),)
+
+            if hackish
+                ret = from_SA(ret)
+            end
+
             return $(to_diff isa Int? :(ret[1]) :  :(ret) )
         end
     end

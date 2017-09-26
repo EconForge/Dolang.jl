@@ -42,6 +42,13 @@ y_vec = reinterpret(SVector{3,Float64}, rand(3,N), (N,))
 z_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
 p_vec = reinterpret(SVector{1,Float64}, rand(1,N), (N,))
 
+# as matrices
+x_mat = Dolang.from_SA(x_vec)
+y_mat = Dolang.from_SA(y_vec)
+z_mat = Dolang.from_SA(z_vec)
+p_mat = Dolang.from_SA(p_vec)
+
+
 @testset "Static Arrays Functions" begin
 
 
@@ -78,6 +85,14 @@ p_vec = reinterpret(SVector{1,Float64}, rand(1,N), (N,))
         @test typeof(res2) <: Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
         res3 = gufun(x_vec,y,z,p)
         @test typeof(res3) <: Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
+        # vectorized calls with matrix inputs
+        res4 = gufun(x_mat, y_mat, z_mat, p_mat)
+        @test typeof(res4) <: Tuple{Matrix{Float64},Array{Float64,3},Array{Float64,3}}
+        res5 = gufun(x_mat, y_mat, z_mat, pv)
+        @test typeof(res5) <: Tuple{Matrix{Float64},Array{Float64,3},Array{Float64,3}}
+        res6 = gufun(xv, yv, zv, pv)
+        @test typeof(res6) <: Tuple{Vector{Float64},Matrix{Float64},Matrix{Float64}}
+
     end
 
     @testset "Generated Gufuns" begin
