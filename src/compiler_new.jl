@@ -21,6 +21,54 @@ end
 
 _get_first(x) = x[1]
 
+list_syms(eq) = Dolang.list_symbols(eq)[:parameters]
+
+diff_symbol(k::Symbol,j::Symbol) = Symbol(string("∂",k,"_∂",j))
+
+function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
+    # given a list of equations:
+    # x=p+a
+    # y=p+x
+    # and a list of symbols to differetiate with
+    # [:a, :p]
+    # produces a new list of equations with derivatives:
+    # x=p+a
+    # ∂x_∂a = 1
+    # ∂x_∂p = 1
+    # y=p+x
+    # ∂y_∂a = ..
+    # ∂y_∂p = ...
+
+    diff_eqs = OrderedDict{Symbol, Union{Expr, <:Number, Symbol}}()
+    for (var,eq) in dd
+        diff_eqs[var] = eq
+        deps = list_syms(eq) # list of variables eq depends on
+        for k in deps
+            if k in jac_args
+                dv = diff_symbol(var, k)
+                deq = Dolang.deriv(eq, k)
+                diff_eqs[dv] = deq
+            else
+                for l in jac_args
+                    dv = diff_symbol(var, k)
+                    ddv = diff_symbol(k, l)
+                    cdv = diff_symbol(var, l)
+                    if ddv in keys(diff_eqs)
+                        if !(dv in keys(diff_eqs))
+                            deq = Dolang.deriv(eq, k)
+                            diff_eqs[dv] = deq
+                        end
+                        diff_eqs[cdv] = :($dv*$ddv)
+                    end
+                end
+            end
+        end
+    end
+
+    return diff_eqs
+
+end
+
 """
 Create a non allocating kernel from the function factory.
 
@@ -53,29 +101,49 @@ If diff is a list, the result is a tuple.
 """
 function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.funname, arguments=fff.arguments)
 
-    # prepare list of equations to write in `outputs`
-    outputs = OrderedDict()
-    targets = OrderedDict()
-    if 0 in diff
-        outputs[0] = collect(zip(fff.targets, fff.equations))
-    end
-    p = length(fff.targets)
-    argnames = collect(keys(arguments))
-    for d in filter(x->x!=0, diff)
-        argname = argnames[d]
-        vars = arguments[argname]
-        q = length(vars)
-        jacexpr = Matrix(p, q)
-        for i=1:p
-            v_out = fff.targets[i]
-            for j=1:q
+    targets = fff.targets
 
-                expr = Dolang.deriv(fff.equations[i], vars[j])
-                sym = Symbol(string("d_",v_out,"_d_",vars[j]))
-                jacexpr[i,j] = (sym, expr)
+    # names of symbols to output
+    output_names = []
+    for d in diff
+        if d == 0
+            push!(output_names, targets)
+        else
+            diff_args = collect(values(fff.arguments))[d]
+            p = length(fff.targets)
+            q = length(diff_args)
+            mat = Matrix{Symbol}(p,q)
+            for i=1:p
+                for j=1:q
+                    mat[i,j] = diff_symbol(targets[i], diff_args[j])
+                end
+            end
+            push!(output_names, mat)
+        end
+    end
+
+
+    argnames = collect(keys(arguments))
+
+    all_eqs = cat(1,values(fff.preamble)...,fff.equations)
+    all_args = cat(1,values(fff.arguments)...)
+    jac_args = cat(1,[collect(values(fff.arguments))[i] for i in diff if i!=0]...)
+
+
+    # concatenate preamble and equations (doesn't make much sense...)
+    dd = deepcopy(fff.preamble)
+    for (i,eq) in enumerate(fff.equations)
+        dd[fff.targets[i]] = eq
+    end
+
+    # compute all equations to write
+    diff_eqs = add_derivatives(dd, jac_args)
+    for out in output_names
+        for k in out[:]
+            if !(k in keys(diff_eqs))
+                diff_eqs[k] = 0.0
             end
         end
-        outputs[d] = jacexpr
     end
 
     # create function block
@@ -85,21 +153,12 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
             push!(code, :($a = ($k)[$i]))
         end
     end
-    # we add preamble in case in contains function definitions
-    # but don't differentiate w.r.t. it.
-    if length(fff.preamble)>0
-        for (k,v) in fff.preamble
-            push!(code, :($k = $v))
-        end
+    for (k,v) in diff_eqs
+            push!(code, :($k=$v))
     end
-    for (d,out) in outputs
-        for k in out[:]
-            push!(code, :($(k[1])=$(k[2])))
-        end
-    end
+
     return_args = []
-    for (d,out) in outputs
-        names = _get_first.(out)
+    for (d,names) in enumerate(output_names)
         outname = Symbol(string("oo_",d))
         push!(code, :($outname = $(_sym_sarray(names))))
         push!(return_args, outname)
