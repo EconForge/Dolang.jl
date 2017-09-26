@@ -126,14 +126,14 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
     all_eqs = cat(1,values(fff.preamble)...,fff.equations)
     all_args = cat(1,values(fff.arguments)...)
     jac_args = cat(1,[collect(values(fff.arguments))[i] for i in diff if i!=0]...)
-
+    jac_args = Symbol[j for j in jac_args]
 
     # concatenate preamble and equations (doesn't make much sense...)
     dd = deepcopy(fff.preamble)
     for (i,eq) in enumerate(fff.equations)
         dd[fff.targets[i]] = eq
     end
-
+    println(jac_args)
     # compute all equations to write
     diff_eqs = add_derivatives(dd, jac_args)
     for out in output_names
@@ -173,6 +173,14 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
     Expr(:function, fun_args, Expr(:block, code...))
 
 end
+
+
+to_LOP(v::Vector{Float64}) = SVector(v...)
+to_LOP(v::Matrix{Float64}) = reinterpret(SVector{size(v,2),Float64}, v', (size(v,1),))
+from_JLOP(v::Vector{SMatrix{p,q,Float64,k}}) where p where q where k = permutedims( reinterpret(Float64, v, (p,q,size(v,1))), [3,1,2])
+from_JLOP(v::Vector{SVector{d,Float64}}) where d  = reinterpret(Float64, v, (d,size(v,1)))'
+from_JLOP(v::SVector{d,Float64}) where d = Vector(v)
+from_JLOP(v::Tuple) = tuple([from_JLOP(e) for e in v]...)
 
 
 """
@@ -235,15 +243,25 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
                 $(kernel_code_stripped...)
                 return $(to_diff isa Int? :(res_[1]) :  :(res_) )
             end
-            # if they are arrays
+
+            # compatibility calls
+            # if they are array vectors
             if (($(args...)),) isa Tuple{$([:(Vector{Float64}) for i=1:length(args)]...)}
                 # oo = kernel( $( [ :(SVector( $(e)...)) for e in args]...) )
                 $([:($_a=$a) for (_a,a) in zip(args_scalar,args)]...)
                 $(kernel_code_stripped...)
                 ret = ( $( [:(Array(res_[$i])) for i=1:length(args_out)]...),)
                 return $(to_diff isa Int? :(ret[1]) :  :(ret) )
-
             end
+            # if arguments are array vectors and one of them is not a vector (plausibly a matrix then...)
+            if ( (($(args...)),) isa Tuple{$([:(Array{Float64}) for i=1:length(args)]...)} ) &&
+                 !( (($(args...)),) isa Tuple{$([:(Vector{Float64}) for i=1:length(args)]...)} )
+                 res = $funname( $([:(to_LOP($a)) for a in args]...) )
+                 return from_JLOP(res)
+                #  ret ( $([:(from_JLOP(res[$i])) for i=1:length(out_types)]...), )
+                #  return $(to_diff isa Int? :(ret[1]) :  :(ret) )
+            end
+
 
             N = _getsize($(args...))::Int
 
