@@ -502,36 +502,38 @@ is the result of trying to do the sub and `did_change` is a bool specifying
 whether or not any substitutions happened. This is used to know when to break
 out of a recursion.
 =#
+
 function _subs(s::Symbol, d::Associative, a...)
     haskey(d, s) && return (d[s], true)
-
-    # also check for canonical form (s, 0)
-    haskey(d, (s, 0)) && return (d[(s, 0)], true)
-
     (s, false)
 end
 
 _subs(x::Number, d::Associative, a...) = (x, false)
 
-function _subs(ex::Expr, d::Associative, funcs::Set{Symbol})
+function _subs(ex::Expr, d::Associative, funcs::Set{Symbol}, shiftit=false)
+
     if is_time_shift(ex)
+
         var, shift = arg_name_time(ex)
-        if haskey(d, (var, shift))
+        if (haskey(d, (var, shift)))
             new_ex = d[(var, shift)]
             return new_ex, true
-        end
-
-        if haskey(d, var)
-            new_ex = time_shift(var, shift, funcs, d)
+        elseif haskey(d, ex)
+            # I hassume the hash of ex is easy to compute
+            new_ex = d[ex]
             return new_ex, true
         end
-
-        # repeat for (var, 0)
-        if haskey(d, (var, 0))
-            new_ex = time_shift(d[(var, 0)], shift, funcs, d)
-            return new_ex, true
+        if shiftit
+            for ts in (-1,1)
+                if (haskey(d, (var, shift+ts)))
+                    new_ex = time_shift(d[(var, shift+ts)], -ts)
+                    return new_ex, true
+                elseif (haskey(d,ex))
+                    new_ex = time_shift(d[ex], -ts)
+                    return new_ex, true
+                end
+            end
         end
-
         # d doesn't have a key in canonical form, so just return here
         return ex, false
     end
@@ -540,7 +542,7 @@ function _subs(ex::Expr, d::Associative, funcs::Set{Symbol})
     changed = false
 
     for (i, arg) in enumerate(ex.args)
-        new_arg, arg_changed = _subs(arg, d, funcs)
+        new_arg, arg_changed = _subs(arg, d, funcs, shiftit)
         out_args[i] = new_arg
         changed = changed || arg_changed
     end
@@ -548,6 +550,7 @@ function _subs(ex::Expr, d::Associative, funcs::Set{Symbol})
     out = Expr(ex.head)
     out.args = out_args
     out, changed
+
 end
 
 """
@@ -563,7 +566,7 @@ for that expression: `(:x, 1)`
 function subs(ex::Union{Expr,Symbol,Number}, from,
               to::Union{Symbol,Expr,Number},
               funcs::Set{Symbol})
-    _subs(ex, Dict(from=>to), funcs)[1]
+    _subs(ex, Dict(from=>to), funcs, shiftit)[1]
 end
 
 """
@@ -573,81 +576,93 @@ subs(ex::Union{Expr,Symbol,Number}, d::Associative,
      funcs::Set{Symbol})
 ```
 
-Apply substituions to `ex` so that all keys in `d` are replaced by their values
+Apply substitutions to `ex` so that all keys in `d` are replaced by their values
 
 Note that the keys of `d` should be the canonical form of variables you wish to
 substitute. For example, to replace `x(1)` with `b/c` you need to have the
 entry `(:x, 1) => :(b/c)` in `d`.
-
-The one exception to this rule is that a key `:k` is treated the same as `(:k,
-0)`.
 """
 function subs(ex::Union{Expr,Symbol,Number}, d::Associative,
               funcs::Set{Symbol})
-    _subs(ex, d, funcs)[1]
+    _subs(ex, d, funcs, shiftit)[1]
+end
+
+
+
+function csubs(ex::Union{Expr,Symbol,Number}, from,
+              to::Union{Symbol,Expr,Number},
+              funcs::Set{Symbol})
+    _subs(ex, Dict(from=>to), funcs)[1]
 end
 
 """
 ```julia
-subs(ex::Union{Expr,Symbol,Number}, d::Associative;
-     variables::Set{Symbol},
-     functions::Set{Symbol})
+subs(ex::Union{Expr,Symbol,Number}, d::Associative, funcs::Set{Symbol})
 ```
-
-Verison of `subs` where `variables` and `functions` are keyword arguments with
-default values
+Apply substituions to `ex` so that all keys in `d` are replaced by their values.
+The difference variables in canonical form `(:v,t)` can match variables shifted by one
+period (i.e. `(:v,t-1)` and `(:v,t+1)`) with the timing of the substituted expression
+shifted accordingly.
+Note that the keys of `d` should be the canonical form of variables you wish to
+substitute. For example, to replace `x(1)` with `b/c` you need to have the
+entry `(:x, 1) => :(b/c)` in `d`.
 """
-function subs(ex::Union{Expr,Symbol,Number}, d::Associative;
-              functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
-    subs(ex, d, Set(functions))
+function csubs(ex::Union{Expr,Symbol,Number}, d::Associative, funcs::Set{Symbol}=Set{Symbol}())
+    _subs(ex, d, funcs, true)[1]
 end
 
-"""
-```julia
-csubs(ex::Union{Symbol,Expr,Number}, d::Associative,
-      variables::Set{Symbol}=Set{Symbol}(),
-      funcs::Set{Symbol}=Set{Symbol}())
-```
+function _resolve_defs(definitions::OrderedDict)
 
-Recursively apply substitutions to `ex` such that all items that are a key
-in `d` are replaced by their associated values. Different from `subs(x, d)`
-in that definitions in `d` are allowed to depend on one another and will
-all be fully resolved here.
 
-## Example
-
-```
-ex = :(a + b)
-d = Dict(:b => :(c/a), :c => :(2a))
-subs(ex, d)  # returns :(a + c / a)
-csubs(ex, d)  # returns :(a + (2a) / a)
-```
-"""
-function csubs(ex::Union{Symbol,Expr,Number}, d::Associative,
-               funcs::Set{Symbol})
-    max_it = (length(d) + 1)^2
-    max_it == 1 && return ex
-
-    for i in 1:max_it
-        ex, changed = _subs(ex, d, funcs)
-        !changed && return ex
-    end
-
-    error("Could not resolve expression recursively.")
 end
 
-"""
-```julia
-csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
-      functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
-```
 
-Verison of `csubs` where `variables` and `functions` are keyword arguments.
-"""
-function csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
-               functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
-    csubs(ex, d, Set(functions))
-end
+
+# """
+# ```julia
+# csubs(ex::Union{Symbol,Expr,Number}, d::Associative,
+#       variables::Set{Symbol}=Set{Symbol}(),
+#       funcs::Set{Symbol}=Set{Symbol}())
+# ```
+#
+# Recursively apply substitutions to `ex` such that all items that are a key
+# in `d` are replaced by their associated values. Different from `subs(x, d)`
+# in that definitions in `d` are allowed to depend on one another and will
+# all be fully resolved here.
+#
+# ## Example
+#
+# ```
+# ex = :(a + b)
+# d = Dict(:b => :(c/a), :c => :(2a))
+# subs(ex, d)  # returns :(a + c / a)
+# csubs(ex, d)  # returns :(a + (2a) / a)
+# ```
+# """
+# function csubs(ex::Union{Symbol,Expr,Number}, d::Associative,
+#                funcs::Set{Symbol})
+#     max_it = (length(d) + 1)^2
+#     max_it == 1 && return ex
+#
+#     for i in 1:max_it
+#         ex, changed = _subs(ex, d, funcs)
+#         !changed && return ex
+#     end
+#
+# end
+#
+# """
+# ```julia
+# csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
+#       functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
+# ```
+#
+# Verison of `csubs` where `variables` and `functions` are keyword arguments.
+# """
+# function csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
+#                functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
+#     csubs(ex, d, Set(functions))
+# end
 
 # ---------#
 # arg_name #
