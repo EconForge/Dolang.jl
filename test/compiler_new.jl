@@ -36,7 +36,7 @@ zv = Vector(z)
 pv = Vector(p)
 
 # we're list of points
-N=5
+N = 5
 x_vec = reinterpret(SVector{1,Float64}, 1+rand(1,N), (N,))
 y_vec = reinterpret(SVector{3,Float64}, rand(3,N), (N,))
 z_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
@@ -52,46 +52,62 @@ p_mat = Dolang.from_SA(p_vec)
 @testset "Static Arrays Functions" begin
 
 
-    @testset "Flat Function Factory" begin
-        fff = Dolang.FlatFunctionFactory(ff)
-        fff2 = Dolang.FlatFunctionFactory(ff2)
+    @testset "Flat Function Factory constructors" begin
+        @test begin
+            Dolang.FlatFunctionFactory(ff)
+            Dolang.FlatFunctionFactory(ff2)
+            true
+        end
     end
 
 
     @testset "Kernel" begin
         fff = Dolang.FlatFunctionFactory(ff2)
-        cc = Dolang.gen_kernel(fff, [0,1,3], funname=:kernel)
+        cc = Dolang.gen_kernel(fff, [0, 1, 3], funname=:kernel)
         kernel = eval(Dolang, cc)
-        res = kernel(x,y,z,p)
-        @test ( typeof(res) <: Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}} )
+        res = @inferred kernel(x, y, z, p)
+        @test isa(res, Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}})
     end
 
 
     @testset "GuFun" begin
         fff = Dolang.FlatFunctionFactory(ff2)
-        cc = Dolang.gen_gufun(fff, [0,1,3], funname=:gufun)
+        cc = Dolang.gen_gufun(fff, [0, 1, 3], funname=:gufun)
         gufun = eval(Dolang, cc)
         # behaves like a kernel
-        res = gufun(x,y,z,p)
-        @test typeof(res) <: Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}}
+        res = @inferred gufun(x, y, z, p)
+        @test isa(res, Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}})
         # doesn't like allocated vectors but does it anyway
-        res = gufun(xv,yv,zv,pv)
-        @test typeof(res) <: Tuple{Array{Float64,1}, Array{Float64,2}, Array{Float64,2}}
+        res = @inferred gufun(xv, yv, zv, pv)
+        @test isa(res, Tuple{Vector{Float64}, Matrix{Float64}, Matrix{Float64}})
         # vectorized calls
-        res = gufun(x_vec,y_vec,z_vec,p_vec)
-        @test typeof(res) <:Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
+        res = @inferred gufun(x_vec, y_vec, z_vec, p_vec)
+        @test isa(res,
+            Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
+        )
         @test (length(res[1]) == length(res[2]) == length(x_vec))
-        res2 = gufun(x,y_vec,z,p_vec)
-        @test typeof(res2) <: Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
-        res3 = gufun(x_vec,y,z,p)
-        @test typeof(res3) <: Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
+        res2 = @inferred gufun(x, y_vec, z, p_vec)
+        @test isa(res2,
+            Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
+        )
+        res3 = @inferred gufun(x_vec, y, z, p)
+        @test isa(res3,
+            Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
+        )
         # vectorized calls with matrix inputs
+
+        # TODO: the method below is not type-inferrable!
+        # res4 = @inferred gufun(x_mat, y_mat, z_mat, p_mat)
         res4 = gufun(x_mat, y_mat, z_mat, p_mat)
-        @test typeof(res4) <: Tuple{Matrix{Float64},Array{Float64,3},Array{Float64,3}}
+        @test isa(res4, Tuple{Matrix{Float64},Array{Float64,3},Array{Float64,3}})
+
+        # TODO: the method below is not type-inferrable!
+        # res5 = @inferred gufun(x_mat, y_mat, z_mat, pv)
         res5 = gufun(x_mat, y_mat, z_mat, pv)
-        @test typeof(res5) <: Tuple{Matrix{Float64},Array{Float64,3},Array{Float64,3}}
-        res6 = gufun(xv, yv, zv, pv)
-        @test typeof(res6) <: Tuple{Vector{Float64},Matrix{Float64},Matrix{Float64}}
+        @test isa(res5, Tuple{Matrix{Float64},Array{Float64,3},Array{Float64,3}})
+
+        res6 = @inferred gufun(xv, yv, zv, pv)
+        @test isa(res6, Tuple{Vector{Float64},Matrix{Float64},Matrix{Float64}})
 
     end
 
@@ -100,22 +116,26 @@ p_mat = Dolang.from_SA(p_vec)
         cc = Dolang.gen_generated_gufun(fff; funname=:gengufun)
         gengufun = eval(Dolang, cc)
         # behaves like a kernel
-        res0 = gengufun(x,y,z,p)
-        @test typeof(res0) <: SVector{2,Float64}
+        res0 = @inferred gengufun(x, y, z, p)
+        @test isa(res0, SVector{2,Float64})
 
-        res = gengufun((Val(0),Val(1),Val(3)),x,y,z,p)
-        @test typeof(res) <: Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}}
+        res = @inferred gengufun((Val{0}(), Val{1}(), Val{3}()), x, y, z, p)
+        @test isa(res, Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}})
+
         # doesn't like allocated vectors but does it anyway
-        res = gengufun((Val(0),Val(1),Val(3)),xv,yv,zv,pv)
-        @test typeof(res) <: Tuple{Array{Float64,1},Array{Float64,2},Array{Float64,2}}
+        res = @inferred gengufun((Val{0}(), Val{1}(), Val{3}()), xv, yv, zv, pv)
+        @test isa(res, Tuple{Array{Float64,1},Array{Float64,2},Array{Float64,2}})
+
         # vectorized calls
-        res = gengufun((Val(0),Val(1),Val(3)),x_vec,y_vec,z_vec,p_vec)
-        @test typeof(res) <: Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
+        res = @inferred gengufun((Val{0}(), Val{1}(), Val{3}()), x_vec, y_vec, z_vec, p_vec)
+        @test isa(res, Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}})
         @test (length(res[1]) == length(res[2]) == length(x_vec))
-        res2 = gengufun((Val(0),Val(1),Val(3)),x,y_vec,z,p_vec)
-        @test typeof(res2) <: Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
-        res3 = gengufun((Val(0),Val(1),Val(3)),x_vec,y,z,p)
-        @test typeof(res3) <: Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}}
+
+        res2 = @inferred gengufun((Val{0}(), Val{1}(), Val{3}()), x, y_vec, z, p_vec)
+        @test isa(res2, Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}})
+
+        res3 = @inferred gengufun((Val{0}(), Val{1}(), Val{3}()), x_vec, y, z, p)
+        @test isa(res3, Tuple{Array{SVector{2, Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}})
 
     end
 
