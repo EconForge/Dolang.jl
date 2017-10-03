@@ -6,17 +6,22 @@
 # extract a single element. If `x` is a Matrix then extract one column of the
 # matrix
 @inline _unpack_var(x::AbstractVector, i::Integer) = x[i]
+@inline _unpack_var(x::AbstractMatrix, i::Integer, ::Type(COrder)) = view(x, :, i)
+@inline _unpack_var(x::AbstractMatrix, i::Integer, ::Type(FOrder)) = view(x, i, :)
 @inline _unpack_var(x::AbstractMatrix, i::Integer) = view(x, :, i)
 
 # inlined function to extract a single observations of a vector fo variables.
+@inline _unpack_obs(x::AbstractMatrix, i::Integer, ::Type(COrder)) = view(x, i, :)
+@inline _unpack_obs(x::AbstractMatrix, i::Integer, ::Type(FOrder)) = view(x, :, i)
 @inline _unpack_obs(x::AbstractMatrix, i::Integer) = view(x, i, :)
 @inline _unpack_obs(x::AbstractVector, i::Integer) = x
 
 # similar to _unpack_var, but instead assigns one element of a vector or one
 # column of a matrix
 @inline _assign_var(lhs::AbstractVector, rhs::Number, i) = setindex!(lhs, rhs, i)
-
 @inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i) = setindex!(lhs, rhs, :, i)
+@inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i, ::Type(COrder)) = setindex!(lhs, rhs, :, i)
+@inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i, ::Type(FOrder)) = setindex!(lhs, rhs, i, :)
 
 # determine the size of the output variable, given the number of expressions
 # in the equation and all the input arguments
@@ -48,16 +53,31 @@ function _output_size(n_expr::Int, args...)
     (n_row, n_expr)
 end
 
+_output_size(n_expr::Int, ::Type(COrder), args...)  = _output_size(n_expr::Int, args...)
+
+function _output_size(n_expr::Int, order::Type(FOrder), args...)
+    s = _output_size(n_expr::Int, order::Type(FOrder), args...)
+    (s[2],s[1])
+end
+
+
+
 # Allocate an array of eltype `T` for `n_expr` variables that corresponds
 # to input arguments `args...`
 _allocate_out(T::Type, n_expr::Int, args::AbstractVector...) = Array{T}(n_expr)
 
+_allocate_out(T::Type, order::Union{Type(COrder),Type(FOrder)}, n_expr::Int, arg::AbstractMatrix) =
+    Array{T}(_output_size(n_expr, order, arg))
+
 _allocate_out(T::Type, n_expr::Int, arg::AbstractMatrix) =
-    Array{T}(_output_size(n_expr, arg))
+        Array{T}(_output_size(n_expr, arg))
 
 function _allocate_out(T::Type, n_expr::Int, args...)
-    sz = _output_size(n_expr, args...)
-    Array{T}(sz[1], sz[2])
+    Array{T}(_output_size(n_expr, args...))
+end
+
+function _allocate_out(T::Type, order::Union{Type(COrder),Type(FOrder)}, n_expr::Int, args...)
+    Array{T}(_output_size(n_expr, order, args...))
 end
 
 ## Triangular solver

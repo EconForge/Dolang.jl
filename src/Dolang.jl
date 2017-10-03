@@ -47,6 +47,8 @@ else
     @inline post_deriv(eq) = eq
 end
 
+abstract type COrder end
+abstract type FOrder end
 
 # core files
 include("symbolic.jl")

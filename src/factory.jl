@@ -19,13 +19,13 @@ end
 # Base Types #
 # ---------- #
 
-@compat const FlatArgs = AbstractVector
+const FlatArgs = AbstractVector
 @compat const GroupedArgs = Associative{Symbol,<:Any}
-@compat const ArgType = Union{FlatArgs,GroupedArgs}
+const ArgType = Union{FlatArgs,GroupedArgs}
 
-@compat const FlatParams = AbstractVector
+const FlatParams = AbstractVector
 @compat const GroupedParams = Associative{Symbol,<:Any}
-@compat const ParamType = Union{FlatParams,GroupedParams}
+const ParamType = Union{FlatParams,GroupedParams}
 
 immutable Der{T} end
 @compat const TDer{n} = Type{Der{n}}
