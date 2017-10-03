@@ -383,6 +383,9 @@ end
 # list_symbols #
 # ------------ #
 
+#
+list_symbols(ex::Number, other...) = Dict{Symbol,Any}()
+
 """
     list_symbols(::Expr;
                  functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())

@@ -177,32 +177,41 @@ or
 system = Dict(:x=>[:y,:z], :y=>[], :z=>[:y] )
 solve_dependency(system)
 ```
+
+Optionally, one can add specify which subset of variables to solve for.
+Unrequired variables will be ommited in the solution.
+
 """
-function solve_dependency(dd::Associative{T,Set{T}}) where T # is hashable
-    solved = T[]
-    deps = deepcopy(dd)
-    p = length(deps)
-    it = 0
-    while length(deps)>0 && it<=p
-        it+=1
-        for (k,dep) in deepcopy(deps)
-            if length(dep)==0
-                push!(solved,k)
-                pop!(deps,k)
-                for (l,ldeps) in deps
-                    if k in ldeps
-                        pop!(ldeps,k)
-                    end
+function solve_dependencies(deps, needed=nothing)
+    solution = []
+    if needed == nothing
+        needed = Set(keys(deps))
+    else
+        needed = Set(needed)
+    end
+    while length(needed)>0
+        tt0 = (length(needed), length(solution))
+        if length(needed)==0
+            return solution
+        else
+            for k in needed
+                # check whether k is solved
+                if k in solution
+                    pop!(needed, k)
+                elseif issubset(deps[k], solution)
+                    push!(solution, k)
+                else
+                    needed = union(deps[k], needed)
                 end
+            end
+            tt = (length(needed), length(solution))
+            if tt == tt0
+                throw("No progress made. Non triangular system.")
             end
         end
     end
-    if it==p+1
-        throw("Non triangular system")
-    end
-    return solved
+    return solution
 end
-
 
 function get_dependencies(defs::Associative{T,U}) where T where U
     deps = OrderedDict{Any,Set{Any}}()
@@ -218,4 +227,24 @@ function reorder_triangular_block(defs::Associative{T,U}) where T where U
     deps = get_dependencies(defs)
     sol = Dolang.solve_dependency(deps)
     return OrderedDict((k,defs[k]) for k in sol)
+end
+
+"Solves definitions blocks, with equations time-shifting."
+function solve_definitions(defs, needed=keys(defs))
+    # defs should map timed-vars to expressions.
+    defs = deepcopy(defs)
+    for (v,t) in collect(keys(defs))
+        # t should always be 0
+        @assert t==0
+        for shift in (-1,1)
+            defs[(v,shift)] = Dolang.time_shift(defs[(v,t)], shift)
+        end
+    end
+    deps = Dolang.get_dependencies(defs)
+    solution = Dolang.solve_dependencies(deps, needed)
+    reordered = OrderedDict()
+    for k in solution
+        reordered[k] = defs[k]
+    end
+    return reordered
 end
