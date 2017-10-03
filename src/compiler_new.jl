@@ -300,7 +300,7 @@ end
 # genfun((Val(1),Val(2)), x, y, z, p, out=)
 # where the first argument denotes the arguments to differentiate with (0, is zero-order diff)
 
-_get_nums(::Union{Val{n}, Type{Val{n}}, Der{n}, Type{Der{n}}}) where n = n
+_get_nums(::Union{Val{n}, Type{Val{n}}, Type{Type{Val{n}}}}) where n = n
 _get_nums(t::Type{<:Tuple}) = [_get_nums(i) for i in getfield(t, 3)]
 
 function gen_generated_kernel(fff::FlatFunctionFactory)
@@ -332,6 +332,13 @@ function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname, disp
         @generated function $funname($(dispatch_arg...), orders::Tuple, $(args...), out=nothing)
             fff = $(fff) # this is amazing !
             oorders = Dolang._get_nums(orders) # convert into tuples
+            code = Dolang.gen_gufun(fff, oorders)
+            code.args[2].args[2]
+        end
+
+        @generated function $funname($(dispatch_arg...), orders::Union{Val,Type{<:Val}}, $(args...), out=nothing)
+            fff = $(fff) # this is amazing !
+            oorders = collect(Dolang._get_nums(orders)) # convert into tuples
             code = Dolang.gen_gufun(fff, oorders)
             code.args[2].args[2]
         end

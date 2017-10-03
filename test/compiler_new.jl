@@ -119,23 +119,31 @@ p_mat = Dolang.from_SA(p_vec)
         res0 = @inferred gengufun(x, y, z, p)
         @test isa(res0, SVector{2,Float64})
 
-        res = @inferred gengufun((Val{0}(), Val{1}(), Val{3}()), x, y, z, p)
-        @test isa(res, Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}})
+        deriv_specs = [
+            (Val{0}(), Val{1}(), Val{3}()),
+            Val{(0, 1, 3)},
+            Val{(0, 1, 3)}()
+        ]
+        for derivative in deriv_specs
 
-        # doesn't like allocated vectors but does it anyway
-        res = @inferred gengufun((Val{0}(), Val{1}(), Val{3}()), xv, yv, zv, pv)
-        @test isa(res, Tuple{Array{Float64,1},Array{Float64,2},Array{Float64,2}})
+            res = @inferred gengufun(derivative, x, y, z, p)
+            @test isa(res, Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}})
 
-        # vectorized calls
-        res = @inferred gengufun((Val{0}(), Val{1}(), Val{3}()), x_vec, y_vec, z_vec, p_vec)
-        @test isa(res, Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}})
-        @test (length(res[1]) == length(res[2]) == length(x_vec))
+            # doesn't like allocated vectors but does it anyway
+            res = @inferred gengufun(derivative, xv, yv, zv, pv)
+            @test isa(res, Tuple{Array{Float64,1},Array{Float64,2},Array{Float64,2}})
 
-        res2 = @inferred gengufun((Val{0}(), Val{1}(), Val{3}()), x, y_vec, z, p_vec)
-        @test isa(res2, Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}})
+            # vectorized calls
+            res = @inferred gengufun(derivative, x_vec, y_vec, z_vec, p_vec)
+            @test isa(res, Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}})
+            @test (length(res[1]) == length(res[2]) == length(x_vec))
 
-        res3 = @inferred gengufun((Val{0}(), Val{1}(), Val{3}()), x_vec, y, z, p)
-        @test isa(res3, Tuple{Array{SVector{2, Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}})
+            res2 = @inferred gengufun(derivative, x, y_vec, z, p_vec)
+            @test isa(res2, Tuple{Array{SVector{2,Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}})
+
+            res3 = @inferred gengufun(derivative, x_vec, y, z, p)
+            @test isa(res3, Tuple{Array{SVector{2, Float64},1},Array{StaticArrays.SArray{Tuple{2,1},Float64,2,2},1},Array{StaticArrays.SArray{Tuple{2,2},Float64,2,4},1}})
+        end
 
     end
 
