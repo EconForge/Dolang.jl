@@ -10,6 +10,7 @@ tests = length(ARGS) > 0 ? ARGS : [
                                    "incidence",
                                    "factory",
                                    "compiler",
+                                   "compiler_new",
                                    "util",
                                    "printing",
                                    ]
