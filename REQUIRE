@@ -1,5 +1,5 @@
 julia 0.5
 DataStructures
 Compat 0.18
-Calculus
+SymEngine
 StaticArrays
