@@ -256,3 +256,81 @@ Optional function arguments have the following purposes:
   `funname(Float64, ...)`)
 """
 FunctionFactory
+
+
+
+##########################
+#  Flat function factory #
+##########################
+
+# a FlatFunctionFactory object contains only what is needed
+# to compile functions. Right now, it is created from a FunctionFactory object.
+# Everything is "normalized", i.e. no time-variables.
+#
+# "preamble" can contain variables needed to compute the "equations".
+# For now, preamble is always empty, as definitions are assumeed to have been
+# substituted when creating the function factory object.
+#
+# Here is an example:
+# Dolang.FlatFunctionFactory(
+#     Expr[:(log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))), :(_c__1_ + _u_ * _d__1_)], # equations
+#     DataStructures.OrderedDict( # arguments
+#         :x=>Symbol[:_a_m1_],
+#         :y=>Symbol[:_a__0_, :_b__0_, :_c__0_],
+#         :z=>Symbol[:_c__1_, :_d__1_],
+#         :p=>Symbol[:_u_]),
+#     Symbol[:_foo__0_, :_bar__0_], # outputs
+#     DataStructures.OrderedDict{Symbol,Expr}(), # preamble
+#     :myfun #function name
+# )
+
+immutable FlatFunctionFactory
+        # normalized equations
+        equations::Vector{Union{Expr,Symbol}}
+        # list of group of (normalized) variables
+        arguments::OrderedDict{Symbol, Vector{Symbol}}
+        # list of assigned variables
+        targets::Vector{Symbol}
+        # preamble: definitions
+        preamble::OrderedDict{Symbol, Expr}
+        # name of function
+        funname::Symbol
+end
+
+function FlatFunctionFactory(ff::FunctionFactory; eliminate_definitions=false)
+
+    equations = Union{Expr,Symbol}[]
+    for eq in ff.eqs
+        # we remove lhs if it is there
+        if eq.head == :(=)
+            ee = eq.args[2]
+        else
+            ee = eq
+        end
+        push!(equations, ee)
+    end
+
+    arguments = OrderedDict{Symbol, Vector{Symbol}}()
+
+    # we assume silently :p is not given as an argument in ff
+    if isa(ff.args, OrderedDict)
+        for k in keys(ff.args)
+            arguments[k] = [Dolang.normalize(e) for e in ff.args[k]]
+        end
+    else
+        arguments[:x] = [Dolang.normalize(e) for e in ff.args]
+    end
+    arguments[:p] = [Dolang.normalize(p) for p in ff.params]
+
+    if length(ff.targets)==0
+        targets = [Symbol(string("outv_",i)) for i=1:length(ff.eqs)]
+    else
+        targets = ff.targets
+    end
+
+    # we ignore definitions assuming they have already been substituted
+    preamble = OrderedDict{Symbol, Expr}()
+
+    FlatFunctionFactory(equations, arguments, targets, preamble, ff.funname)
+
+end

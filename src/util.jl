@@ -161,3 +161,50 @@ function solve_triangular_system(d::OrderedDict)
 
     OrderedDict{Symbol,Real}(zip(nms, data))
 end
+
+
+"""
+Solves triangular system specified by incidence dictionary.
+
+Returns a Vector of keys specifying the order in which `dd` should be evaluated
+
+```
+system = Dict(0=>[1,2], 1=>Int[], 2=>[1] )
+solve_dependency(system)
+```
+
+or
+
+```
+system = Dict(:x=>[:y,:z], :y=>Symbol[], :z=>[:y])
+solve_dependency(system)
+```
+"""
+function solve_dependency(dd::Dict{T,Set{T}}) where T # is hashable
+    solved = T[]
+    deps = deepcopy(dd)
+    p = length(deps)
+    it = 0
+    while length(deps) > 0 && it <= p
+        it += 1
+        for (k, dep) in deps
+            if length(dep) == 0
+                push!(solved, k)
+                pop!(deps, k)
+                for (l, ldeps) in deps
+                    if k in ldeps
+                        pop!(ldeps, k)
+                    end
+                end
+            end
+        end
+    end
+    if it >= p+1
+        error("Non triangular system")
+    end
+    return solved
+end
+
+function solve_dependency(dd::Dict{T,Vector{T}}) where T
+    solve_dependency(Dict((k, Set(v)) for (k, v) in dd))
+end

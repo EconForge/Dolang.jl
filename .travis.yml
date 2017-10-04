@@ -5,14 +5,13 @@ os:
   - linux
   # - osx  # we don't do any binary dependencies or OS specific magic
 julia:
-  - 0.5
   - 0.6
 notifications:
   email: false
 # uncomment the following lines to override the default test script
-#script:
+# script:
 #  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-#  - julia -e 'Pkg.clone(pwd()); Pkg.build("Dolang"); Pkg.test("Dolang"; coverage=true)'
+#  - julia -e 'Pkg.clone(pwd()); Pkg.build("Dolang"); Pkg.test("Dolang"; coverage=false)'
 after_success:
-  - julia -e 'Pkg.add("Documenter"); Pkg.add("SymEngine"); Base.compilecache("Dolang")'
+  - julia -e 'Pkg.add("Documenter"); Base.compilecache("Dolang")'
   - julia -e 'cd(Pkg.dir("Dolang")); include(joinpath("docs", "make.jl"))'

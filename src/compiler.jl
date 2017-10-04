@@ -738,17 +738,10 @@ evaluated with these vectors and the `n` observations of each matrix argument.
 
 ## Note
 
-If `SymEngine.jl` is installed, the output will be an `@generated` function
+The output will be an `@generated` function
 that can be evaluated at arbitrary order of analytical derivative -- with
 derivative computation and function compilation happening at runtime upon the
 user's first request to evaluate that order derivative.
-
-Otherwise, `Calculus.jl` will be used for symbolic differentiation and the
-output of this function will be methods to evaluate the function at orders 0,
-1, and 2. The reason for the difference is that the differentiation code in
-Calculus.jl calls the Julia `eval` function, which is not allowed in
-`@generated` functions.
-
 """
 function make_function(ff::FunctionFactory)
     out = Expr(:block)
@@ -804,22 +797,9 @@ end
 
 function extra_methods(ff::FunctionFactory)
     out = Expr[]
-    if !HAVE_SYMENGINE
-        # for Calculus.jl the @generated functions do not work -- we need to
-        # construct code for levels 0, 1, and 2 here instead of at call time
-        push!(out, build_function(ff, Der{1}))  # allocating jacobian
-        push!(out, build_function!(ff, Der{1}))  # mutating jacobian
-    end
     return out
 end
 function extra_methods{T<:FlatArgs}(ff::FunctionFactory{T})
     out = Expr[]
-    if !HAVE_SYMENGINE
-        # for Calculus.jl the @generated functions do not work -- we need to
-        # construct code for levels 0, 1, and 2 here instead of at call time
-        push!(out, build_function(ff, Der{1}))  # allocating jacobian
-        push!(out, build_function(ff, Der{2}))  # allocating hessian
-        push!(out, build_function!(ff, Der{1}))  # mutating jacobian
-    end
     return out
 end
