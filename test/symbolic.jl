@@ -229,40 +229,6 @@ end
 
 end
 
-@testset " csubs()" begin
-    d = Dict(:monty=> :python, :run=>:faster, :eat=>:more)
-    @test Dolang.csubs(:monty, d) == :python
-    @test Dolang.csubs(:Monty, d) == :Monty
-    @test Dolang.csubs(1.0, d) == 1.0
-
-    want = :(python(faster + more, eats))
-    @test Dolang.csubs(:(monty(run + eat, eats)), d) == want
-
-    for ex in [:(a + b(0) + b(1)), :(a + b + b(1))]
-        for key in [:b, (:b, 0)]
-            d = Dict(key => :(c(0) + d(1)))
-            want = :(a + (c(0) + d(1)) + (c(1) + d(2)))
-            @test Dolang.csubs(ex, d) == want
-
-            d = Dict(key => :(c + d(1)))
-            want = :(a + (c + d(1)) + (c + d(2)))
-            @test Dolang.csubs(ex, d) == want
-        end
-    end
-
-    d = Dict((:b, 0) => :(c + d(1)), (:b, 1) => :(c(100) + d(2)))
-    ex = :(a + b + b(1))
-    want = :(a + (c + d(1)) + (c(100) + d(2)))
-    @test Dolang.csubs(ex, d) == want
-
-    # case where subs and csubs aren't the same
-    ex = :(a + b)
-    d = Dict(:b => :(c/a), :c => :(2a))
-    @test Dolang.subs(ex, d) == :(a + c/a)
-    @test Dolang.csubs(ex, d) == :(a + (2a)/a)
-
-end
-
 @testset "arg_name, arg_time, arg_name_time, arg_names" begin
     for i in 1:5
         s = gensym()

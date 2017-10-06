@@ -202,35 +202,12 @@ normalize(exs::Vector{Expr}; kwargs...) =
 #       to call recursively. I define the public interface (kwarg version)
 #       below
 
-# TODO: make `time_shift(x, shift; args, shfit, defs) = time_shift(subs(x, defs), args, shift)`
-
-"""
-    time_shift(s::Symbol, shift::Integer,
-               functions::Set{Symbol}=Set{Symbol}(),
-               defs::Associative=Dict())
-
-If `s` is in `defs`, then return the shifted version of the definition
-
-Otherwise return `s`
-"""
-function time_shift(s::Symbol, shift::Integer,
-                    functions::Set{Symbol},
-                    defs::Associative)
-    # if it is a def, recursively substitute it
-    if haskey(defs, s)
-        return time_shift(defs[s], shift, functions, defs)
-    end
-
-    # any other symbols just gets parsed
-    return s
-end
-
 """
     time_shift(x::Number, other...)
 
 Return `x` for all values of `other`
 """
-time_shift(x::Number, other...) = x
+time_shift(x::Union{Number,Symbol}, other...) = x
 
 """
 ```julia
@@ -250,18 +227,12 @@ on the form of `ex` (list below has the form "contents of ex: return expr"):
   applied on each of `ex.args`
 """
 function time_shift(ex::Expr, shift::Integer,
-                    functions::Set{Symbol},
-                    defs::Associative)
+                    functions::Set{Symbol})
 
     # need to pattern match here to make sure we don't normalize function names
     if is_time_shift(ex)
         var = ex.args[1]
         i = ex.args[2]
-
-        # if we found a definition, move to resolving it
-        if haskey(defs, var)
-            time_shift(defs[var], shift+i, functions, defs)
-        end
 
         if var in functions
             return ex
@@ -276,7 +247,7 @@ function time_shift(ex::Expr, shift::Integer,
         if func in DOLANG_FUNCTIONS || func in functions
             out = Expr(:call, func)
             for arg in ex.args[2:end]
-                push!(out.args, time_shift(arg, shift, functions, defs))
+                push!(out.args, time_shift(arg, shift, functions))
             end
             return out
         else
@@ -286,7 +257,7 @@ function time_shift(ex::Expr, shift::Integer,
 
     # otherwise just shift all args, but retain expr head
     out = Expr(ex.head)
-    out.args = [time_shift(an_arg, shift, defs) for an_arg in ex.args]
+    out.args = [time_shift(an_arg, shift) for an_arg in ex.args]
     return out
 end
 
@@ -301,9 +272,8 @@ Version of `time_shift` where `functions` and `defs` are keyword arguments with
 default values.
 """
 function time_shift(ex::Expr, shift::Integer=0;
-                    functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
-                    defs::Associative=Dict())
-    time_shift(ex, shift, Set(functions), defs)
+                    functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
+    time_shift(ex, shift, Set(functions))
 end
 
 # ------------ #
@@ -321,7 +291,7 @@ If `s` is not a key in `defs`, return the steady state version of the  `s`
 Otherwise, return `steady_state(defs[s], functions, defs)`
 
 """
-function steady_state(s::Union{Symbol,Number}, functions::Set{Symbol}, defs::Associative)
+function steady_state(s::Union{Symbol,Number}, functions::Set{Symbol})
 
     if haskey(defs, s)
         steady_state(defs[s], functions, defs)
@@ -475,7 +445,7 @@ function list_variables(
         arg;
         functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}()
     )::Set{Tuple{Symbol,Int}}
-    list_symbols(arg, functions=functions)[:variables]
+    get(list_symbols(arg, functions=functions),:variables,Set{Tuple{Symbol,Int}}())
 end
 
 """
@@ -561,7 +531,7 @@ end
 subs(ex::Union{Expr,Symbol,Number}, from, to::Union{Symbol,Expr,Number}, funcs::Set{Symbol})
 ```
 
-Apply a substituion where all occurances of `from` in `ex` are replaced by `to`.
+Apply a substitution where all occurances of `from` in `ex` are replaced by `to`.
 
 Note that to replace something like `x(1)` `from` must be the canonical form
 for that expression: `(:x, 1)`
@@ -590,82 +560,6 @@ function subs(ex::Union{Expr,Symbol,Number}, d::Associative,
     _subs(ex, d, funcs, shiftit)[1]
 end
 
-
-
-function csubs(ex::Union{Expr,Symbol,Number}, from,
-              to::Union{Symbol,Expr,Number},
-              funcs::Set{Symbol})
-    _subs(ex, Dict(from=>to), funcs)[1]
-end
-
-"""
-```julia
-subs(ex::Union{Expr,Symbol,Number}, d::Associative, funcs::Set{Symbol})
-```
-Apply substituions to `ex` so that all keys in `d` are replaced by their values.
-The difference variables in canonical form `(:v,t)` can match variables shifted by one
-period (i.e. `(:v,t-1)` and `(:v,t+1)`) with the timing of the substituted expression
-shifted accordingly.
-Note that the keys of `d` should be the canonical form of variables you wish to
-substitute. For example, to replace `x(1)` with `b/c` you need to have the
-entry `(:x, 1) => :(b/c)` in `d`.
-"""
-function csubs(ex::Union{Expr,Symbol,Number}, d::Associative, funcs::Set{Symbol}=Set{Symbol}())
-    _subs(ex, d, funcs, true)[1]
-end
-
-function _resolve_defs(definitions::OrderedDict)
-
-
-end
-
-
-
-# """
-# ```julia
-# csubs(ex::Union{Symbol,Expr,Number}, d::Associative,
-#       variables::Set{Symbol}=Set{Symbol}(),
-#       funcs::Set{Symbol}=Set{Symbol}())
-# ```
-#
-# Recursively apply substitutions to `ex` such that all items that are a key
-# in `d` are replaced by their associated values. Different from `subs(x, d)`
-# in that definitions in `d` are allowed to depend on one another and will
-# all be fully resolved here.
-#
-# ## Example
-#
-# ```
-# ex = :(a + b)
-# d = Dict(:b => :(c/a), :c => :(2a))
-# subs(ex, d)  # returns :(a + c / a)
-# csubs(ex, d)  # returns :(a + (2a) / a)
-# ```
-# """
-# function csubs(ex::Union{Symbol,Expr,Number}, d::Associative,
-#                funcs::Set{Symbol})
-#     max_it = (length(d) + 1)^2
-#     max_it == 1 && return ex
-#
-#     for i in 1:max_it
-#         ex, changed = _subs(ex, d, funcs)
-#         !changed && return ex
-#     end
-#
-# end
-#
-# """
-# ```julia
-# csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
-#       functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
-# ```
-#
-# Verison of `csubs` where `variables` and `functions` are keyword arguments.
-# """
-# function csubs(ex::Union{Symbol,Expr,Number}, d::Associative;
-#                functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())
-#     csubs(ex, d, Set(functions))
-# end
 
 # ---------#
 # arg_name #

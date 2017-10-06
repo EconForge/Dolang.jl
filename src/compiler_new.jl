@@ -16,6 +16,7 @@ _sym_sarray(v::Matrix{Symbol}) = Expr(:call, :(SMatrix{$(size(v)...)}), v...)
 
 list_syms(eq::Expr) = get(list_symbols(eq), :parameters, Set{Symbol}())
 list_syms(eq::Symbol) = [eq]
+list_syms(eq::Number) = eq
 
 diff_symbol(k::Symbol, j::Symbol) = Symbol("∂", k, "_∂", j)
 
@@ -33,7 +34,7 @@ function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
     # ∂y_∂a = ..
     # ∂y_∂p = ...
 
-    diff_eqs = OrderedDict{Symbol, Union{Expr, <:Number, Symbol}}()
+    diff_eqs = OrderedDict{Symbol, SymExpr}()
     for (var, eq) in dd
         diff_eqs[var] = eq
         deps = list_syms(eq) # list of variables eq depends on
@@ -95,8 +96,8 @@ If diff is a list, the result is a tuple.
 """
 function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.funname, arguments=fff.arguments)
 
-    targets = fff.targets
-
+    targets = [keys(fff.equations)...]
+    equations = [values(fff.equations)...]
     # names of symbols to output
     output_names = []
     for d in diff
@@ -119,7 +120,7 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
 
     argnames = collect(keys(arguments))
 
-    all_eqs = cat(1, values(fff.preamble)...,fff.equations)
+    all_eqs = cat(1, values(fff.preamble)..., equations)
     all_args = cat(1, values(fff.arguments)...)
     jac_args = cat(1, [collect(values(fff.arguments))[i] for i in diff if i!=0]...)
     jac_args = Symbol.(jac_args)
@@ -129,7 +130,7 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
     for (k, v) in (fff.preamble)
         dd[k] = v
     end
-    for (target, eq) in zip(targets, fff.equations)
+    for (target, eq) in zip(targets, equations)
         dd[target] = eq
     end
     # compute all equations to write

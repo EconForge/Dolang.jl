@@ -162,6 +162,9 @@ function solve_triangular_system(d::OrderedDict)
     OrderedDict{Symbol,Real}(zip(nms, data))
 end
 
+type TriangularSystemException <: Exception
+    missing
+end
 
 """
 Solves triangular system specified by incidence dictionary.
@@ -182,7 +185,7 @@ Optionally, one can add specify which subset of variables to solve for.
 Unrequired variables will be ommited in the solution.
 
 """
-function solve_dependencies(deps, needed=nothing)
+function solve_dependencies(deps::Associative{T,Set{T}}, needed=nothing) where T
     solution = []
     if needed == nothing
         needed = Set(keys(deps))
@@ -206,7 +209,9 @@ function solve_dependencies(deps, needed=nothing)
             end
             tt = (length(needed), length(solution))
             if tt == tt0
-                throw("No progress made. Non triangular system.")
+                mis = join([string(e) for e in needed], ", ")
+                exc = TriangularSystemException(mis)
+                throw(exc)
             end
         end
     end
@@ -225,12 +230,17 @@ end
 
 function reorder_triangular_block(defs::Associative{T,U}) where T where U
     deps = get_dependencies(defs)
-    sol = Dolang.solve_dependency(deps)
+    sol = Dolang.solve_dependencies(deps)
     return OrderedDict((k,defs[k]) for k in sol)
 end
 
-"Solves definitions blocks, with equations time-shifting."
-function solve_definitions(defs, needed=keys(defs))
+"""Solves definitions blocks
+
+Keys are timed variables in canonical form (e.g. `(:v,0)`) at date t=0.
+Values are expressions, possibly referencing key variables at different dates.
+The system is recursively solved for the unknowns, by default the keys.
+"""
+function solve_definitions(defs::Associative{Tuple{Symbol, Int}, SymExpr}, unknowns=keys(defs))
     # defs should map timed-vars to expressions.
     defs = deepcopy(defs)
     for (v,t) in collect(keys(defs))
@@ -241,7 +251,7 @@ function solve_definitions(defs, needed=keys(defs))
         end
     end
     deps = Dolang.get_dependencies(defs)
-    solution = Dolang.solve_dependencies(deps, needed)
+    solution = Dolang.solve_dependencies(deps, unknowns)
     reordered = OrderedDict()
     for k in solution
         reordered[k] = defs[k]

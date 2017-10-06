@@ -284,15 +284,17 @@ FunctionFactory
 #     :myfun #function name
 # )
 
+SymExpr = Union{Expr,Symbol,Number}
+
 immutable FlatFunctionFactory
         # normalized equations
-        equations::Vector{Union{Expr,Symbol}}
+        equations::OrderedDict{Symbol,SymExpr}
         # list of group of (normalized) variables
         arguments::OrderedDict{Symbol, Vector{Symbol}}
         # list of assigned variables
-        targets::Vector{Symbol}
+        targets::Vector{Symbol}   ### Redundant
         # preamble: definitions
-        preamble::OrderedDict{Symbol, Expr}
+        preamble::OrderedDict{Symbol, SymExpr}
         # name of function
         funname::Symbol
 end
@@ -333,4 +335,43 @@ function FlatFunctionFactory(ff::FunctionFactory; eliminate_definitions=false)
 
     FlatFunctionFactory(equations, arguments, targets, preamble, ff.funname)
 
+end
+
+
+function FlatFunctionFactory(equations::OrderedDict, arguments::OrderedDict, definitions::Associative; eliminate_preamble=false, funname=:anon)
+
+    # eqs: OrderedDict (targets are keys)
+    # args: OrderedDict
+    # defs:
+    all_vars = union([list_variables(eq) for eq in values(equations)]...)
+    present_vars = union(union(values(arguments)...), keys(equations))
+    filter!(x->(x isa Tuple), present_vars)
+
+    # variables appearing in equations
+    needed_defs = setdiff(all_vars, present_vars)
+
+    defs = solve_definitions(definitions, needed_defs)
+
+    defs_normalized = OrderedDict{Symbol,SymExpr}([normalize(k)=>normalize.(v) for (k,v) in defs])
+    args_normalized = OrderedDict{Symbol,Vector{Symbol}}([k=>normalize.(v) for (k,v) in arguments])
+    eqs_normalized = OrderedDict{Symbol, SymExpr}([normalize(k)=>normalize(v) for (k,v) in equations])
+    targets = [keys(eqs_normalized)...]
+    return FlatFunctionFactory( eqs_normalized, args_normalized, targets, defs_normalized, funname)
+
+end
+
+function FlatFunctionFactory(equations::Vector, arguments, definitions; kwargs...)
+    eqs = OrderedDict(Symbol("eq_",i)=>eq for (i,eq) in enumerate(equations))
+    FlatFunctionFactory(eqs, arguments, definitions; kwargs...)
+end
+
+function FlatFunctionFactory(equations, arguments::Vector, definitions; kwargs...)
+    args = OrderedDict(Symbol("arg_",i)=>arg for (i,arg) in enumerate(arguments))
+    FlatFunctionFactory(equations, args, definitions; kwargs...)
+end
+
+function FlatFunctionFactory(equations::Vector, arguments::Vector, definitions; kwargs...)
+    eqs = OrderedDict(Symbol("eq_",i)=>eq for (i,eq) in enumerate(equations))
+    args = OrderedDict(Symbol("arg_",i)=>arg for (i,arg) in enumerate(arguments))
+    FlatFunctionFactory(eqs, args, definitions; kwargs...)
 end
