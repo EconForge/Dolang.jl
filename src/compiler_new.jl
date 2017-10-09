@@ -38,25 +38,24 @@ function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
     for (var, eq) in dd
         diff_eqs[var] = eq
         deps = list_syms(eq) # list of variables eq depends on
-        for k in deps
-            if k in jac_args
+        for k in setdiff(deps, jac_args)
+            for l in jac_args
                 dv = diff_symbol(var, k)
-                deq = Dolang.deriv(eq, k)
-                diff_eqs[dv] = deq
-            else
-                for l in jac_args
-                    dv = diff_symbol(var, k)
-                    ddv = diff_symbol(k, l)
-                    cdv = diff_symbol(var, l)
-                    if haskey(diff_eqs, ddv)
-                        if !haskey(diff_eqs, dv)
-                            deq = Dolang.deriv(eq, k)
-                            diff_eqs[dv] = deq
-                        end
-                        diff_eqs[cdv] = :($dv*$ddv)
+                ddv = diff_symbol(k, l)
+                cdv = diff_symbol(var, l)
+                if haskey(diff_eqs, ddv)
+                    if !haskey(diff_eqs, dv)
+                        deq = Dolang.deriv(eq, k)
+                        diff_eqs[dv] = deq
                     end
+                    diff_eqs[cdv] = :($dv*$ddv)
                 end
             end
+        end
+        for k in intersect(deps, jac_args)
+            dv = diff_symbol(var, k)
+            deq = Dolang.deriv(eq, k)
+            diff_eqs[dv] = deq
         end
     end
 
