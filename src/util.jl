@@ -218,6 +218,8 @@ function solve_dependencies(deps::Associative{T,Set{T}}, needed=nothing) where T
     return solution
 end
 
+list_symbols(expr::Symbol) = list_symbols(:($expr*2))
+
 function get_dependencies(defs::Associative{T,U}) where T where U
     deps = OrderedDict{Any,Set{Any}}()
     for (k,v) in (defs)

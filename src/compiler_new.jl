@@ -38,7 +38,8 @@ function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
     for (var, eq) in dd
         diff_eqs[var] = eq
         deps = list_syms(eq) # list of variables eq depends on
-        for k in setdiff(deps, jac_args)
+
+        for k in [kk for kk in deps if !(kk in jac_args)]
             for l in jac_args
                 dv = diff_symbol(var, k)
                 ddv = diff_symbol(k, l)
@@ -52,11 +53,12 @@ function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
                 end
             end
         end
-        for k in intersect(deps, jac_args)
+        for k in [kk for kk in deps if kk in jac_args]
             dv = diff_symbol(var, k)
             deq = Dolang.deriv(eq, k)
             diff_eqs[dv] = deq
         end
+
     end
 
     return diff_eqs
@@ -141,6 +143,8 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
             end
         end
     end
+
+    diff_eqs = reorder_triangular_block(diff_eqs)
 
     # create function block
     code = []
