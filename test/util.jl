@@ -156,7 +156,7 @@ end  # @testset "util"
             (:c, -1)  => :(y(-1) ^ theta - i(-1)),
             (:rho, 0) => :(c(0) / c(-1))
         )
-        @test soved_defs == Dolang.solve_definitions(defs)
+        @test solved_defs == Dolang.solve_definitions(defs)
 
         solved_defs_reduced = OrderedDict(
             (:c, 1)   => :(y(1) ^ theta - i(1)),

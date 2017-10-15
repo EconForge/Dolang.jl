@@ -242,7 +242,7 @@ Keys are timed variables in canonical form (e.g. `(:v,0)`) at date t=0.
 Values are expressions, possibly referencing key variables at different dates.
 The system is recursively solved for the unknowns, by default the keys.
 """
-function solve_definitions(defs::Associative{Tuple{Symbol, Int}, SymExpr}, unknowns=keys(defs))
+function solve_definitions(defs::Associative{Tuple{Symbol, Int}, <:SymExpr}, unknowns=keys(defs))
     # defs should map timed-vars to expressions.
     defs = deepcopy(defs)
     for (v,t) in collect(keys(defs))

@@ -538,10 +538,18 @@ substitute. For example, to replace `x(1)` with `b/c` you need to have the
 entry `(:x, 1) => :(b/c)` in `d`.
 """
 function subs(ex::Union{Expr,Symbol,Number}, d::Associative,
-              funcs::Set{Symbol})
-    _subs(ex, d, funcs, shiftit)[1]
+              funcs::Set{Symbol}=Set{Symbol}())
+    _subs(ex, d, funcs)[1]
 end
 
+###########
+#         #
+###########
+
+function csubs(expr, d::Associative)
+    dd = reorder_triangular_block(d)
+    subs(expr, dd)
+end
 
 # ---------#
 # arg_name #

@@ -77,7 +77,7 @@ function build_definition_map(defs::Associative, incidence::IncidenceTable)
             for time in incidence.by_var[def_var]
                 new_key = normalize((def_var, time))
                 out[new_key] = normalize(
-                    time_shift(_ex, time, funcs, defs)
+                    time_shift(_ex, time, funcs)
                 )
             end
         end
@@ -333,7 +333,13 @@ function FlatFunctionFactory(ff::FunctionFactory; eliminate_definitions=false)
     # we ignore definitions assuming they have already been substituted
     preamble = OrderedDict{Symbol, Expr}()
 
-    FlatFunctionFactory(equations, arguments, targets, preamble, ff.funname)
+    if equations isa Vector
+        eqs = OrderedDict(Symbol("eq_",i)=>eq for (i,eq) in enumerate(equations))
+    else
+        eqs = equations
+    end
+
+    FlatFunctionFactory(eqs, arguments, targets, preamble, ff.funname)
 
 end
 
