@@ -156,16 +156,6 @@ end
         have = Dolang.time_shift(:(a+b(1) + c(0)), shift)
         @test have == :(a+b($(shift+1)) + c($(shift)))
 
-        # with defs
-        have = Dolang.time_shift(:(a+b(1) + c), shift, defs=defs)
-        @test have == :(b($(shift-1))/c + b($(shift+1)) + c)
-
-        have = Dolang.time_shift(:(a+b(1) + c(0)), shift, defs=defs)
-        @test have == :(b($(shift-1))/c + b($(shift+1)) + c($(shift)))
-
-        # note that defs have to be sanitized
-        have = Dolang.time_shift(:(a+b(1) + c(0)), shift, defs=defs_sanitized)
-        @test have == :(b($(shift-1))/c($(shift)) + b($(shift+1)) + c($(shift)))
 
         # unknown function
         @test_throws Dolang.UnknownFunctionError Dolang.time_shift(:(a+b(1) + foobar(c)), shift)
@@ -173,19 +163,11 @@ end
         # with functions
         have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, functions=funcs)
         @test have == :(a+b($(shift+1)) + foobar(c))
-
-        # functions + defs
-        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, defs=defs, functions=funcs)
-        @test have == :(b($(shift-1))/c + b($(shift+1)) + foobar(c))
     end
 end
 
 @testset "Dolang.steady_state" begin
     @test Dolang.steady_state(:(a+b(1) + c)) == :(a+b+c)
-
-    # with defs
-    have = Dolang.steady_state(:(a+b(1) + c), defs=Dict(:a=>:(b(-1)/c)))
-    @test have == :(b/c+b+c)
 
     # unknown function
     @test_throws Dolang.UnknownFunctionError Dolang.steady_state(:(a+b(1)+c+foobar(c)))

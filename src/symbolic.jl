@@ -280,35 +280,17 @@ end
 # steady state #
 # ------------ #
 
-"""
-```julia
-steady_state(s, functions::Set{Symbol}, defs::Associative)
-```
-
-If `s` is not a key in `defs`, return the steady state version of the  `s`
-(essentially s(0)).
-
-Otherwise, return `steady_state(defs[s], functions, defs)`
-
-"""
-function steady_state(s::Union{Symbol,Number}, functions::Set{Symbol})
-
-    if haskey(defs, s)
-        steady_state(defs[s], functions, defs)
-    else
-        s
-    end
-end
 
 """
 ```julia
-steady_state(ex::Expr, functions::Set{Symbol}, defs::Associative)
+steady_state(ex::Expr, functions::Set{Symbol})
 ```
 
 Return the steady state version of `ex`, where all symbols in `args`
 always appear at time 0
 """
-function steady_state(ex::Expr, functions::Set{Symbol}, defs::Associative)
+function steady_state(ex::Expr, functions::Set{Symbol})
+
     if is_time_shift(ex)
         return ex.args[1]
     end
@@ -319,7 +301,7 @@ function steady_state(ex::Expr, functions::Set{Symbol}, defs::Associative)
         if func in DOLANG_FUNCTIONS || func in functions
             out = Expr(:call, func)
             for arg in ex.args[2:end]
-                push!(out.args, steady_state(arg, functions, defs))
+                push!(out.args, steady_state(arg, functions))
             end
             return out
         else
@@ -329,25 +311,25 @@ function steady_state(ex::Expr, functions::Set{Symbol}, defs::Associative)
 
      # otherwise just steady_state all args, but retain expr head
     out = Expr(ex.head)
-    out.args = [steady_state(an_arg, functions, defs) for an_arg in ex.args]
+    out.args = [steady_state(an_arg, functions) for an_arg in ex.args]
     return out
 end
 
 """
 ```julia
 steady_state(ex::Expr;
-             functions::Vector{Symbol}=Vector{Symbol}(),
-             defs::Associative=Dict())
+             functions::Vector{Symbol}=Vector{Symbol}())
 ```
 
 Version of `steady_state` where `functions` and `defs` are keyword arguments
 with default values
 """
 function steady_state(ex::Expr;
-                      functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}(),
-                      defs::Associative=Dict())
-    steady_state(ex, Set(functions), defs)
+                      functions::Union{Set{Symbol},Vector{Symbol}}=Set{Symbol}())
+    steady_state(ex, Set(functions))
 end
+
+steady_state(ex::Union{Symbol, Number}, args...) = ex
 
 # ------------ #
 # list_symbols #
