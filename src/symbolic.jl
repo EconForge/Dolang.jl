@@ -337,6 +337,8 @@ steady_state(ex::Union{Symbol, Number}, args...) = ex
 
 #
 list_symbols(ex::Number, other...) = Dict{Symbol,Any}()
+list_symbols(expr::Symbol, other...) =  Dict{Symbol,Any}(:parameters=>[expr])
+
 
 """
     list_symbols(::Expr;
@@ -465,7 +467,7 @@ end
 
 _subs(x::Number, d::Associative, a...) = (x, false)
 
-function _subs(ex::Expr, d::Associative, funcs::Set{Symbol}, shiftit=false)
+function _subs(ex::Expr, d::Associative, funcs::Set{Symbol})
 
     if is_time_shift(ex)
 
@@ -478,17 +480,6 @@ function _subs(ex::Expr, d::Associative, funcs::Set{Symbol}, shiftit=false)
             new_ex = d[ex]
             return new_ex, true
         end
-        if shiftit
-            for ts in (-1,1)
-                if (haskey(d, (var, shift+ts)))
-                    new_ex = time_shift(d[(var, shift+ts)], -ts)
-                    return new_ex, true
-                elseif (haskey(d,ex))
-                    new_ex = time_shift(d[ex], -ts)
-                    return new_ex, true
-                end
-            end
-        end
         # d doesn't have a key in canonical form, so just return here
         return ex, false
     end
@@ -497,7 +488,7 @@ function _subs(ex::Expr, d::Associative, funcs::Set{Symbol}, shiftit=false)
     changed = false
 
     for (i, arg) in enumerate(ex.args)
-        new_arg, arg_changed = _subs(arg, d, funcs, shiftit)
+        new_arg, arg_changed = _subs(arg, d, funcs)
         out_args[i] = new_arg
         changed = changed || arg_changed
     end
@@ -521,7 +512,7 @@ for that expression: `(:x, 1)`
 function subs(ex::Union{Expr,Symbol,Number}, from,
               to::Union{Symbol,Expr,Number},
               funcs::Set{Symbol})
-    _subs(ex, Dict(from=>to), funcs, shiftit)[1]
+    _subs(ex, Dict(from=>to), funcs)[1]
 end
 
 """

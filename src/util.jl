@@ -181,16 +181,23 @@ system = Dict(:x=>[:y,:z], :y=>[], :z=>[:y] )
 solve_dependency(system)
 ```
 
-Optionally, one can add specify which subset of variables to solve for.
-Unrequired variables will be ommited in the solution.
+Optionally, one can add specify which subset of variables to solve  so that unrequired variables will be ommited in the solution. In
 
+```
+system = Dict(:x=>[:y,:z], :y=>[], :z=>[:y], :p=>[:x,y,z] )
+solve_dependency(system, [:x,:y,:z])
+
+```
+
+the answer is the same as before since `:p` is not needed to
+define the values of `[:x,:y,:z]`.
 """
-function solve_dependencies(deps::Associative{T,Set{T}}, needed=nothing) where T
+function solve_dependencies(deps::Associative{T,Set{T}}, unknowns=nothing) where T
     solution = []
-    if needed == nothing
+    if unknowns == nothing
         needed = Set(keys(deps))
     else
-        needed = Set(needed)
+        needed = Set(unknowns)
     end
     while length(needed)>0
         tt0 = (length(needed), length(solution))
@@ -218,7 +225,6 @@ function solve_dependencies(deps::Associative{T,Set{T}}, needed=nothing) where T
     return solution
 end
 
-list_symbols(expr::Symbol) = list_symbols(:($expr*2))
 
 function get_dependencies(defs::Associative{T,U}) where T where U
     deps = OrderedDict{Any,Set{Any}}()
