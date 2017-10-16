@@ -156,16 +156,6 @@ end
         have = Dolang.time_shift(:(a+b(1) + c(0)), shift)
         @test have == :(a+b($(shift+1)) + c($(shift)))
 
-        # with defs
-        have = Dolang.time_shift(:(a+b(1) + c), shift, defs=defs)
-        @test have == :(b($(shift-1))/c + b($(shift+1)) + c)
-
-        have = Dolang.time_shift(:(a+b(1) + c(0)), shift, defs=defs)
-        @test have == :(b($(shift-1))/c + b($(shift+1)) + c($(shift)))
-
-        # note that defs have to be sanitized
-        have = Dolang.time_shift(:(a+b(1) + c(0)), shift, defs=defs_sanitized)
-        @test have == :(b($(shift-1))/c($(shift)) + b($(shift+1)) + c($(shift)))
 
         # unknown function
         @test_throws Dolang.UnknownFunctionError Dolang.time_shift(:(a+b(1) + foobar(c)), shift)
@@ -173,19 +163,11 @@ end
         # with functions
         have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, functions=funcs)
         @test have == :(a+b($(shift+1)) + foobar(c))
-
-        # functions + defs
-        have = Dolang.time_shift(:(a+b(1) + foobar(c)), shift, defs=defs, functions=funcs)
-        @test have == :(b($(shift-1))/c + b($(shift+1)) + foobar(c))
     end
 end
 
 @testset "Dolang.steady_state" begin
     @test Dolang.steady_state(:(a+b(1) + c)) == :(a+b+c)
-
-    # with defs
-    have = Dolang.steady_state(:(a+b(1) + c), defs=Dict(:a=>:(b(-1)/c)))
-    @test have == :(b/c+b+c)
 
     # unknown function
     @test_throws Dolang.UnknownFunctionError Dolang.steady_state(:(a+b(1)+c+foobar(c)))
@@ -226,40 +208,6 @@ end
     @test out[:parameters] == Set{Symbol}([:a, :c])
     @test out[:variables] == @inferred Dolang.list_variables(ex, functions=[:foobar])
     @test out[:parameters] == @inferred Dolang.list_parameters(ex, functions=[:foobar])
-
-end
-
-@testset " csubs()" begin
-    d = Dict(:monty=> :python, :run=>:faster, :eat=>:more)
-    @test Dolang.csubs(:monty, d) == :python
-    @test Dolang.csubs(:Monty, d) == :Monty
-    @test Dolang.csubs(1.0, d) == 1.0
-
-    want = :(python(faster + more, eats))
-    @test Dolang.csubs(:(monty(run + eat, eats)), d) == want
-
-    for ex in [:(a + b(0) + b(1)), :(a + b + b(1))]
-        for key in [:b, (:b, 0)]
-            d = Dict(key => :(c(0) + d(1)))
-            want = :(a + (c(0) + d(1)) + (c(1) + d(2)))
-            @test Dolang.csubs(ex, d) == want
-
-            d = Dict(key => :(c + d(1)))
-            want = :(a + (c + d(1)) + (c + d(2)))
-            @test Dolang.csubs(ex, d) == want
-        end
-    end
-
-    d = Dict((:b, 0) => :(c + d(1)), (:b, 1) => :(c(100) + d(2)))
-    ex = :(a + b + b(1))
-    want = :(a + (c + d(1)) + (c(100) + d(2)))
-    @test Dolang.csubs(ex, d) == want
-
-    # case where subs and csubs aren't the same
-    ex = :(a + b)
-    d = Dict(:b => :(c/a), :c => :(2a))
-    @test Dolang.subs(ex, d) == :(a + c/a)
-    @test Dolang.csubs(ex, d) == :(a + (2a)/a)
 
 end
 

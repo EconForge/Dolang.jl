@@ -33,6 +33,12 @@ end
     funname = :myfun
     _FF = Dolang.FunctionFactory
 
+    ff1 = _FF{typeof(args),
+              typeof(params),
+              Dict{Symbol,Expr},
+              DataType}(eqs, args, params, targets, defs, funname,
+                        Dolang.SkipArg)
+
     @testset "  constructors" begin
         # inner constructor directly
         ff1 = _FF{typeof(args),

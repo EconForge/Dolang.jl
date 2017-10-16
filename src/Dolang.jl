@@ -1,5 +1,4 @@
-__precompile__(true)
-
+ __precompile__(true)
 module Dolang
 
 using DataStructures

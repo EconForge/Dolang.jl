@@ -77,7 +77,7 @@ function build_definition_map(defs::Associative, incidence::IncidenceTable)
             for time in incidence.by_var[def_var]
                 new_key = normalize((def_var, time))
                 out[new_key] = normalize(
-                    time_shift(_ex, time, funcs, defs)
+                    time_shift(_ex, time, funcs)
                 )
             end
         end
@@ -264,35 +264,38 @@ FunctionFactory
 ##########################
 
 # a FlatFunctionFactory object contains only what is needed
-# to compile functions. Right now, it is created from a FunctionFactory object.
+# to compile functions.
 # Everything is "normalized", i.e. no time-variables.
 #
 # "preamble" can contain variables needed to compute the "equations".
-# For now, preamble is always empty, as definitions are assumeed to have been
-# substituted when creating the function factory object.
 #
 # Here is an example:
 # Dolang.FlatFunctionFactory(
-#     Expr[:(log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))), :(_c__1_ + _u_ * _d__1_)], # equations
+#     DataStructures.OrderedDict(
+#         :_foo__0_=>:(log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))),
+#         :_foo__1_=>(_c__1_ + _u_ * _d__1_)
+#     ),  # equations
 #     DataStructures.OrderedDict( # arguments
 #         :x=>Symbol[:_a_m1_],
 #         :y=>Symbol[:_a__0_, :_b__0_, :_c__0_],
 #         :z=>Symbol[:_c__1_, :_d__1_],
 #         :p=>Symbol[:_u_]),
-#     Symbol[:_foo__0_, :_bar__0_], # outputs
+#     Symbol[:_foo__0_, :_bar__0_], # outputs (redundant)
 #     DataStructures.OrderedDict{Symbol,Expr}(), # preamble
 #     :myfun #function name
 # )
 
+SymExpr = Union{Expr,Symbol,Number}
+
 immutable FlatFunctionFactory
         # normalized equations
-        equations::Vector{Union{Expr,Symbol}}
+        equations::OrderedDict{Symbol,SymExpr}
         # list of group of (normalized) variables
         arguments::OrderedDict{Symbol, Vector{Symbol}}
         # list of assigned variables
-        targets::Vector{Symbol}
+        targets::Vector{Symbol}   ### Redundant
         # preamble: definitions
-        preamble::OrderedDict{Symbol, Expr}
+        preamble::OrderedDict{Symbol, SymExpr}
         # name of function
         funname::Symbol
 end
@@ -322,15 +325,59 @@ function FlatFunctionFactory(ff::FunctionFactory; eliminate_definitions=false)
     end
     arguments[:p] = [Dolang.normalize(p) for p in ff.params]
 
-    if length(ff.targets)==0
-        targets = [Symbol(string("outv_",i)) for i=1:length(ff.eqs)]
-    else
-        targets = ff.targets
-    end
-
     # we ignore definitions assuming they have already been substituted
     preamble = OrderedDict{Symbol, Expr}()
 
-    FlatFunctionFactory(equations, arguments, targets, preamble, ff.funname)
+    if equations isa Vector
+        if length(ff.targets)==0
+            targets = [Symbol(string("outv_",i)) for i=1:length(ff.eqs)]
+        else
+            targets = ff.targets
+        end
+        eqs = OrderedDict(targets[i]=>eq for (i,eq) in enumerate(equations))
+    else
+        eqs = equations
+    end
 
+    FlatFunctionFactory(eqs, arguments, targets, preamble, ff.funname)
+
+end
+
+
+function FlatFunctionFactory(equations::OrderedDict, arguments::OrderedDict, definitions::Associative; eliminate_preamble=false, funname=:anon)
+
+    # eqs: OrderedDict (targets are keys)
+    # args: OrderedDict
+    # defs:
+    all_vars = union([list_variables(eq) for eq in values(equations)]...)
+    present_vars = union(union(values(arguments)...), keys(equations))
+    filter!(x->(x isa Tuple), present_vars)
+
+    # variables appearing in equations
+    needed_defs = setdiff(all_vars, present_vars)
+
+    defs = solve_definitions(definitions, needed_defs)
+
+    defs_normalized = OrderedDict{Symbol,SymExpr}([normalize(k)=>normalize.(v) for (k,v) in defs])
+    args_normalized = OrderedDict{Symbol,Vector{Symbol}}([k=>normalize.(v) for (k,v) in arguments])
+    eqs_normalized = OrderedDict{Symbol, SymExpr}([normalize(k)=>normalize(v) for (k,v) in equations])
+    targets = [keys(eqs_normalized)...]
+    return FlatFunctionFactory( eqs_normalized, args_normalized, targets, defs_normalized, funname)
+
+end
+
+function FlatFunctionFactory(equations::Vector, arguments, definitions; kwargs...)
+    eqs = OrderedDict(Symbol("eq_",i)=>eq for (i,eq) in enumerate(equations))
+    FlatFunctionFactory(eqs, arguments, definitions; kwargs...)
+end
+
+function FlatFunctionFactory(equations, arguments::Vector, definitions; kwargs...)
+    args = OrderedDict(Symbol("arg_",i)=>arg for (i,arg) in enumerate(arguments))
+    FlatFunctionFactory(equations, args, definitions; kwargs...)
+end
+
+function FlatFunctionFactory(equations::Vector, arguments::Vector, definitions; kwargs...)
+    eqs = OrderedDict(Symbol("eq_",i)=>eq for (i,eq) in enumerate(equations))
+    args = OrderedDict(Symbol("arg_",i)=>arg for (i,arg) in enumerate(arguments))
+    FlatFunctionFactory(eqs, args, definitions; kwargs...)
 end

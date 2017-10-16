@@ -162,49 +162,107 @@ function solve_triangular_system(d::OrderedDict)
     OrderedDict{Symbol,Real}(zip(nms, data))
 end
 
+type TriangularSystemException <: Exception
+    missing
+end
 
 """
 Solves triangular system specified by incidence dictionary.
 
-Returns a Vector of keys specifying the order in which `dd` should be evaluated
-
 ```
-system = Dict(0=>[1,2], 1=>Int[], 2=>[1] )
+system = Dict(0=>[1,2], 1=>[], 2=>[1] )
 solve_dependency(system)
 ```
 
 or
 
 ```
-system = Dict(:x=>[:y,:z], :y=>Symbol[], :z=>[:y])
+system = Dict(:x=>[:y,:z], :y=>[], :z=>[:y] )
 solve_dependency(system)
 ```
+
+Optionally, one can add specify which subset of variables to solve  so that unrequired variables will be ommited in the solution. In
+
+```
+system = Dict(:x=>[:y,:z], :y=>[], :z=>[:y], :p=>[:x,y,z] )
+solve_dependency(system, [:x,:y,:z])
+
+```
+
+the answer is the same as before since `:p` is not needed to
+define the values of `[:x,:y,:z]`.
 """
-function solve_dependency(dd::Dict{T,Set{T}}) where T # is hashable
-    solved = T[]
-    deps = deepcopy(dd)
-    p = length(deps)
-    it = 0
-    while length(deps) > 0 && it <= p
-        it += 1
-        for (k, dep) in deps
-            if length(dep) == 0
-                push!(solved, k)
-                pop!(deps, k)
-                for (l, ldeps) in deps
-                    if k in ldeps
-                        pop!(ldeps, k)
-                    end
+function solve_dependencies(deps::Associative{T,Set{T}}, unknowns=nothing) where T
+    solution = []
+    if unknowns == nothing
+        needed = Set(keys(deps))
+    else
+        needed = Set(unknowns)
+    end
+    while length(needed)>0
+        tt0 = (length(needed), length(solution))
+        if length(needed)==0
+            return solution
+        else
+            for k in needed
+                # check whether k is solved
+                if k in solution
+                    pop!(needed, k)
+                elseif issubset(deps[k], solution)
+                    push!(solution, k)
+                else
+                    needed = union(deps[k], needed)
                 end
+            end
+            tt = (length(needed), length(solution))
+            if tt == tt0
+                mis = join([string(e) for e in needed], ", ")
+                exc = TriangularSystemException(mis)
+                throw(exc)
             end
         end
     end
-    if it >= p+1
-        error("Non triangular system")
-    end
-    return solved
+    return solution
 end
 
-function solve_dependency(dd::Dict{T,Vector{T}}) where T
-    solve_dependency(Dict((k, Set(v)) for (k, v) in dd))
+
+function get_dependencies(defs::Associative{T,U}) where T where U
+    deps = OrderedDict{Any,Set{Any}}()
+    for (k,v) in (defs)
+        ii = intersect( Set(union( collect( values( Dolang.list_symbols(v) ))... )), Set(keys(defs)))
+        ij = Set(ii)
+        deps[k] = ij
+    end
+    deps
+end
+
+function reorder_triangular_block(defs::Associative{T,U}) where T where U
+    deps = get_dependencies(defs)
+    sol = Dolang.solve_dependencies(deps)
+    return OrderedDict((k,defs[k]) for k in sol)
+end
+
+"""Solves definitions blocks
+
+Keys are timed variables in canonical form (e.g. `(:v,0)`) at date t=0.
+Values are expressions, possibly referencing key variables at different dates.
+The system is recursively solved for the unknowns, by default the keys.
+"""
+function solve_definitions(defs::Associative{Tuple{Symbol, Int}, <:SymExpr}, unknowns=keys(defs))
+    # defs should map timed-vars to expressions.
+    defs = deepcopy(defs)
+    for (v,t) in collect(keys(defs))
+        # t should always be 0
+        @assert t==0
+        for shift in (-1,1)
+            defs[(v,shift)] = Dolang.time_shift(defs[(v,t)], shift)
+        end
+    end
+    deps = Dolang.get_dependencies(defs)
+    solution = Dolang.solve_dependencies(deps, unknowns)
+    reordered = OrderedDict()
+    for k in solution
+        reordered[k] = defs[k]
+    end
+    return reordered
 end

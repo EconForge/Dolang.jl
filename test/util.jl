@@ -97,3 +97,74 @@
 
 
 end  # @testset "util"
+
+
+@testset "triangular systems" begin
+
+    @testset "solve_dependencies" begin
+        system_ints = Dict{Int,Set{Int}}(
+            1=>Set([2,3,4]),
+            2=>Set([3,4]),
+            3=>Set([4]),
+            4=>Set([])
+        )
+        sol = Dolang.solve_dependencies(system_ints)
+        @test sol==[4,3,2,1]
+
+        system_syms = Dict{Any,Set{Any}}(
+            :d=>Set([(:a,0),:b,:c]),
+            :c=>Set([(:a,0),:b]),
+            :b=>Set([(:a,0)]),
+            (:a,0)=>Set([])
+        )
+        sol = Dolang.solve_dependencies(system_syms)
+        @test sol==[(:a,0),:b,:c,:d]
+
+        system_error = Dict{Any,Set{Any}}(
+            :d=>Set([(:a,0),:b,:c]),
+            :c=>Set([(:a,0),:b]),
+            :b=>Set([(:a,0)]),
+            (:a,0)=>Set([:d])
+        )
+        @test_throws Dolang.TriangularSystemException Dolang.solve_dependencies(system_error)
+    end
+
+    @testset "Reorder triangular block" begin
+        eqs = Dict(
+            (:k,0)=>:((1-delta)*k(-1)+i(-1)),
+            (:y,0)=>:(A(0)*k(-1)^theta),
+            (:A,0)=>:(rho*A(-1)+epsilon),
+        )
+        eqs_reordered = OrderedDict(
+            (:A, 0) => :(rho * A(-1) + epsilon),
+            (:y, 0) => :(A(0) * k(-1) ^ theta),
+            (:k, 0) => :((1 - delta) * k(-1) + i(-1))
+        )
+        @test eqs_reordered == Dolang.reorder_triangular_block(eqs)
+    end
+
+    @testset "Solve definitions" begin
+
+        defs = Dict(
+            (:V, 0)   => :(c ^ (1 - gamma) / (1 - gamma)),
+            (:c, 0)   => :(y(0) ^ theta - i(0)),
+            (:rho, 0) => :(c(0) / c(-1))
+        )
+        solved_defs = OrderedDict(
+            (:V, 0)   => :(c ^ (1 - gamma) / (1 - gamma)),
+            (:c, 0)   => :(y(0) ^ theta - i(0)),
+            (:c, -1)  => :(y(-1) ^ theta - i(-1)),
+            (:rho, 0) => :(c(0) / c(-1))
+        )
+        @test solved_defs == Dolang.solve_definitions(defs)
+
+        solved_defs_reduced = OrderedDict(
+            (:c, 1)   => :(y(1) ^ theta - i(1)),
+            (:c, 0)  => :(y(0) ^ theta - i(0)),
+            (:rho, 1) => :(c(1) / c(0))
+        )
+
+        @test solved_defs_reduced == Dolang.solve_definitions(defs, [(:rho,1)])
+
+    end
+end
