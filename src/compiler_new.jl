@@ -16,7 +16,7 @@ _sym_sarray(v::Matrix{Symbol}) = Expr(:call, :(SMatrix{$(size(v)...)}), v...)
 
 list_syms(eq::Expr) = get(list_symbols(eq), :parameters, Set{Symbol}())
 list_syms(eq::Symbol) = [eq]
-list_syms(eq::Number) = eq
+list_syms(eq::Number) = Symbol[]
 
 diff_symbol(k::Symbol, j::Symbol) = Symbol("∂", k, "_∂", j)
 

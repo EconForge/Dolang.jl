@@ -264,22 +264,23 @@ FunctionFactory
 ##########################
 
 # a FlatFunctionFactory object contains only what is needed
-# to compile functions. Right now, it is created from a FunctionFactory object.
+# to compile functions.
 # Everything is "normalized", i.e. no time-variables.
 #
 # "preamble" can contain variables needed to compute the "equations".
-# For now, preamble is always empty, as definitions are assumeed to have been
-# substituted when creating the function factory object.
 #
 # Here is an example:
 # Dolang.FlatFunctionFactory(
-#     Expr[:(log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))), :(_c__1_ + _u_ * _d__1_)], # equations
+#     DataStructures.OrderedDict(
+#         :_foo__0_=>:(log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))),
+#         :_foo__1_=>(_c__1_ + _u_ * _d__1_)
+#     ),  # equations
 #     DataStructures.OrderedDict( # arguments
 #         :x=>Symbol[:_a_m1_],
 #         :y=>Symbol[:_a__0_, :_b__0_, :_c__0_],
 #         :z=>Symbol[:_c__1_, :_d__1_],
 #         :p=>Symbol[:_u_]),
-#     Symbol[:_foo__0_, :_bar__0_], # outputs
+#     Symbol[:_foo__0_, :_bar__0_], # outputs (redundant)
 #     DataStructures.OrderedDict{Symbol,Expr}(), # preamble
 #     :myfun #function name
 # )
@@ -324,17 +325,16 @@ function FlatFunctionFactory(ff::FunctionFactory; eliminate_definitions=false)
     end
     arguments[:p] = [Dolang.normalize(p) for p in ff.params]
 
-    if length(ff.targets)==0
-        targets = [Symbol(string("outv_",i)) for i=1:length(ff.eqs)]
-    else
-        targets = ff.targets
-    end
-
     # we ignore definitions assuming they have already been substituted
     preamble = OrderedDict{Symbol, Expr}()
 
     if equations isa Vector
-        eqs = OrderedDict(Symbol("eq_",i)=>eq for (i,eq) in enumerate(equations))
+        if length(ff.targets)==0
+            targets = [Symbol(string("outv_",i)) for i=1:length(ff.eqs)]
+        else
+            targets = ff.targets
+        end
+        eqs = OrderedDict(targets[i]=>eq for (i,eq) in enumerate(equations))
     else
         eqs = equations
     end
