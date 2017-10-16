@@ -41,27 +41,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "symbolic.html#Dolang.time_shift-Tuple{Expr,Integer,Set{Symbol},Associative}",
-    "page": "Symbolic manipulation",
-    "title": "Dolang.time_shift",
-    "category": "Method",
-    "text": "time_shift(ex::Expr, shift::Integer,\n           functions::Set{Symbol}=Set{Symbol}(),\n           defs::Associative=Dict())\n\nRecursively apply a time_shift to ex according to the following rules based on the form of ex (list below has the form \"contents of ex: return expr\"):\n\nvar(n::Integer): time_shift(var, args, shift + n, defs)\nf(other...): if f is in functions or is a known dolang funciton (see Dolang.DOLANG_FUNCTIONS) return f(map(i -> time_shift(i, args, shift, defs), other)), otherwise error\nAny other Expr: Return an Expr with the same head, with time_shift applied on each of ex.args\n\n\n\n"
-},
-
-{
-    "location": "symbolic.html#Dolang.time_shift-Tuple{Expr,Integer}",
-    "page": "Symbolic manipulation",
-    "title": "Dolang.time_shift",
-    "category": "Method",
-    "text": "time_shift(ex::Expr, shift::Int=0;\n           functions::Union{Set{Symbol},Vector{Symbol}}=Vector{Symbol}(),\n           defs::Associative=Dict())\n\nVersion of time_shift where functions and defs are keyword arguments with default values.\n\n\n\n"
-},
-
-{
     "location": "symbolic.html#Dolang.time_shift-Tuple{Symbol,Integer,Set{Symbol},Associative}",
     "page": "Symbolic manipulation",
     "title": "Dolang.time_shift",
     "category": "Method",
-    "text": "time_shift(s::Symbol, shift::Integer,\n           functions::Set{Symbol}=Set{Symbol}(),\n           defs::Associative=Dict())\n\nIf s is in defs, then return the shifted version of the definition\n\nOtherwise return s\n\n\n\n"
+    "text": "time_shift(x::Number, other...)\n\nReturn x for all values of other\n\n\n\n"
 },
 
 {
@@ -78,30 +62,6 @@ var documenterSearchIndex = {"docs": [
     "title": "time_shift",
     "category": "section",
     "text": "time_shift shifts an expression by a specified number of time periods. As with normalize, there are many methods for this function, which will will describe one at a time.time_shift(::Expr, ::Integer, ::Set{Symbol}, ::Associative)\ntime_shift(::Expr, ::Integer)Examplesjulia> defs = Dict(:a=>:(b(-1)/c));\n\njulia> defs2 = Dict(:a=>:(b(-1)/c(0)));\n\njulia> funcs = [:foobar];\n\njulia> shift = 1;\n\njulia> time_shift(:(a+b(1) + c), shift)\n:(a + b(2) + c)\n\njulia> time_shift(:(a+b(1) + c(0)), shift)\n:(a + b(2) + c(1))\n\njulia> time_shift(:(a+b(1) + c), shift, defs=defs)\n:(b(0) / c + b(2) + c)\n\njulia> time_shift(:(a+b(1) + c(0)), shift, defs=defs)\n:(b(0) / c + b(2) + c(1))\n\njulia> time_shift(:(a+b(1) + c(0)), shift, defs=defs2)\n:(b(0) / c(1) + b(2) + c(1))\n\njulia> time_shift(:(a+b(1) + foobar(c)), shift, functions=funcs)\n:(a + b(2) + foobar(c))\n\njulia> time_shift(:(a+b(1) + foobar(c)), shift, defs=defs, functions=funcs)\n:(b(0) / c + b(2) + foobar(c))\n\njulia> shift = -1;\n\njulia> time_shift(:(a+b(1) + c), shift)\n:(a + b(0) + c)\n\njulia> time_shift(:(a+b(1) + c(0)), shift)\n:(a + b(0) + c(-1))\n\njulia> time_shift(:(a+b(1) + c), shift, defs=defs)\n:(b(-2) / c + b(0) + c)\n\njulia> time_shift(:(a+b(1) + c(0)), shift, defs=defs)\n:(b(-2) / c + b(0) + c(-1))\n\njulia> time_shift(:(a+b(1) + c(0)), shift, defs=defs2)\n:(b(-2) / c(-1) + b(0) + c(-1))\n\njulia> time_shift(:(a+b(1) + foobar(c)), shift, functions=funcs)\n:(a + b(0) + foobar(c))\n\njulia> time_shift(:(a+b(1) + foobar(c)), shift, defs=defs, functions=funcs)\n:(b(-2) / c + b(0) + foobar(c))time_shift(::Symbol, ::Integer, ::Set{Symbol}, ::Associative)Examplesjulia> defs = Dict(:a=>:(b(-1)/c));\n\njulia> defs2 = Dict(:a=>:(b(-1)/c(0)));\n\njulia> shift = 1;\n\njulia> funcs = Set([:foobar]);\n\njulia> time_shift(:a, shift, funcs, Dict())\n:a\n\njulia> time_shift(:a, shift, funcs, defs)\n:(b(0) / c)\n\njulia> time_shift(:a, shift, funcs, defs2)\n:(b(0) / c(1))\n\njulia> time_shift(:b, shift, funcs, defs)\n:b\n\njulia> shift = -1;\n\njulia> time_shift(:a, shift, funcs, Dict())\n:a\n\njulia> time_shift(:a, shift, funcs, defs)\n:(b(-2) / c)\n\njulia> time_shift(:a, shift, funcs, defs2)\n:(b(-2) / c(-1))\n\njulia> time_shift(:b, shift, funcs, defs)\n:btime_shift(::Number)Examplesjulia> time_shift(1)\n1\n\njulia> time_shift(2)\n2\n\njulia> time_shift(-1)\n-1\n\njulia> time_shift(-2)\n-2"
-},
-
-{
-    "location": "symbolic.html#Dolang.steady_state-Tuple{Symbol,Set{Symbol},Associative}",
-    "page": "Symbolic manipulation",
-    "title": "Dolang.steady_state",
-    "category": "Method",
-    "text": "steady_state(s, functions::Set{Symbol}, defs::Associative)\n\nIf s is not a key in defs, return the steady state version of the  s (essentially s(0)).\n\nOtherwise, return steady_state(defs[s], functions, defs)\n\n\n\n"
-},
-
-{
-    "location": "symbolic.html#Dolang.steady_state-Tuple{Expr,Set{Symbol},Associative}",
-    "page": "Symbolic manipulation",
-    "title": "Dolang.steady_state",
-    "category": "Method",
-    "text": "steady_state(ex::Expr, functions::Set{Symbol}, defs::Associative)\n\nReturn the steady state version of ex, where all symbols in args always appear at time 0\n\n\n\n"
-},
-
-{
-    "location": "symbolic.html#Dolang.steady_state-Tuple{Expr}",
-    "page": "Symbolic manipulation",
-    "title": "Dolang.steady_state",
-    "category": "Method",
-    "text": "steady_state(ex::Expr;\n             functions::Vector{Symbol}=Vector{Symbol}(),\n             defs::Associative=Dict())\n\nVersion of steady_state where functions and defs are keyword arguments with default values\n\n\n\n"
 },
 
 {
@@ -173,7 +133,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Symbolic manipulation",
     "title": "Dolang.subs",
     "category": "Method",
-    "text": "subs(ex::Union{Expr,Symbol,Number}, from, to::Union{Symbol,Expr,Number}, funcs::Set{Symbol})\n\nApply a substituion where all occurances of from in ex are replaced by to.\n\nNote that to replace something like x(1) from must be the canonical form for that expression: (:x, 1)\n\n\n\n"
+    "text": "subs(ex::Union{Expr,Symbol,Number}, from, to::Union{Symbol,Expr,Number}, funcs::Set{Symbol})\n\nApply a substitution where all occurances of from in ex are replaced by to.\n\nNote that to replace something like x(1) from must be the canonical form for that expression: (:x, 1)\n\n\n\n"
 },
 
 {
@@ -181,7 +141,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Symbolic manipulation",
     "title": "Dolang.subs",
     "category": "Method",
-    "text": "subs(ex::Union{Expr,Symbol,Number}, d::Associative,\n     variables::Set{Symbol},\n     funcs::Set{Symbol})\n\nApply substituions to ex so that all keys in d are replaced by their values\n\nNote that the keys of d should be the canonical form of variables you wish to substitute. For example, to replace x(1) with b/c you need to have the entry (:x, 1) => :(b/c) in d.\n\nThe one exception to this rule is that a key :k is treated the same as (:k, 0).\n\n\n\n"
+    "text": "subs(ex::Union{Expr,Symbol,Number}, d::Associative,\n     variables::Set{Symbol},\n     funcs::Set{Symbol})\n\nApply substitutions to ex so that all keys in d are replaced by their values\n\nNote that the keys of d should be the canonical form of variables you wish to substitute. For example, to replace x(1) with b/c you need to have the entry (:x, 1) => :(b/c) in d.\n\n\n\n"
 },
 
 {
@@ -189,7 +149,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Symbolic manipulation",
     "title": "Dolang.subs",
     "category": "Method",
-    "text": "subs(ex::Union{Expr,Symbol,Number}, d::Associative;\n     variables::Set{Symbol},\n     functions::Set{Symbol})\n\nVerison of subs where variables and functions are keyword arguments with default values\n\n\n\n"
+    "text": "subs(ex::Union{Expr,Symbol,Number}, d::Associative,\n     variables::Set{Symbol},\n     funcs::Set{Symbol})\n\nApply substitutions to ex so that all keys in d are replaced by their values\n\nNote that the keys of d should be the canonical form of variables you wish to substitute. For example, to replace x(1) with b/c you need to have the entry (:x, 1) => :(b/c) in d.\n\n\n\n"
 },
 
 {
@@ -198,22 +158,6 @@ var documenterSearchIndex = {"docs": [
     "title": "subs",
     "category": "section",
     "text": "subs will replace a symbol or expression with a different value, where the value has type Union{Symbol,Expr,Number}The first method of this function is very specific, and matches only a particular pattern:subs(::Union{Expr,Symbol,Number}, from, ::Union{Symbol,Expr,Number}, ::Set{Symbol})Examplesjulia> subs(:(a + b(1) + c), :a, :(b(-1)/c + d), Set{Symbol}())\n:((b(-1) / c + d) + b(1) + c)\n\njulia> subs(:(a + b(1) + c), :d, :(b(-1)/c + d), Set{Symbol}())\n:(a + b(1) + c)subs(::Expr, ::Associative, ::Set{Symbol})\nsubs(::Expr, ::Associative)Examplesjulia> ex = :(a + b);\n\njulia> d = Dict(:b => :(c/a), :c => :(2a));\n\njulia> subs(ex, d)  # subs is not recursive -- c is not replaced\n:(a + c / a)"
-},
-
-{
-    "location": "symbolic.html#Dolang.csubs-Tuple{Expr,Associative,Set{Symbol}}",
-    "page": "Symbolic manipulation",
-    "title": "Dolang.csubs",
-    "category": "Method",
-    "text": "csubs(ex::Union{Symbol,Expr,Number}, d::Associative,\n      variables::Set{Symbol}=Set{Symbol}(),\n      funcs::Set{Symbol}=Set{Symbol}())\n\nRecursively apply substitutions to ex such that all items that are a key in d are replaced by their associated values. Different from subs(x, d) in that definitions in d are allowed to depend on one another and will all be fully resolved here.\n\nExample\n\nex = :(a + b)\nd = Dict(:b => :(c/a), :c => :(2a))\nsubs(ex, d)  # returns :(a + c / a)\ncsubs(ex, d)  # returns :(a + (2a) / a)\n\n\n\n"
-},
-
-{
-    "location": "symbolic.html#Dolang.csubs-Tuple{Expr,Associative}",
-    "page": "Symbolic manipulation",
-    "title": "Dolang.csubs",
-    "category": "Method",
-    "text": "csubs(ex::Union{Symbol,Expr,Number}, d::Associative;\n      functions::Union{Vector{Symbol},Set{Symbol}}=Set{Symbol}())\n\nVerison of csubs where variables and functions are keyword arguments.\n\n\n\n"
 },
 
 {
