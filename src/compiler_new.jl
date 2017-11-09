@@ -49,7 +49,11 @@ function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
                         deq = Dolang.deriv(eq, k)
                         diff_eqs[dv] = deq
                     end
-                    diff_eqs[cdv] = :($dv*$ddv)
+                    if cdv in keys(diff_eqs)
+                        diff_eqs[cdv] = :($(diff_eqs[cdv])+$dv*$ddv)
+                    else
+                        diff_eqs[cdv] = :($dv*$ddv)
+                    end
                 end
             end
         end
