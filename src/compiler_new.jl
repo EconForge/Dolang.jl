@@ -128,7 +128,8 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
     all_eqs = cat(1, values(fff.preamble)..., equations)
     all_args = cat(1, values(fff.arguments)...)
     jac_args = cat(1, [collect(values(fff.arguments))[i] for i in diff if i!=0]...)
-    jac_args = Symbol.(jac_args)
+    # jac_args = Symbol.(jac_args) # strange type of output can by Any[]
+    jac_args = Symbol[Symbol(e) for e in jac_args]
 
     # concatenate preamble and equations (doesn't make much sense...)
     dd = OrderedDict()
