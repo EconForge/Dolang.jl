@@ -347,7 +347,12 @@ function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname, disp
 
         @generated function $funname($(dispatch_arg...), orders::Union{Val,Type{<:Val}}, $(args...), out=nothing)
             fff = $(fff) # this is amazing !
-            oorders = collect(Dolang._get_nums(orders)) # convert into tuples
+            _oorders = collect(Dolang._get_nums(orders)) # convert into tuples
+            if length(_oorders) == 1
+                oorders = reshape(_oorders, 1)
+            else
+                oorders = _oorders
+            end
             code = Dolang.gen_gufun(fff, oorders)
             code.args[2].args[2]
         end
