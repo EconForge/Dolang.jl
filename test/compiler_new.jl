@@ -147,6 +147,7 @@ p_mat = Dolang.from_SA(p_vec)
 
         @test isa(@inferred(gengufun(Val{0}, x, y, z, p)), SVector{2,Float64})
         @test isa(@inferred(gengufun(Val{1}, x, y, z, p)), StaticArrays.SArray{Tuple{2,1},Float64,2,2})
+        @test isa(@inferred(gengufun(Val{(1,)}, x, y, z, p)), Tuple{StaticArrays.SArray{Tuple{2,1},Float64,2,2}})
 
     end
 
