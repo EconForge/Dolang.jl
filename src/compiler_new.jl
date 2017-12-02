@@ -210,7 +210,7 @@ If at least one of the arguments is a list of points, the result is a list of
 points (or a tuple mad of lists of points). In this case preallocated
 structures can be passed as `out`.
 """
-function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Vector{Int}, Int};
+function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
     funname=fff.funname)
 
     if to_diff isa Int
@@ -311,6 +311,9 @@ end
 
 _get_nums(::Union{Val{n}, Type{Val{n}}, Type{Type{Val{n}}}}) where n = n
 _get_nums(t::Type{<:Tuple}) = [_get_nums(i) for i in getfield(t, 3)]
+_get_oorders(x::Array{Int,0}) = x[1]
+_get_oorders(x::Union{Tuple,<:Array{Int}}) = x
+
 
 function gen_generated_kernel(fff::FlatFunctionFactory)
 
@@ -347,7 +350,7 @@ function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname, disp
 
         @generated function $funname($(dispatch_arg...), orders::Union{Val,Type{<:Val}}, $(args...), out=nothing)
             fff = $(fff) # this is amazing !
-            oorders = collect(Dolang._get_nums(orders)) # convert into tuples
+            oorders = _get_oorders(collect(Dolang._get_nums(orders)))
             code = Dolang.gen_gufun(fff, oorders)
             code.args[2].args[2]
         end
