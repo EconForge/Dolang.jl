@@ -11,14 +11,14 @@ def stringify_variable(arg: Tuple[str, int]) -> str:
     s = arg[0]
     date = arg[1]
     if date == 0:
-        return '{}__'.format(s)
+        return '{}__0_'.format(s)
     elif date <= 0:
-        return '{}__m{}_'.format(s, str(-date))
+        return '{}_m{}_'.format(s, str(-date))
     elif date >= 0:
         return '{}__{}_'.format(s, str(date))
 
 def stringify_parameter(p: str) -> str:
-    return '{}'.format(p)
+    return '_{}_'.format(p)
 
 def stringify(arg) -> str:
     if isinstance(arg, str):
@@ -113,13 +113,17 @@ class ExpressionNormalizer(NodeTransformer):
 
     # replaces calls to variables by time subscripts
 
-    def __init__(self, variables=None, functions=None):
+    def __init__(self, variables=None, functions=None, constants=None):
 
         self.variables = variables if variables is not None else []
         if functions is None:
             self.functions = [e for e in functions_dict.keys()]
         else:
             self.functions = functions
+        if constants is None:
+            self.constants = ['pi','e','inf']
+        else:
+            self.constants = constants
         # self.variables = tvariables # ???
 
     def visit_Name(self, node):
@@ -127,7 +131,9 @@ class ExpressionNormalizer(NodeTransformer):
         name = node.id
         # if name self.functions:
         #     return node
-        if name in self.variables:
+        if name in self.constants:
+            return node
+        elif name in self.variables:
             return Name(id=stringify_variable((name,0)), ctx=Load())
         else:
             return Name(id=stringify_parameter(name), ctx=Load())
