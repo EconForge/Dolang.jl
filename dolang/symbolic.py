@@ -28,7 +28,10 @@ def stringify(arg) -> str:
             return stringify_variable(arg)
     raise Exception("Unknown canonical form: {}".format(arg))
 
-###
+# normalize_symbol = stringify_parameter
+normalize_variable = stringify_variable
+normalize = stringify
+
 
 def destringify_variable(s: str) -> Tuple[str, int]:
     raise Exception("Not implemented.")
