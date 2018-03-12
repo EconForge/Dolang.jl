@@ -89,38 +89,3 @@ def get_symbolic_derivatives(fff:FlatFunctionFactory, max_order=1):
 
 
 
-# should be in symbolic.py
-class ExpressionSanitizer(NodeTransformer):
-
-    # replaces calls to variables by time subscripts
-    def __init__(self, variables=None):
-        self.variables = variables if variables is not None else []
-
-    def visit_Name(self, node):
-        name = node.id
-        if name in self.variables:
-            return ast.parse('{}(0)'.format(name)).body[0].value
-        else:
-            return node
-
-    def visit_Call(self, node):
-        name = node.func.id
-        if name in self.variables:
-            return node
-        else:
-            return Call(func=node.func, args=[self.visit(e) for e in node.args], keywords=[])
-
-
-from ast import Expr
-
-class SubsTransformer(ast.NodeTransformer):
-
-    def __init__(self, substitutions: Dict[str,Expr]):
-        self.substitutions = substitutions
-
-    def visit_Name(self, node):
-        name = node.id
-        if name in self.substitutions:
-            return self.substitutions[name]
-        else:
-            return node

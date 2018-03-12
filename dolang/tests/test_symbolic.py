@@ -27,13 +27,23 @@ def test_list_variables():
     assert(list_variables(e) == [('a', 1), ('f', 1), ('f', 4)])
     assert(list_variables(e, funs=['f']) == [('a', 1)])
 
+
+def test_sanitize():
+    from dolang.parser import parse_string
+    e = parse_string('sin(a(1)+b+a+f(-1)+f(+4)+a(1))')
+    to_source(e)
+    enes = dolang.symbolic.sanitize(e, variables=['a','f'])
+    print(to_source(enes))
+    assert( to_source(enes) == "sin(a__1_ + b_ + a__0_ + f_m1_ + f__4_ + a__1_)" )
+
+
 def test_normalize():
     from dolang.parser import parse_string
     e = parse_string('sin(a(1)+b+a+f(-1)+f(+4)+a(1))')
     to_source(e)
     enes = normalize(e, variables=['a','f'])
     print(to_source(enes))
-    assert( to_source(enes) == "sin(a__1_ + b_ + a__ + f__m1_ + f__4_ + a__1_)" )
+    assert( to_source(enes) == "sin(a__1_ + b_ + a__0_ + f_m1_ + f__4_ + a__1_)" )
 
 
 #

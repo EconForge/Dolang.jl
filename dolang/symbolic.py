@@ -3,7 +3,7 @@ Expression = ast.Expr
 
 from dolang.language import functions as functions_dict
 functions = list(functions_dict.keys())
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 
 # from dolang.parser import parse_string
 
@@ -18,7 +18,7 @@ def stringify_variable(arg: Tuple[str, int]) -> str:
         return '{}__{}_'.format(s, str(date))
 
 def stringify_parameter(p: str) -> str:
-    return '_{}_'.format(p)
+    return '{}_'.format(p)
 
 def stringify(arg) -> str:
     if isinstance(arg, str):
@@ -62,6 +62,10 @@ def steady_state(expr: Expression, vars: List[str] = []) -> Expression:
     eexpr = copy.deepcopy(expr)
     return TimeShiftTransformer(shift='S', variables=vars).visit(eexpr)
 
+def sanitize(expr:Expression, variables=None, functions=None):
+    # special functions ?
+    es = ExpressionSanitizer(variables=variables)
+    return es.visit(expr)
 
 # list variables
 # list_variables(:(a+b(1)+c), [:b,:c,:d]) == [(:b,1),(:c,0)]
@@ -260,3 +264,43 @@ class ListSymbols(ast.NodeVisitor):
             self.problems.append([name, colno, 'function_not_called'])
         else:
             self.constants.append((name, colno))
+
+
+# should be in symbolic.py
+class ExpressionSanitizer(NodeTransformer):
+
+    # replaces calls to variables by time subscripts
+    def __init__(self, variables=None):
+        self.variables = variables if variables is not None else []
+
+    def visit_Name(self, node):
+        name = node.id
+        if name in self.variables:
+            return ast.parse('{}(0)'.format(name)).body[0].value
+        else:
+            return node
+
+    def visit_Call(self, node):
+        name = node.func.id
+        if name in self.variables:
+            return node
+        else:
+            return Call(func=node.func, args=[self.visit(e) for e in node.args], keywords=[])
+
+
+
+
+
+
+
+class SubsTransformer(ast.NodeTransformer):
+
+    def __init__(self, substitutions: Dict[str,Expr]):
+        self.substitutions = substitutions
+
+    def visit_Name(self, node):
+        name = node.id
+        if name in self.substitutions:
+            return self.substitutions[name]
+        else:
+            return node
