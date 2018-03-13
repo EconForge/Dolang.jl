@@ -1,11 +1,21 @@
+from dolang.language import functions as functions_dict
+from dolang.parser import parse_string
+from dolang.codegen import to_source
+
 import ast
+from ast import Expr
 Expression = ast.Expr
 
-from dolang.language import functions as functions_dict
 functions = list(functions_dict.keys())
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Set, TypeVar, Union
 
 # from dolang.parser import parse_string
+T = TypeVar('T')
+
+
+def dedup(l: List[T])->List[T]:
+    return list(dict.fromkeys(l))
+
 
 def stringify_variable(arg: Tuple[str, int]) -> str:
     s = arg[0]
@@ -17,8 +27,10 @@ def stringify_variable(arg: Tuple[str, int]) -> str:
     elif date >= 0:
         return '{}__{}_'.format(s, str(date))
 
+
 def stringify_parameter(p: str) -> str:
     return '{}_'.format(p)
+
 
 def stringify(arg) -> str:
     if isinstance(arg, str):
@@ -43,6 +55,23 @@ def destringify(s: str):
     raise Exception("Not implemented.")
 
 ###
+### The following function cat take a string or an expression as the first argument, and return an argument of the same type.
+###
+
+from functools import wraps
+
+def expression_or_string(f):
+    @wraps(f)
+    def wrapper(*args, **kwds):
+        if not isinstance(args[0], str):
+            return f(*args, **kwds)
+        else:
+            a = parse_string(args[0])
+            nargs = tuple([a]) + args[1:]
+            res = f(*nargs, **kwds)
+            print(res)
+            return to_source(res)
+    return wrapper
 
 def normalize(expr: Expression, variables: List[str] = [])->Expression:
     import copy
@@ -62,6 +91,7 @@ def steady_state(expr: Expression, vars: List[str] = []) -> Expression:
     eexpr = copy.deepcopy(expr)
     return TimeShiftTransformer(shift='S', variables=vars).visit(eexpr)
 
+@expression_or_string
 def sanitize(expr:Expression, variables=None, functions=None):
     # special functions ?
     es = ExpressionSanitizer(variables=variables)
@@ -72,36 +102,40 @@ def sanitize(expr:Expression, variables=None, functions=None):
 #
 
 
-def list_variables(expr: Expression, funs: List[str]=None, vars: List[str]=None) -> List[Tuple[str,int]]:
+def list_variables(expr: Expression, funs: List[str]=None) -> List[Tuple[str,int]]:
 
     if funs is None: funs=[]
-    if vars is None: vars=[]
-    l = ListSymbols(known_functions=functions+funs, known_variables=vars)
-    l.visit(expr)
-    if l.problems:
+    ll = ListSymbols(known_functions=functions+funs)
+    ll.visit(expr)
+    if ll.problems:
         e = Exception('Symbolic error.')
-        e.problems = l.problems
+        e.problems = ll.problems
         raise e
-    return [v[0] for v in l.variables]
+    return dedup([v[0] for v in ll.variables])
 
-def list_symbols(expr: Expression, funs: List[str]=None, vars: List[str]=None) -> List[Tuple[str,int]]:
+def list_symbols(expr: Expression, funs: List[str]=None) -> List[Tuple[str,int]]:
     if funs is None: funs=[]
-    l = ListSymbols(known_functions=functions+funs, known_variables=vars)
-    l.visit(expr)
-    if l.problems:
+    ll = ListSymbols(known_functions=functions+funs)
+    ll.visit(expr)
+    if ll.problems:
         e = Exception('Symbolic error.')
-        e.problems = l.problems
+        e.problems = ll.problems
+        print(e.problems)
         raise e
     head = lambda v: [i[0] for i in v]
-    d = {
-        'variables': head(l.variables),
-        'constants': head(l.constants),
-        'functions': head(l.functions)
-    }
-    return d
+    return SymbolList(
+        dedup(head(ll.variables)),
+        dedup(head(ll.constants)),
+        dedup(head(ll.functions))
+    )
 
+from dataclasses import dataclass
 
-
+@dataclass
+class SymbolList(dict):
+    variables: Set[Tuple[str, int]]
+    parameters: Set[str]
+    functions: Set[str]
 
 # substitute expression
 # subs(:(a + b), :b, :(c+d(1)) == :(a+c+d(1))
@@ -110,7 +144,6 @@ def list_symbols(expr: Expression, funs: List[str]=None, vars: List[str]=None) -
 
 
 
-from dolang.language import functions as functions_dict
 
 
 
@@ -211,7 +244,7 @@ class TimeShiftTransformer(ast.NodeTransformer):
             return Call(func=node.func, args=[self.visit(e) for e in node.args], keywords=[])
 
 
-def eval_scalar(tree):
+def eval_scalar(tree: Expression)->Union[int, float]:
     try:
         if isinstance(tree, ast.Num):
             return tree.n
@@ -246,11 +279,8 @@ class ListSymbols(ast.NodeVisitor):
                 assert(len(call.args) == 1)
                 n = int(eval_scalar(call.args[0]))
                 self.variables.append(((name, n), colno))
-            except:
-                if name in self.known_variables + [vv[0][0] for vv in self.variables]:
-                    self.problems.append([name, 0, colno, 'incorrect subscript'])
-                else:
-                    self.problems.append([name, 0, colno, 'unknown_function'])
+            except Exception as e:
+                self.problems.append([name, 0, colno, 'incorrect subscript'])
                 # [self.visit(e) for e in call.args]
 
     def visit_Name(self, name):
@@ -258,15 +288,12 @@ class ListSymbols(ast.NodeVisitor):
         colno = name.col_offset
         n = 0
         name = name.id
-        if name in self.known_variables:
-            self.variables.append(((name, 0), colno))
-        elif name in self.known_functions:
+        if name in  self.known_functions:
             self.problems.append([name, colno, 'function_not_called'])
         else:
             self.constants.append((name, colno))
 
 
-# should be in symbolic.py
 class ExpressionSanitizer(NodeTransformer):
 
     # replaces calls to variables by time subscripts
@@ -283,18 +310,15 @@ class ExpressionSanitizer(NodeTransformer):
     def visit_Call(self, node):
         name = node.func.id
         if name in self.variables:
-            return node
+            t = eval_scalar(node.args[0])
+            return ast.parse('{}({})'.format(name,t)).body[0].value
         else:
             return Call(func=node.func, args=[self.visit(e) for e in node.args], keywords=[])
 
 
+class NameSubstituter(ast.NodeTransformer):
 
-
-
-
-
-class SubsTransformer(ast.NodeTransformer):
-
+    # substitutes a name by an expression
     def __init__(self, substitutions: Dict[str,Expr]):
         self.substitutions = substitutions
 
