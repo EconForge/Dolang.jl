@@ -2,7 +2,11 @@ import numpy
 import ast
 from dolang.symbolic import stringify
 from dolang.symbolic import stringify_variable
-
+from ast import Assign, arg, FunctionDef, Module, Store
+from ast import arguments as ast_arguments
+from ast import Subscript, Name, Load, Index, Num
+from dolang.factory import FlatFunctionFactory
+from dolang import parse_string
 ################################
 
 from .symbolic import eval_scalar
@@ -384,123 +388,97 @@ def compile_function_ast(equations, symbols, arg_names, output_names=None, funna
 from dolang.symbolic import list_variables
 from dolang.symbolic import time_shift
 
-def make_method(equations, arguments, constants, targets=None, rhs_only=False, definitions={}, funname='anonymous'):
 
-    compat = lambda s: s.replace("^", "**").replace('==','=').replace('=','==')
-    equations = [compat(eq) for eq in equations]
+def compile_factory(fff: FlatFunctionFactory):
 
-    if isinstance(arguments, list):
-        arguments = OrderedDict( [('arg_{}'.format(i),k) for i, k in enumerate(arguments)])
-
-    ## replace = by ==
-    known_variables = [a[0] for a in sum(arguments.values(), [])]
-    known_definitions = [a for a in definitions.keys()]
-    known_constants = [a[0] for a in constants]
-    all_variables = known_variables + known_definitions
-    known_functions = []
-    known_constants = []
-
-    if targets is not None:
-        all_variables.extend([o[0] for o in targets])
-        targets = [stringify(o) for o in targets]
-    else:
-        targets = ['_out_{}'.format(n) for n in range(len(equations))]
-
-    all_symbols = all_variables # + known_constants
-
-    equations = [parse(eq) for eq in equations]
-    definitions = {k: parse(v) for k, v in definitions.items()}
-
-    defs_incidence = {}
-    for sym, val in definitions.items():
-        lvars = list_variables(val)
-        defs_incidence[(sym, 0)] = [v for v in lvars if v[0] in known_definitions]
-    # return defs_incidence
-
-    equations_incidence = {}
-    to_be_defined = set([])
-    for i, eq in enumerate(equations):
-        cn = CountNames(all_variables, known_functions, known_constants)
-        cn.visit(eq)
-        equations_incidence[i] = cn.variables
-        to_be_defined = to_be_defined.union([a for a in cn.variables if a[0] in known_definitions])
-
-    deps = []
-    for tv in to_be_defined:
-        ndeps = get_deps(defs_incidence, tv)
-        deps.extend(ndeps)
-    deps = [d for d in unique(deps)]
-
-    new_definitions = dict()
-    for k in deps:
-        val = definitions[k[0]]
-        nval = time_shift(val, k[1])
-        new_definitions[stringify_variable(k)] = stringify(nval)
-
-    new_equations = []
-
-    for n,eq in enumerate(equations):
-        d = match(parse("_x == _y"), eq)
-        if d is not False:
-            lhs = d['_x']
-            rhs = d['_y']
-            if rhs_only:
-                val = rhs
-            else:
-                val = ast.BinOp(left=rhs, op=Sub(), right=lhs)
-        else:
-            val = eq
-        new_equations.append(stringify(val, variables=all_symbols))
+    arguments = [*fff.arguments.keys()]
+    funname = fff.funname
+    outnames = [*fff.content.keys()]
 
 
+    unpacking = []
+    for i,(arg_group_name,arg_group) in enumerate(fff.arguments.items()):
+        for pos,sym in enumerate(arg_group):
 
-    # preambleIndex(Num(x))
-    preamble = []
-    for i,(arg_group_name,arg_group) in enumerate(arguments.items()):
-        for pos,t in enumerate(arg_group):
-            sym = stringify_variable(t)
             rhs = Subscript(value=Name(id=arg_group_name, ctx=Load()), slice=Index(Num(pos)), ctx=Load())
             val = Assign(targets=[Name(id=sym, ctx=Store())], value=rhs)
-            preamble.append(val)
+            unpacking.append(val)
+    #
+    # for pos,p in enumerate(constants):
+    #     sym = stringify(p)
+    #     rhs = Subscript(value=Name(id='p', ctx=Load()), slice=Index(Num(pos)), ctx=Load())
+    #     val = Assign(targets=[Name(id=sym, ctx=Store())], value=rhs)
+    #     preamble.append(val)
 
-    for pos,p in enumerate(constants):
-        sym = stringify(p)
-        rhs = Subscript(value=Name(id='p', ctx=Load()), slice=Index(Num(pos)), ctx=Load())
-        val = Assign(targets=[Name(id=sym, ctx=Store())], value=rhs)
-        preamble.append(val)
 
-
-
-    # now construct the function per se
     body = []
-    for k,v in  new_definitions.items():
-        line = Assign(targets=[Name(id=k, ctx=Store())], value=v)
+
+    for (k,neq) in fff.preamble.items():
+        val = parse_string(neq).value
+        line = Assign(targets=[Name(id=k, ctx=Store())], value=val)
         body.append(line)
 
-    for n, neq in enumerate(new_equations):
-        line = Assign(targets=[Name(id=targets[n], ctx=Store())], value=new_equations[n])
+    for n, (k,neq) in enumerate(fff.content.items()):
+        val = parse_string(neq).value # should the result of parse_string always of type Expr ?
+        line = Assign(targets=[Name(id=k, ctx=Store())], value=val)
         body.append(line)
-
-    for n, neq in enumerate(new_equations):
+    #
+    for n, (lhs, neq) in enumerate(fff.content.items()):
         line = Assign(targets=[Subscript(value=Name(id='out', ctx=Load()),
-                                         slice=Index(Num(n)), ctx=Store())], value=Name(id=targets[n], ctx=Load()))
+                                         slice=Index(Num(n)), ctx=Store())], value=Name(id=lhs, ctx=Load()))
         body.append(line)
-
-
-    from ast import arg, FunctionDef, Module
-    from ast import arguments as ast_arguments
 
 
     f = FunctionDef(name=funname,
-                args=ast_arguments(args=[arg(arg=a) for a in arguments.keys()]+[arg(arg='p'),arg(arg='out')],
+                args=ast_arguments(args=[arg(arg=a) for a in arguments]+[arg(arg='out')],
                 vararg=None, kwarg=None, kwonlyargs=[], kw_defaults=[], defaults=[]),
-                body=preamble + body, decorator_list=[])
+                body=unpacking+body, decorator_list=[])
 
     mod = Module(body=[f])
     mod = ast.fix_missing_locations(mod)
     return mod
 
 
+def make_method_from_factory(fff:FlatFunctionFactory, vectorize=True, use_file=False):
+
+    mod = compile_factory(fff)
+
+    # from .codegen import to_source
+    # import dolo.config
+    # if dolo.config.debug:
+    #     print(to_source(mod))
+    from .codegen import to_source
+
+    if vectorize:
+        coredims = [len(v) for k,v in fff.arguments.items()]
+        signature = str.join(',', ['(n_{})'.format(d) for d in coredims])
+        n_out = len(fff.content)
+        if n_out in coredims:
+            signature += '->(n_{})'.format(n_out)
+            # ftylist = float64[:](*([float64[:]] * len(coredims)))
+            fty = "void(*[float64[:]]*{})".format(len(coredims)+1)
+        else:
+            signature += ',(n_{})'.format(n_out)
+            fty = "void(*[float64[:]]*{})".format(len(coredims)+1)
+        ftylist = [fty]
+    else:
+        signature=None
+        ftylist=None
+
+    if use_file:
+        fun = eval_ast_with_file(mod, print_code=True)
+    else:
+        fun = eval_ast(mod)
+
+    from numba import jit, guvectorize
+
+    jitted = jit(fun, nopython=True)
+    if vectorize:
+        gufun = guvectorize([fty], signature, target='parallel', nopython=True)(fun)
+        return jitted, gufun
+    else:
+        return jitted
+    return [f,None]
 
 def eval_ast(mod):
 
