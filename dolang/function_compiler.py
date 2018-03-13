@@ -1,6 +1,6 @@
 import numpy
 import ast
-from dolang.symbolic import stringify, normalize
+from dolang.symbolic import stringify
 
 ################################
 

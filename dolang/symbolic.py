@@ -32,17 +32,13 @@ def stringify_parameter(p: str) -> str:
     return '{}_'.format(p)
 
 
-def stringify(arg) -> str:
+def stringify_symbol(arg) -> str:
     if isinstance(arg, str):
         return stringify_parameter(arg)
     elif isinstance(arg, tuple):
         if len(arg)==2 and isinstance(arg[0],str) and isinstance(arg[1],int):
             return stringify_variable(arg)
     raise Exception("Unknown canonical form: {}".format(arg))
-
-# normalize_symbol = stringify_parameter
-normalize_variable = stringify_variable
-normalize = stringify
 
 
 def destringify_variable(s: str) -> Tuple[str, int]:
@@ -69,37 +65,36 @@ def expression_or_string(f):
             a = parse_string(args[0])
             nargs = tuple([a]) + args[1:]
             res = f(*nargs, **kwds)
-            print(res)
             return to_source(res)
     return wrapper
 
-def normalize(expr: Expression, variables: List[str] = [])->Expression:
+@expression_or_string
+def stringify(expr: Expression, variables: List[str] = [])->Expression:
     import copy
-    en = ExpressionNormalizer(variables=variables)
+    en = ExpressionStringifier(variables=variables)
     return en.visit(copy.deepcopy(expr))
 
 # shift timing in equations
 # time_shift(:(a+b(1)+c),1,[:b,:c]) == :(a+b(2)+c(1))
-def time_shift(expr: Expression, n, vars: List[str] = []) -> Expression:
+@expression_or_string
+def time_shift(expr: Expression, n) -> Expression:
     import copy
     eexpr = copy.deepcopy(expr)
-    return TimeShiftTransformer(shift=n, variables=vars).visit(eexpr)
+    variables = [e[0] for e in list_variables(eexpr)]
+    return TimeShiftTransformer(shift=n, variables=variables).visit(eexpr)
 
-#
-def steady_state(expr: Expression, vars: List[str] = []) -> Expression:
+@expression_or_string
+def steady_state(expr: Expression) -> Expression:
     import copy
     eexpr = copy.deepcopy(expr)
-    return TimeShiftTransformer(shift='S', variables=vars).visit(eexpr)
+    variables = [e[0] for e in list_variables(eexpr)]
+    return TimeShiftTransformer(shift='S', variables=variables).visit(eexpr)
 
 @expression_or_string
 def sanitize(expr:Expression, variables=None, functions=None):
     # special functions ?
     es = ExpressionSanitizer(variables=variables)
     return es.visit(expr)
-
-# list variables
-# list_variables(:(a+b(1)+c), [:b,:c,:d]) == [(:b,1),(:c,0)]
-#
 
 
 def list_variables(expr: Expression, funs: List[str]=None) -> List[Tuple[str,int]]:
@@ -149,7 +144,7 @@ class SymbolList(dict):
 
 from ast import NodeTransformer, Name, UnaryOp, UAdd, USub, Load, Call
 
-class ExpressionNormalizer(NodeTransformer):
+class ExpressionStringifier(NodeTransformer):
 
     # replaces calls to variables by time subscripts
 
@@ -202,16 +197,6 @@ class TimeShiftTransformer(ast.NodeTransformer):
         self.variables = variables if variables is not None else []
         self.shift = shift
 
-    def visit_Name(self, node):
-        name = node.id
-        if name in self.variables:
-            if self.shift==0 or self.shift=='S':
-                return ast.parse(name).body[0].value
-            else:
-                return ast.parse('{}({})'.format(name,self.shift)).body[0].value
-        else:
-             return node
-
     def visit_Call(self, node):
 
         name = node.func.id
@@ -231,13 +216,10 @@ class TimeShiftTransformer(ast.NodeTransformer):
             else:
                 date = args.n
             if self.shift =='S':
-                return ast.parse('{}'.format(name)).body[0].value
+                new_date = 0
             else:
                 new_date = date+self.shift
-                if new_date != 0:
-                    return ast.parse('{}({})'.format(name,new_date)).body[0].value
-                else:
-                    return ast.parse('{}'.format(name)).body[0].value
+            return ast.parse('{}({})'.format(name,new_date)).body[0].value
         else:
 
             # , keywords=node.keywords,  kwargs=node.kwargs)

@@ -1,7 +1,7 @@
 import ast
 from dolang.codegen import to_source
 
-from dolang.symbolic import stringify, normalize, list_variables, list_symbols, ListSymbols
+from dolang.symbolic import stringify, list_variables, list_symbols, ListSymbols
 
 import dolang
 
@@ -62,6 +62,15 @@ def test_sanitize():
 
 
 def test_stringify():
+
+    from dolang.parser import parse_string
+    e = parse_string('sin(a(1) + b + a(0) + f(-(1)) + f(4) + a(1))')
+    to_source(e)
+    enes = normalize(e, variables=['a','f'])
+    print(to_source(enes))
+    assert( to_source(enes) == "sin(a__1_ + b_ + a__0_ + f_m1_ + f__4_ + a__1_)" )
+
+def test_time_shift():
 
     from dolang.parser import parse_string
     e = parse_string('sin(a(1) + b + a(0) + f(-(1)) + f(4) + a(1))')
