@@ -1,6 +1,7 @@
 import numpy
 import ast
 from dolang.symbolic import stringify
+from dolang.symbolic import stringify_variable
 
 ################################
 
@@ -412,7 +413,7 @@ def make_method(equations, arguments, constants, targets=None, rhs_only=False, d
 
     defs_incidence = {}
     for sym, val in definitions.items():
-        lvars = list_variables(val, vars=known_definitions)
+        lvars = list_variables(val)
         defs_incidence[(sym, 0)] = [v for v in lvars if v[0] in known_definitions]
     # return defs_incidence
 
@@ -430,11 +431,11 @@ def make_method(equations, arguments, constants, targets=None, rhs_only=False, d
         deps.extend(ndeps)
     deps = [d for d in unique(deps)]
 
-    new_definitions = OrderedDict()
+    new_definitions = dict()
     for k in deps:
         val = definitions[k[0]]
-        nval = time_shift(val, k[1], all_variables)
-        new_definitions[stringify(k)] = normalize(nval, variables=all_symbols)
+        nval = time_shift(val, k[1])
+        new_definitions[stringify_variable(k)] = stringify(nval)
 
     new_equations = []
 
@@ -449,7 +450,7 @@ def make_method(equations, arguments, constants, targets=None, rhs_only=False, d
                 val = ast.BinOp(left=rhs, op=Sub(), right=lhs)
         else:
             val = eq
-        new_equations.append(normalize(val, variables=all_symbols))
+        new_equations.append(stringify(val, variables=all_symbols))
 
 
 
@@ -457,7 +458,7 @@ def make_method(equations, arguments, constants, targets=None, rhs_only=False, d
     preamble = []
     for i,(arg_group_name,arg_group) in enumerate(arguments.items()):
         for pos,t in enumerate(arg_group):
-            sym = stringify(t)
+            sym = stringify_variable(t)
             rhs = Subscript(value=Name(id=arg_group_name, ctx=Load()), slice=Index(Num(pos)), ctx=Load())
             val = Assign(targets=[Name(id=sym, ctx=Store())], value=rhs)
             preamble.append(val)
