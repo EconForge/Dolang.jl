@@ -5,11 +5,12 @@ from dolang.symbolic import stringify, list_variables, list_symbols, ListSymbols
 
 import dolang
 
+
 def test_parse_string():
     from dolang.parser import parse_string
     e = parse_string('sin(a(1)+b+f(1)+f(+4)+a(t+1))')
     s = to_source(e)
-    assert( s == "sin(a(1) + b + f(1) + f(+(4)) + a(t + 1))" )
+    assert(s == "sin(a(1) + b + f(1) + f(+(4)) + a(t + 1))")
 #
 
 
@@ -19,11 +20,12 @@ def test_list_symbols_debug():
     l = ListSymbols(known_functions=['sin', 'f'])
     l.visit(e)
     # note that cos is recognized as variable
-    assert(l.variables==[(('a', 1), 4), (('a', 1), 22), (('cos', 0), 37)])
-    assert(l.constants == [('b', 9),('a',27)])
+    assert(l.variables == [(('a', 1), 4), (('a', 1), 22), (('cos', 0), 37)])
+    assert(l.constants == [('b', 9), ('a', 27)])
     assert(l.functions == [('sin', 0), ('f', 11), ('f', 16)]
-)
+           )
     assert(l.problems == [['a', 0, 29, 'incorrect subscript']])
+
 
 def test_list_symbols():
     from dolang.parser import parse_string
@@ -34,12 +36,14 @@ def test_list_symbols():
     assert(ll.parameters == ['b'])
 
     e = parse_string('sin(a(1)+b+f(1)+f(+4)+a(1))+cos(0)')
-    ll = list_symbols(e,funs=['f'])
+    ll = list_symbols(e, funs=['f'])
     # now we add a custom function
     assert(ll.variables == [('a', 1)])
     assert(ll.parameters == ['b'])
 
 #
+
+
 def test_list_variables():
     from dolang.parser import parse_string
     e = parse_string('sin(a(1)+b+f(1)+f(+4)+sin(a)+k*cos(a(0)))')
@@ -53,7 +57,7 @@ def test_sanitize():
     s = 'sin(a(1)+b+a+f(-1)+f(+4)+a(1))'
     expected = "sin(a(1) + b + a(0) + f(-(1)) + f(4) + a(1))"
     e = dolang.parser.parse_string('sin(a(1)+b+a+f(-1)+f(+4)+a(1))')
-    enes = dolang.symbolic.sanitize(e, variables=['a','f'])
+    enes = dolang.symbolic.sanitize(e, variables=['a', 'f'])
 
     assert(to_source(enes) == expected)
 
@@ -66,15 +70,16 @@ def test_stringify():
     from dolang.parser import parse_string
     e = parse_string('sin(a(1) + b + a(0) + f(-(1)) + f(4) + a(1))')
     to_source(e)
-    enes = normalize(e, variables=['a','f'])
+    enes = stringify(e, variables=['a', 'f'])
     print(to_source(enes))
-    assert( to_source(enes) == "sin(a__1_ + b_ + a__0_ + f_m1_ + f__4_ + a__1_)" )
+    assert(to_source(enes) == "sin(a__1_ + b_ + a__0_ + f_m1_ + f__4_ + a__1_)")
+
 
 def test_time_shift():
 
     from dolang.parser import parse_string
     e = parse_string('sin(a(1) + b + a(0) + f(-(1)) + f(4) + a(1))')
     to_source(e)
-    enes = normalize(e, variables=['a','f'])
+    enes = stringify(e, variables=['a', 'f'])
     print(to_source(enes))
-    assert( to_source(enes) == "sin(a__1_ + b_ + a__0_ + f_m1_ + f__4_ + a__1_)" )
+    assert(to_source(enes) == "sin(a__1_ + b_ + a__0_ + f_m1_ + f__4_ + a__1_)")
