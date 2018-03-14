@@ -1,5 +1,5 @@
 from typing import List, Dict, Tuple
-from dataclasses import dataclass
+from .dataclasses import dataclass
 import ast
 from ast import NodeTransformer, Call
 from dolang.codegen import to_source

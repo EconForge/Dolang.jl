@@ -23,9 +23,6 @@ requirements:
   run:
     - python
     - numba
-    - numpy
-    - pandas
-    - tempita
     - yaml
     - sympy
 

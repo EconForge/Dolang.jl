@@ -3,7 +3,7 @@ from dolang.parser import parse_string
 from dolang.codegen import to_source
 from typing import Tuple, List, Dict, Set, TypeVar, Union
 from ast import NodeTransformer, Name, UnaryOp, UAdd, USub, Load, Call
-from dataclasses import dataclass
+from .dataclasses import dataclass
 import ast
 from ast import Expr
 from functools import wraps
