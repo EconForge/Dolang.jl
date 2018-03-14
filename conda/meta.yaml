@@ -1,4 +1,4 @@
-{% set version = "0.0.4" %}
+{% set version = "0.0.5" %}
 # {% set sha256 = "2debe8a5fc000668edbf1b16bdc8de6e8830047bc3f3ffcb2a5636c16137b004" %}
 
 package:
@@ -26,9 +26,7 @@ requirements:
     - numpy
     - pandas
     - tempita
-    - scipy
     - yaml
-    - nose
     - sympy
 
 test:
