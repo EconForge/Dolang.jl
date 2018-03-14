@@ -1,52 +1,85 @@
 import ast
 from dolang.codegen import to_source
 
-from dolang.symbolic import stringify, normalize, list_variables, ListSymbols
+from dolang.symbolic import stringify, list_variables, list_symbols, ListSymbols
+
+import dolang
 
 
 def test_parse_string():
     from dolang.parser import parse_string
     e = parse_string('sin(a(1)+b+f(1)+f(+4)+a(t+1))')
     s = to_source(e)
-    assert( s == "sin(a(1) + b + f(1) + f(+(4)) + a(t + 1))" )
+    assert(s == "sin(a(1) + b + f(1) + f(+(4)) + a(t + 1))")
+#
+
 
 def test_list_symbols_debug():
     from dolang.parser import parse_string
-    e = parse_string('sin(a(1)+b+f(1)+f(+4)+a(t+1))')
-    l = ListSymbols(known_functions=['f'], known_variables=['a'])
+    e = parse_string('sin(a(1)+b+f(1)+f(+4)+a(1)+a+a(t+1))+cos(0)')
+    l = ListSymbols(known_functions=['sin', 'f'])
     l.visit(e)
-    assert(l.variables==[(('a', 1), 4)])
-    assert(l.constants==[('b', 9), ('t', 24)])
-    assert(l.functions==[('f', 11), ('f', 16)])
-    assert(l.problems==[['sin', 0, 0, 'unknown_function'], ['a', 0, 22, 'incorrect subscript']])
+    # note that cos is recognized as variable
+    assert(l.variables == [(('a', 1), 4), (('a', 1), 22), (('cos', 0), 37)])
+    assert(l.constants == [('b', 9), ('a', 27)])
+    assert(l.functions == [('sin', 0), ('f', 11), ('f', 16)]
+           )
+    assert(l.problems == [['a', 0, 29, 'incorrect subscript']])
+
+
+def test_list_symbols():
+    from dolang.parser import parse_string
+    e = parse_string('sin(a(1)+b+f(1)+f(+4)+a(1))+cos(0)')
+    ll = list_symbols(e)
+    # cos is recognized as a usual function
+    assert(ll.variables == [('a', 1), ('f', 1), ('f', 4)])
+    assert(ll.parameters == ['b'])
+
+    e = parse_string('sin(a(1)+b+f(1)+f(+4)+a(1))+cos(0)')
+    ll = list_symbols(e, funs=['f'])
+    # now we add a custom function
+    assert(ll.variables == [('a', 1)])
+    assert(ll.parameters == ['b'])
+
+#
+
 
 def test_list_variables():
     from dolang.parser import parse_string
-    e = parse_string('sin(a(1)+b+f(1)+f(+4)+a(t+1))')
-    list_variables(e,vars=['a','f'])
-    assert(list_variables(e) == [('a', 1), ('f', 1), ('f', 4)])
-    assert(list_variables(e, funs=['f']) == [('a', 1)])
+    e = parse_string('sin(a(1)+b+f(1)+f(+4)+sin(a)+k*cos(a(0)))')
+    list_variables(e)
+    assert(list_variables(e) == [('a', 1), ('f', 1), ('f', 4), ('a', 0)])
+    assert(list_variables(e, funs=['f']) == [('a', 1), ('a', 0)])
 
-def test_normalize():
+
+def test_sanitize():
+
+    s = 'sin(a(1)+b+a+f(-1)+f(+4)+a(1))'
+    expected = "sin(a(1) + b + a(0) + f(-(1)) + f(4) + a(1))"
+    e = dolang.parser.parse_string('sin(a(1)+b+a+f(-1)+f(+4)+a(1))')
+    enes = dolang.symbolic.sanitize(e, variables=['a', 'f'])
+
+    assert(to_source(enes) == expected)
+
+    # it also works with the string directly
+    assert(dolang.symbolic.sanitize(s, variables=['a', 'f']) == expected)
+
+
+def test_stringify():
+
     from dolang.parser import parse_string
-    e = parse_string('sin(a(1)+b+a+f(-1)+f(+4)+a(1))')
+    e = parse_string('sin(a(1) + b + a(0) + f(-(1)) + f(4) + a(1))')
     to_source(e)
-    enes = normalize(e, variables=['a','f'])
+    enes = stringify(e, variables=['a', 'f'])
     print(to_source(enes))
-    assert( to_source(enes) == "sin(a__1_ + b_ + a__ + f__m1_ + f__4_ + a__1_)" )
+    assert(to_source(enes) == "sin(a__1_ + b_ + a__0_ + f_m1_ + f__4_ + a__1_)")
 
 
-#
-#
-# from dolang.codegen import to_source
-# # to_source(e)
-# e = parse_string("a(1) + b")
-#
-# e2 = parse_string("a(1) + b")
-#
-# to_source(e2)
-# to_source(e)
-# print(ast.dump(e))
-# to_source(e)
-# to_source(time_shift(e, -2, vars=['a']))
-# to_source(steady_state(e, vars='a'))
+def test_time_shift():
+
+    from dolang.parser import parse_string
+    e = parse_string('sin(a(1) + b + a(0) + f(-(1)) + f(4) + a(1))')
+    to_source(e)
+    enes = stringify(e, variables=['a', 'f'])
+    print(to_source(enes))
+    assert(to_source(enes) == "sin(a__1_ + b_ + a__0_ + f_m1_ + f__4_ + a__1_)")

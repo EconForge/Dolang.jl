@@ -1,8 +1,21 @@
-from __future__ import division
-
 import copy
 import ast
 from ast import NodeVisitor
+
+from .symbolic import eval_scalar
+
+
+def parse(s): return ast.parse(s).body[0].value
+
+def unique(seq):
+    seen = set()
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            yield item
+
+def tshift(t, n):
+    return (t[0], t[1]+n)
 
 def get_atoms(string):
 
@@ -102,6 +115,35 @@ def solve_triangular_system(system, values=None, context=None):
 
     resp = OrderedDict([(v, d[v]) for v in system.keys()])
     return resp
+
+
+def get_deps(incidence, var, visited=None):
+
+    # assert(var in incidence)
+    assert(isinstance(var, tuple) and len(var) == 2)
+
+    if visited is None:
+        visited = (var,)
+    elif var in visited:
+        raise Exception("Non triangular system.")
+    else:
+        visited = visited + (var,)
+
+    n = var[1]
+    if abs(n) > 20:
+        raise Exception("Found variable with time {}. Something has probably gone wrong.".format(n))
+
+    deps = incidence[(var[0], 0)]
+    if n != 0:
+        deps = [tshift(e, n) for e in deps]
+
+    resp = sum([get_deps(incidence, e, visited) for e in deps], [])
+
+    resp.append(var)
+
+    return resp
+
+
 
 def test_triangular_solution():
 
