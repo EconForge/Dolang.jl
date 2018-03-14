@@ -86,6 +86,3 @@ def get_symbolic_derivatives(fff:FlatFunctionFactory, max_order=1):
 
     return derivatives_sym
     # return derivatives, incidences
-
-
-
