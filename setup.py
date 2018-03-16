@@ -4,5 +4,5 @@ setup(name='dolang',
       author=['Pablo Winant'],
       author_email='pablo.winant@gmail.com',
       packages=['dolang'],
-      install_requires=['numpy', 'sympy', 'dataclass', 'numba']
+      install_requires=['numpy', 'sympy', 'dataclasses', 'numba']
       )
