@@ -5,7 +5,7 @@ import time
 from contextlib import contextmanager
 
 from dolang.triangular_solver import solve_triangular_system
-from dolang.parser import parse_string
+from dolang.symbolic import parse_string
 from dolang.symbolic import normalize, stringify_variable, stringify_parameter
 from dolang.codegen import to_source
 

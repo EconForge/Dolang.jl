@@ -1,5 +1,4 @@
 from dolang.language import functions as functions_dict
-from dolang.parser import parse_string
 from dolang.codegen import to_source
 from typing import Tuple, List, Dict, Set, TypeVar, Union
 from ast import NodeTransformer, Name, UnaryOp, UAdd, USub, Load, Call
@@ -7,17 +6,26 @@ from .dataclasses import dataclass
 import ast
 from ast import Expr
 from functools import wraps
+import re
+
+T = TypeVar('T')
 
 Expression = ast.Expr
 
 functions = list(functions_dict.keys())
 
-
-# from dolang.parser import parse_string
-T = TypeVar('T')
+__regex_eq__ = re.compile("([^=]*)=([^=]*)")
 
 
-def dedup(l: List[T])->List[T]:
+def parse_string(s: str) -> ast.Expr:
+    ss = s.replace("^", "**")
+    m = re.match(__regex_eq__, ss)
+    if m:
+        ss = str.join('==', m.groups())
+    return ast.parse(ss).body[0]
+
+
+def dedup(l: List[T]) -> List[T]:
     return list(dict.fromkeys(l))
 
 
@@ -40,7 +48,8 @@ def stringify_symbol(arg) -> str:
     if isinstance(arg, str):
         return stringify_parameter(arg)
     elif isinstance(arg, tuple):
-        if len(arg) == 2 and isinstance(arg[0], str) and isinstance(arg[1], int):
+        if len(arg) == 2 and isinstance(arg[0], str) and isinstance(
+                arg[1], int):
             return stringify_variable(arg)
     raise Exception("Unknown canonical form: {}".format(arg))
 
@@ -55,6 +64,7 @@ def destringify_parameter(s: str) -> Tuple[str, int]:
 
 def destringify(s: str):
     raise Exception("Not implemented.")
+
 
 ###
 # The following function can take a string or an expression as the first argument, and return an argument of the same type.
@@ -71,14 +81,16 @@ def expression_or_string(f):
             nargs = tuple([a]) + args[1:]
             res = f(*nargs, **kwds)
             return to_source(res)
+
     return wrapper
 
 
 @expression_or_string
-def stringify(expr: Expression, variables: List[str] = [])->Expression:
+def stringify(expr: Expression, variables: List[str] = []) -> Expression:
     import copy
     en = ExpressionStringifier(variables=variables)
     return en.visit(copy.deepcopy(expr))
+
 
 # shift timing in equations
 # time_shift(:(a+b(1)+c),1,[:b,:c]) == :(a+b(2)+c(1))
@@ -107,7 +119,8 @@ def sanitize(expr: Expression, variables=None, functions=None):
     return es.visit(expr)
 
 
-def list_variables(expr: Expression, funs: List[str]=None) -> List[Tuple[str, int]]:
+def list_variables(expr: Expression,
+                   funs: List[str] = None) -> List[Tuple[str, int]]:
 
     if funs is None:
         funs = []
@@ -127,7 +140,7 @@ class SymbolList(dict):
     functions: Set[str]
 
 
-def list_symbols(expr: Expression, funs: List[str]=None) -> SymbolList:
+def list_symbols(expr: Expression, funs: List[str] = None) -> SymbolList:
     if funs is None:
         funs = []
     ll = ListSymbols(known_functions=functions + funs)
@@ -138,17 +151,18 @@ def list_symbols(expr: Expression, funs: List[str]=None) -> SymbolList:
         print(e.problems)
         raise e
 
-    def head(v): return [i[0] for i in v]
+    def head(v):
+        return [i[0] for i in v]
+
     return SymbolList(
-            dedup(head(ll.variables)),
-            dedup(head(ll.constants)),
-            dedup(head(ll.functions))
-        )
+        dedup(head(ll.variables)), dedup(head(ll.constants)),
+        dedup(head(ll.functions)))
 
 
 ### Tree manipulation functions
 
-def eval_scalar(tree: Expression)->Union[int, float]:
+
+def eval_scalar(tree: Expression) -> Union[int, float]:
     try:
         if isinstance(tree, ast.Num):
             return tree.n
@@ -164,7 +178,6 @@ def eval_scalar(tree: Expression)->Union[int, float]:
 
 
 class ListSymbols(ast.NodeVisitor):
-
     def __init__(self, known_functions=[], known_variables=[]):
         self.known_functions = known_functions
         self.known_variables = known_variables
@@ -181,7 +194,7 @@ class ListSymbols(ast.NodeVisitor):
             [self.visit(e) for e in call.args]
         else:
             try:
-                assert(len(call.args) == 1)
+                assert (len(call.args) == 1)
                 n = int(eval_scalar(call.args[0]))
                 self.variables.append(((name, n), colno))
             except Exception as e:
@@ -242,11 +255,13 @@ class ExpressionStringifier(NodeTransformer):
             if newname is not None:
                 return Name(newname, Load())
         else:
-            return Call(func=node.func, args=[self.visit(e) for e in node.args], keywords=[])
+            return Call(
+                func=node.func,
+                args=[self.visit(e) for e in node.args],
+                keywords=[])
 
 
 class TimeShiftTransformer(ast.NodeTransformer):
-
     def __init__(self, shift=0, variables=None):
 
         self.variables = variables if variables is not None else []
@@ -278,7 +293,10 @@ class TimeShiftTransformer(ast.NodeTransformer):
         else:
 
             # , keywords=node.keywords,  kwargs=node.kwargs)
-            return Call(func=node.func, args=[self.visit(e) for e in node.args], keywords=[])
+            return Call(
+                func=node.func,
+                args=[self.visit(e) for e in node.args],
+                keywords=[])
 
 
 class ExpressionSanitizer(NodeTransformer):
@@ -300,7 +318,10 @@ class ExpressionSanitizer(NodeTransformer):
             t = eval_scalar(node.args[0])
             return ast.parse('{}({})'.format(name, t)).body[0].value
         else:
-            return Call(func=node.func, args=[self.visit(e) for e in node.args], keywords=[])
+            return Call(
+                func=node.func,
+                args=[self.visit(e) for e in node.args],
+                keywords=[])
 
 
 class NameSubstituter(ast.NodeTransformer):

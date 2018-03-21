@@ -3,7 +3,7 @@ from ast import Assign, arg, FunctionDef, Module, Store, Subscript, Name, Load, 
 from ast import arguments as ast_arguments
 
 from dolang.factory import FlatFunctionFactory
-from dolang.parser import parse_string
+from dolang.symbolic import parse_string
 from dolang.codegen import to_source
 
 

@@ -1,5 +1,5 @@
 # def test_make_method_list_of_lists():
-#     from dolang.parser import parse_string
+#     from dolang.symbolic import parse_string
 #     from dolang.codegen import to_source
 #     from dolang.function_compiler import make_method
 #     #style 1: list of lists
@@ -13,7 +13,7 @@
 #     print(to_source(fun))
 #
 # def test_make_method_dictionary():
-#     from dolang.parser import parse_string
+#     from dolang.symbolic import parse_string
 #     from dolang.codegen import to_source
 #     from dolang.function_compiler import make_method
 #     # style 2: OrderedDict
@@ -34,7 +34,7 @@
 # #     print(to_source(fun3))
 #
 # def test_make_method_definitions():
-#     from dolang.parser import parse_string
+#     from dolang.symbolic import parse_string
 #     from dolang.codegen import to_source
 #     from dolang.function_compiler import make_method
 #     # with definitions
@@ -50,7 +50,7 @@
 #     print(to_source(fun))
 #
 # def test_make_method_elaborate_definitions():
-#     from dolang.parser import parse_string
+#     from dolang.symbolic import parse_string
 #     from dolang.codegen import to_source
 #     from dolang.function_compiler import make_method
 #     # with elaborate definitions
@@ -66,7 +66,7 @@
 #     print(to_source(fun))
 # #
 # # from dolang.symbolic import list_variables, ListSymbols
-# # from dolang.parser import parse_string
+# # from dolang.symbolic import parse_string
 # # expr = parse_string('z + x(-(1)) + y(-(1))')
 # # list_variables( expr )
 # #
