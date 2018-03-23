@@ -2,8 +2,12 @@ from typing import List, Dict, Tuple
 from .dataclasses import dataclass
 import ast
 from ast import NodeTransformer, Call
+
 from dolang.codegen import to_source
 import sympy as symlib
+import yaml
+import io
+
 
 @dataclass
 class FlatFunctionFactory:
@@ -12,8 +16,23 @@ class FlatFunctionFactory:
     arguments: Dict[str, List[str]]
     funname: str
 
+    def __str__(self):
 
-def stack_arguments(ff:FlatFunctionFactory, varname:str='v'):
+        d = dict(
+            type="FlatFunctionFactory",
+            funname=self.funname,
+            preamble=self.preamble,
+            content=self.content,
+            arguments=self.arguments,
+        )
+
+        stream = io.StringIO()
+        yaml.dump(d, stream=stream, default_flow_style=False)
+        txt = stream.getvalue()
+        return txt
+
+
+def stack_arguments(ff: FlatFunctionFactory, varname: str = 'v'):
     import operator
     import functools
     args_k = [*ff.arguments.keys()]
@@ -25,7 +44,7 @@ def stack_arguments(ff:FlatFunctionFactory, varname:str='v'):
     return fff
 
 
-def substitute_preamble(ff:FlatFunctionFactory):
+def substitute_preamble(ff: FlatFunctionFactory):
     import dolang
     import copy
     pr = copy.copy(ff.preamble)
@@ -39,7 +58,7 @@ def substitute_preamble(ff:FlatFunctionFactory):
     return FlatFunctionFactory({}, dd, ff.arguments, ff.funname)
 
 
-def get_symbolic_derivatives(fff:FlatFunctionFactory, max_order=1):
+def get_symbolic_derivatives(fff: FlatFunctionFactory, max_order=1):
 
     eqs = [symlib.sympify(eq) for eq in fff.content.values()]
     varname = [*fff.arguments.keys()][0]
@@ -47,37 +66,38 @@ def get_symbolic_derivatives(fff:FlatFunctionFactory, max_order=1):
     svars = [symlib.sympify(v) for v in fff.arguments[varname]]
 
     derivatives_sym = dict()
-    derivatives_sym[0] = dict(((i,),symlib.sympify(eq)) for i,eq in enumerate(fff.content.values()))
+    derivatives_sym[0] = dict(((i, ), symlib.sympify(eq))
+                              for i, eq in enumerate(fff.content.values()))
 
     incidences = dict()
     incidence = dict()
-    for i,eq in enumerate(eqs):
+    for i, eq in enumerate(eqs):
         ats = eq.atoms()
         l = []
-        for (j,at) in enumerate(svars):
+        for (j, at) in enumerate(svars):
             if at in ats:
-                l.append((j,at))
-        incidence[(i,)] = l
+                l.append((j, at))
+        incidence[(i, )] = l
 
     incidences[0] = incidence
 
-    for order in range(1,max_order+1):
+    for order in range(1, max_order + 1):
         deriv = dict()
         incs = dict()
-        deriv__ = derivatives_sym[order-1]
-        incs__ = incidences[order-1]
-        for eq_d,eq in deriv__.items():
+        deriv__ = derivatives_sym[order - 1]
+        incs__ = incidences[order - 1]
+        for eq_d, eq in deriv__.items():
             syms = incs__[eq_d]
             n = eq_d[0]
             v = eq_d[1:]
-            if len(v)==0:
+            if len(v) == 0:
                 m = -1
             else:
-                m = v[-1] # max index
-            for k,s in syms:
-                if k>=m:
+                m = v[-1]  # max index
+            for k, s in syms:
+                if k >= m:
                     deq = eq.diff(s)
-                    ind = eq_d + (k,)
+                    ind = eq_d + (k, )
                     deriv[ind] = deq
                     # ats = deq.atoms()
                     incs[ind] = [e for e in syms if e[1] in deq.atoms()]
