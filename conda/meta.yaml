@@ -1,4 +1,4 @@
-{% set version = "0.0.5" %}
+{% set version = "0.0.6" %}
 # {% set sha256 = "2debe8a5fc000668edbf1b16bdc8de6e8830047bc3f3ffcb2a5636c16137b004" %}
 
 package:
@@ -6,8 +6,9 @@ package:
   version: {{ version }}
 
 source:
-  fn: master.tar.gz
-  url: https://github.com/EconForge/Dolang/archive/master.tar.gz
+  path: ../        
+  #  fn: master.tar.gz
+  #  url: https://github.com/EconForge/Dolang/archive/master.tar.gz
 
   # url: https://github.com/EconForge/Dolang/archive/v{{ version }}.tar.gz
   # sha256: {{ sha256 }}
