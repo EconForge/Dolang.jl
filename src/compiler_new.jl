@@ -19,27 +19,40 @@ list_syms(eq::Symbol) = [eq]
 list_syms(eq::Number) = Symbol[]
 
 diff_symbol(k::Symbol, j::Symbol) = Symbol("∂", k, "_∂", j)
+function diff_symbol(lhs::Symbol, rhs1::Symbol, rhs2::Symbol)
+    Symbol("∂2", lhs, "_∂", rhs1, "∂", rhs2)
+end
 
+"""
+    add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
+
+Given a (lhs => rhs) dict of equations (`dd`), and a list of and a list of
+symbols to differetiate with, produce a new list of equations with
+derivatives.
+
+For example, if
+
+    dd = OrderedDict(:x => :(p + a), :y => :(p + x))
+    jac_args = [:a, :p]
+
+Then the output would be
+
+    OrderedDict(
+        :x => :(p + a), :y => :(p + x),  # Equations
+        :∂x_∂a => 1, :∂x_∂p => 1, # differentiate x equation
+        :∂y_∂x => 1, :∂y_∂a => :(∂y_∂x * ∂x_∂a), :∂y_∂p => 1,  # y equation
+    )
+"""
 function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
-    # given a list of equations:
-    # x=p+a
-    # y=p+x
-    # and a list of symbols to differetiate with
-    # [:a, :p]
-    # produces a new list of equations with derivatives:
-    # x=p+a
-    # ∂x_∂a = 1
-    # ∂x_∂p = 1
-    # y=p+x
-    # ∂y_∂a = ..
-    # ∂y_∂p = ...
+
 
     diff_eqs = OrderedDict{Symbol, SymExpr}()
     for (var, eq) in dd
         diff_eqs[var] = eq
         deps = list_syms(eq) # list of variables eq depends on
 
-        for k in [kk for kk in deps if !(kk in jac_args)]
+        for k in deps
+            k in jac_args && continue  # only non jac_args right now
             for l in jac_args
                 dv = diff_symbol(var, k)
                 ddv = diff_symbol(k, l)
@@ -49,7 +62,7 @@ function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
                         deq = Dolang.deriv(eq, k)
                         diff_eqs[dv] = deq
                     end
-                    if cdv in keys(diff_eqs)
+                    if haskey(diff_eqs, cdv)
                         diff_eqs[cdv] = :($(diff_eqs[cdv])+$dv*$ddv)
                     else
                         diff_eqs[cdv] = :($dv*$ddv)
@@ -57,7 +70,8 @@ function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
                 end
             end
         end
-        for k in [kk for kk in deps if kk in jac_args]
+        for k in deps
+            !(k in jac_args) && continue  # only jac_args right now
             dv = diff_symbol(var, k)
             deq = Dolang.deriv(eq, k)
             diff_eqs[dv] = deq
@@ -77,7 +91,7 @@ Create a non allocating kernel from the function factory.
 
 The generated kernel looks like (diff=[0, 1])
 ```
-function myfun(x::SVector{1, Float64}, y::SVector{3, Float64}, z::SVector{2, Float64}, p::SVector{1, Float64})
+function myfun(x::SVector{1,<:Real}, y::SVector{3,<:Real}, z::SVector{2,<:Real}, p::SVector{1,<:Real})
     _a_m1_ = x[1]
     _a__0_ = y[1]
     _b__0_ = y[2]
@@ -174,7 +188,7 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
     push!(code, :(return res_))
 
     # now we construct the function
-    typed_args = [:($k::SVector{$(length(v)), Float64}) for (k, v) in arguments]
+    typed_args = [:($k::SVector{$(length(v)), <:Real}) for (k, v) in arguments]
     fun_args = Expr(:call, funname, typed_args...)
 
     Expr(:function, fun_args, Expr(:block, code...))
@@ -184,17 +198,19 @@ end
 
 # NOTE: for small arrays (probably <= 10 elements) the splatting below is
 #       faster than `reinterpret(SVector{length(v), Float64}, v)`
-to_SA(v::Vector{Float64}) = SVector(v...)
-to_SA(v::Matrix{Float64}) = reinterpret(SVector{size(v, 2),Float64}, v', (size(v, 1),))
-
-function from_SA(v::Vector{SMatrix{p,q,Float64,k}}) where p where q where k
-    permutedims(reinterpret(Float64, v, (p, q, size(v, 1))), [3, 1, 2])
+to_SA(v::Vector) = SVector(v...)
+function to_SA(v::Matrix{T}) where T <: Real
+    reinterpret(SVector{size(v, 2),T}, v', (size(v, 1),))
 end
-from_SA(v::Vector{SVector{d,Float64}}) where d  = reinterpret(Float64, v, (d, size(v, 1)))'
-from_SA(v::SVector{d,Float64}) where d = Vector(v)
+
+function from_SA(v::Vector{SMatrix{p,q,T,k}}) where {k, T<:Real, q, p}
+    permutedims(reinterpret(T, v, (p, q, size(v, 1))), [3, 1, 2])
+end
+from_SA(v::Vector{SVector{d,T}}) where {T <: Real, d}  = reinterpret(T, v, (d, size(v, 1)))'
+from_SA(v::SVector{d,T}) where {T <: Real, d} = Vector(v)
 
 # that one is a bit risky as from_SA(to_SA(mat)) != mat
-from_SA(v::SMatrix{p,q,Float64,k}) where p where q where k = Matrix(v)
+from_SA(v::SMatrix{p,q,T,k}) where {k, T<:Real, q, p} = Matrix(v)
 from_SA(v::Tuple) = tuple([from_SA(e) for e in v]...)
 
 
