@@ -76,7 +76,7 @@ end
     @test have2.args[1] == :(_d_ = Dolang._unpack_var(y, 1))
 end
 
-@testset " _unpack_+?\(::FunctionFactory\)" begin
+@testset " _unpack_+?(::FunctionFactory)" begin
     ordered_args = [(:c, 1), (:d, 1), (:a, 0), (:b, 0), (:c, 0), (:a, -1)]
     @test Dolang.arg_block(ff, :V) == Dolang._unpack_expr(args, :V)
     @test Dolang.param_block(ff, :p) == Dolang._unpack_expr(params, :p)
@@ -623,7 +623,8 @@ end
     x = [0.33, 0.233874]
     p = [0.99, 5.0, 1.0, 23.9579, 0.025, 0.33, 0.8, 0.0, 0.016]
 
-    eval(current_module(), make_function(ff_grouped))
+    code = make_function(ff_grouped)
+    eval(current_module(), code)
 
     # allocating
     want = [1.0123335492995267e-5, 4.255452989987418e-9]

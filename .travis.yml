@@ -6,6 +6,7 @@ os:
   # - osx  # we don't do any binary dependencies or OS specific magic
 julia:
   - 0.6
+  - 0.7
 notifications:
   email: false
 # uncomment the following lines to override the default test script

@@ -749,25 +749,33 @@ function make_function(ff::FunctionFactory)
     sig = super_signature(ff, signature)
     body = Expr(:block, :(ff = $ff), :(Dolang.func_body(ff, Der{D})))
     gen_func_body = Expr(:function, sig, body)
-    push!(out.args, Expr(:macrocall, Symbol("@generated"), gen_func_body))
+    # push!(out.args, Expr(:macrocall, Symbol("@generated"), gen_func_body))
+    push!(out.args, :(@generated $gen_func_body))
+
 
     # make generated, mutating function
     sig! = super_signature(ff, signature!)
     body! = Expr(:block, :(ff = $ff), :(Dolang.func_body!(ff, Der{D})))
     gen_func!_body = Expr(:function, sig!, body!)
-    push!(out.args, Expr(:macrocall, Symbol("@generated"), gen_func!_body))
+    # push!(out.args, Expr(:macrocall, Symbol("@generated"), gen_func!_body))
+    push!(out.args, :(@generated $gen_func!_body))
+
 
     # NOTE: I add these specializations to overcome method abiguity introduced
     #       by the vectorized routines below
     sig0 = signature(ff, Der{0})
     body0 = Expr(:block, :(ff = $ff), :(Dolang.func_body(ff, Der{0})))
     func_body0 = Expr(:function, sig0, body0)
-    push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0))
+    # push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0))
+    push!(out.args, :(@generated $func_body0))
+
 
     sig0! = signature!(ff, Der{0})
     body0! = Expr(:block, :(ff = $ff), :(Dolang.func_body!(ff, Der{0})))
     func_body0! = Expr(:function, sig0!, body0!)
-    push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0!))
+    # push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0!))
+    push!(out.args, :(@generated $func_body0!))
+
 
     # also make a method(s) without the Der{0} for backwards compat
     for sig_func in (signature, signature!)

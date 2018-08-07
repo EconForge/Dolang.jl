@@ -104,45 +104,7 @@ end
         @test Dolang.normalize((:x, -1)) == :_x_m1_
         @test Dolang.normalize((:x, -100)) == :_x_m100_
     end
-
-    @testset "Custom normalizer" begin
-        function agent_time_normalizer(ex::Expr)
-            # matches var[inds](time)
-            if (ex.head == :call &&  # function matches ending `()`
-                length(ex.args) == 2 &&   # only one arg inside `()`
-                isa(ex.args[1], Expr) &&  # part before `()` is an expr
-                ex.args[1].head == :ref &&  # part before `()` is a `[]`
-                isa(ex.args[1].args[2], Union{Symbol, Number}) &&  # part in `[]` is scalar
-                isa(ex.args[2], Union{Symbol, Number})  # part in `()` is scalar
-                )
-                # have structure we want, just need to unpack it
-                var = ex.args[1].args[1]
-                ind = ex.args[1].args[2]
-                shift = ex.args[2]
-                return Nullable(
-                    Symbol("_$(var)__$(ind)", shift >= 0 ? "__" : "_m", abs(shift), "_")
-                    )
-            else
-                return Nullable{Symbol}()
-            end
-        end
-
-        ex = :(a(1) + x[i](1) / b)
-        want = :(_a__1_ + _x__i__1_ / _b_)
-        @test_throws Dolang.NormalizeError Dolang.normalize(ex)
-        try
-            Dolang.normalize(ex)
-        catch e
-            @test isa(e, Dolang.NormalizeError)
-            @test e.ex == :(x[i](1))
-        end
-        @test Dolang.normalize(ex, custom=agent_time_normalizer) == want
-
-        # test with target
-        ex = :(z(1) = a(1) + x[i](1) / b)
-        want = :(_a__1_ + _x__i__1_ / _b_ - _z__1_)
-        @test Dolang.normalize(ex, custom=agent_time_normalizer) == want
-    end
+    
 end
 
 @testset "Dolang.time_shift" begin

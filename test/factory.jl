@@ -104,7 +104,7 @@ end
 
         # check content of exception
         ex = try
-            _FF(bad_eqs, args, params, targets=targets, targets=targets,
+            _FF(bad_eqs, args, params, targets=targets,
                 defs=defs)
            catch e
                e

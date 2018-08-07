@@ -2,17 +2,17 @@
 # x::Svector{2}, y::Vector{SVector{2}}, z::SVector{3}
 # (in this case, length of y)
 # slow and fails shamelessly if only SVectors are supplied
-function _getsize(arrays::Union{Vector,<:SVector}...)
-    vectors_length = Int[length(a) for a in arrays if isa(a, Vector)]
+function _getsize(arrays::Union{AbstractVector,Adjoint,<:SVector}...)
+    vectors_length = Int[length(a) for a in arrays if isa(a, AbstractArray)]
     @assert length(vectors_length)>0
     maximum(vectors_length)
 end
-@inline _getobs(x::Vector{<:SVector}, i::Int) = x[i]
+@inline _getobs(x::Union{AbstractVector,Adjoint}, i::Int) = x[i]
 @inline _getobs(x::SVector, i::Int) = x
 
 # constructs expression SVector(a,b,c) from [:a,:b,:c]
-_sym_sarray(v::Vector{Symbol}) = Expr(:call,:SVector, v...)
-_sym_sarray(v::Matrix{Symbol}) = Expr(:call, :(SMatrix{$(size(v)...)}), v...)
+_sym_sarray(v::AbstractVector{Symbol}) = Expr(:call,:SVector, v...)
+_sym_sarray(v::AbstractMatrix{Symbol}) = Expr(:call, :(SMatrix{$(size(v)...)}), v...)
 
 list_syms(eq::Expr) = get(list_symbols(eq), :parameters, Set{Symbol}())
 list_syms(eq::Symbol) = [eq]
@@ -184,13 +184,13 @@ end
 
 # NOTE: for small arrays (probably <= 10 elements) the splatting below is
 #       faster than `reinterpret(SVector{length(v), Float64}, v)`
-to_SA(v::Vector{Float64}) = SVector(v...)
-to_SA(v::Matrix{Float64}) = reinterpret(SVector{size(v, 2),Float64}, v', (size(v, 1),))
+to_SA(v::AbstractVector{Float64}) = SVector(v...)
+to_SA(v::AbstractMatrix{Float64}) = copy(reinterpret(SVector{size(v, 2),Float64}, copy(v'), (size(v, 1),)))
 
-function from_SA(v::Vector{SMatrix{p,q,Float64,k}}) where p where q where k
-    permutedims(reinterpret(Float64, v, (p, q, size(v, 1))), [3, 1, 2])
+function from_SA(v::AbstractVector{SMatrix{p,q,Float64,k}}) where p where q where k
+    copy(permutedims(reinterpret(Float64, v, (p, q, size(v, 1))), [3, 1, 2]))
 end
-from_SA(v::Vector{SVector{d,Float64}}) where d  = reinterpret(Float64, v, (d, size(v, 1)))'
+from_SA(v::AbstractVector{SVector{d,Float64}}) where d  = copy(reinterpret(Float64, v, (d, size(v, 1)))')
 from_SA(v::SVector{d,Float64}) where d = Vector(v)
 
 # that one is a bit risky as from_SA(to_SA(mat)) != mat
@@ -261,7 +261,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
             end
 
             # if all arguments are array vectors
-            if (($(args...)),) isa Tuple{$([:(Vector{Float64}) for i=1:length(args)]...)}
+            if (($(args...)),) isa Tuple{$([:(AbstractVector{Float64}) for i=1:length(args)]...)}
                  # oo = kernel( $( [ :(SVector( $(e)...)) for e in args]...) )
                  $([:($_a = $a) for (_a, a) in zip(args_scalar, args)]...)
                  $(kernel_code_stripped...)
@@ -269,7 +269,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
                  return $(to_diff isa Int? :(ret[1]) :  :(ret) )
              end
             # if arguments are array vectors and one of them is not a vector (plausibly a matrix then...)
-            hackish = ( (($(args...)),) isa Tuple{$([:(Array{Float64}) for i=1:length(args)]...)} )
+            hackish = ( (($(args...)),) isa Tuple{$([:(AbstractArray{Float64}) for i=1:length(args)]...)} )
             if hackish
                 $([:($a = Dolang.to_SA($a)) for a in args]...)
             end
@@ -283,7 +283,8 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
                 $([:($a=out[$i]::Vector{$t}) for (i,(a, t)) in enumerate(zip(args_out, out_types))]...)
             end
 
-            @inbounds @simd for n=1:N
+            # @inbounds @simdfor n=1:N
+            for n=1:N
                 $([:($a_ = Dolang._getobs($a, n)) for (a_, a) in zip(args_scalar, args)]...)
                 # res_ = kernel($(args_scalar...))
                 $(kernel_code_stripped...)
