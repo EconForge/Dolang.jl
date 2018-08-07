@@ -2,12 +2,15 @@
 # x::Svector{2}, y::Vector{SVector{2}}, z::SVector{3}
 # (in this case, length of y)
 # slow and fails shamelessly if only SVectors are supplied
-function _getsize(arrays::Union{AbstractVector,Adjoint,<:SVector}...)
+function _getsize(arrays::Union{AbstractArray,<:SVector}...)
+# function _getsize(arrays::Union{AbstractVector,Adjoint,<:SVector}...)
     vectors_length = Int[length(a) for a in arrays if isa(a, AbstractArray)]
     @assert length(vectors_length)>0
     maximum(vectors_length)
 end
-@inline _getobs(x::Union{AbstractVector,Adjoint}, i::Int) = x[i]
+
+@inline _getobs(x::AbstractArray, i::Int) = x[i]
+# @inline _getobs(x::Union{AbstractVector,Adjoint}, i::Int) = x[i]
 @inline _getobs(x::SVector, i::Int) = x
 
 # constructs expression SVector(a,b,c) from [:a,:b,:c]
@@ -283,8 +286,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
                 $([:($a=out[$i]::Vector{$t}) for (i,(a, t)) in enumerate(zip(args_out, out_types))]...)
             end
 
-            # @inbounds @simdfor n=1:N
-            for n=1:N
+            @inbounds @simd for n=1:N
                 $([:($a_ = Dolang._getobs($a, n)) for (a_, a) in zip(args_scalar, args)]...)
                 # res_ = kernel($(args_scalar...))
                 $(kernel_code_stripped...)
