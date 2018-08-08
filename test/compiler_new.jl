@@ -64,7 +64,7 @@ p_mat = Dolang.from_SA(p_vec)
     @testset "Kernel" begin
         fff = Dolang.FlatFunctionFactory(ff2)
         cc = Dolang.gen_kernel(fff, [0, 1, 3], funname=:kernel)
-        kernel = eval(Dolang, cc)
+        kernel = Core.eval(Dolang, cc)
         res = @inferred kernel(x, y, z, p)
         @test isa(res, Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}})
     end
@@ -73,7 +73,7 @@ p_mat = Dolang.from_SA(p_vec)
     @testset "GuFun" begin
         fff = Dolang.FlatFunctionFactory(ff2)
         cc = Dolang.gen_gufun(fff, [0, 1, 3], funname=:gufun)
-        gufun = eval(Dolang, cc)
+        gufun = Core.eval(Dolang, cc)
         # behaves like a kernel
         res = @inferred gufun(x, y, z, p)
         @test isa(res, Tuple{SVector{2,Float64},SMatrix{2,1,Float64},SMatrix{2,2,Float64}})
@@ -114,7 +114,7 @@ p_mat = Dolang.from_SA(p_vec)
     @testset "Generated Gufuns" begin
         fff = Dolang.FlatFunctionFactory(ff2)
         cc = Dolang.gen_generated_gufun(fff; funname=:gengufun)
-        gengufun = eval(Dolang, cc)
+        gengufun = Core.eval(Dolang, cc)
         # behaves like a kernel
         res0 = @inferred gengufun(x, y, z, p)
         @test isa(res0, SVector{2,Float64})

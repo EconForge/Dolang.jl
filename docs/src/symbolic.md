@@ -187,7 +187,7 @@ with normalize, there are many methods for this function, which will will
 describe one at a time.
 
 ```@docs
-time_shift(::Expr, ::Integer, ::Set{Symbol}, ::Associative)
+time_shift(::Expr, ::Integer, ::Set{Symbol}, ::AbstractDict)
 time_shift(::Expr, ::Integer)
 ```
 
@@ -248,7 +248,7 @@ julia> time_shift(:(a+b(1) + foobar(c)), shift, defs=defs, functions=funcs)
 ```
 
 ```@docs
-time_shift(::Symbol, ::Integer, ::Set{Symbol}, ::Associative)
+time_shift(::Symbol, ::Integer, ::Set{Symbol}, ::AbstractDict)
 ```
 
 **Examples**
@@ -314,7 +314,7 @@ julia> time_shift(-2)
 The `steady_state` function will set the period for all "timed" variables to 0.
 
 ```@docs
-steady_state(::Symbol, ::Set{Symbol}, ::Associative)
+steady_state(::Symbol, ::Set{Symbol}, ::AbstractDict)
 ```
 
 ```jldoctest
@@ -340,7 +340,7 @@ julia> steady_state(-1, Set{Symbol}(), defs)
 
 
 ```@docs
-steady_state(::Expr, ::Set{Symbol}, ::Associative)
+steady_state(::Expr, ::Set{Symbol}, ::AbstractDict)
 steady_state(::Expr)
 ```
 
@@ -475,8 +475,8 @@ julia> subs(:(a + b(1) + c), :d, :(b(-1)/c + d), Set{Symbol}())
 ```
 
 ```@docs
-subs(::Expr, ::Associative, ::Set{Symbol})
-subs(::Expr, ::Associative)
+subs(::Expr, ::AbstractDict, ::Set{Symbol})
+subs(::Expr, ::AbstractDict)
 ```
 
 **Examples**
@@ -496,8 +496,8 @@ julia> subs(ex, d)  # subs is not recursive -- c is not replaced
 substitutions recursively.
 
 ```@docs
-csubs(::Expr, ::Associative, ::Set{Symbol})
-csubs(::Expr, ::Associative)
+csubs(::Expr, ::AbstractDict, ::Set{Symbol})
+csubs(::Expr, ::AbstractDict)
 ```
 
 **Examples**

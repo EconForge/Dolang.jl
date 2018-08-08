@@ -9,10 +9,10 @@ defs = Dict(:x=>:(a(0)/(1-c(1))))
 targets = [(:foo, 0), (:bar, 0)]
 funname = :myfun
 
-const flat_args = [(:a, 0), (:b, 1), (:c, -1)]
-const grouped_args = OrderedDict(:x=>[(:a, -1),], :y=>[(:a, 0), (:b, 0), (:c, 0)], :z=>[(:c, 1), (:d, 1)])
-const flat_params = [:beta, :delta]
-const grouped_params = Dict(:p => [:u])
+flat_args = [(:a, 0), (:b, 1), (:c, -1)]
+grouped_args = OrderedDict(:x=>[(:a, -1),], :y=>[(:a, 0), (:b, 0), (:c, 0)], :z=>[(:c, 1), (:d, 1)])
+flat_params = [:beta, :delta]
+grouped_params = Dict(:p => [:u])
 
 args2 = vcat(args, targets)::Vector{Tuple{Symbol,Int}}
 
@@ -517,13 +517,13 @@ end
         @test want_d!_vec == Dolang.build_vec_function!(ffd, Der{0})
     end
 
-    @testset " evaluating compiled code" begin
+    @testset " Core.evaluating compiled code" begin
         # prep convenience make_function method arguments
         variables = vcat(args, :u)
         to_diff = 1:length(args)
         conv_code = make_function(eqs, variables, to_diff, name=:anon, targets=targets, defs=defs)
-        eval(current_module(), conv_code)
-        eval(current_module(), Dolang.make_function(ff))
+        Core.eval(current_module(), conv_code)
+        Core.eval(current_module(), Dolang.make_function(ff))
         for (fun, fun!) in [(myfun, myfun!), (anon, anon!)]
             u = rand()
             V = rand(6)+4
@@ -624,7 +624,7 @@ end
     p = [0.99, 5.0, 1.0, 23.9579, 0.025, 0.33, 0.8, 0.0, 0.016]
 
     code = make_function(ff_grouped)
-    eval(current_module(), code)
+    Core.eval(current_module(), code)
 
     # allocating
     want = [1.0123335492995267e-5, 4.255452989987418e-9]

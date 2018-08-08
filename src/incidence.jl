@@ -1,7 +1,7 @@
 """
 Maps from equation number to a Dict: variable -> Set(time_periods)
 """
-immutable IncidenceTable
+struct IncidenceTable
     by_eq::Dict{Int,Dict{Symbol,Set{Int}}}
     by_var::Dict{Symbol,Set{Int}}
     by_date::Dict{Int,Set{Symbol}}

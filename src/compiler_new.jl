@@ -128,9 +128,9 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
 
     argnames = collect(keys(arguments))
 
-    all_eqs = cat(1, values(fff.preamble)..., equations)
-    all_args = cat(1, values(fff.arguments)...)
-    jac_args = cat(1, [collect(values(fff.arguments))[i] for i in diff if i!=0]...)
+    all_eqs = cat(values(fff.preamble)..., equations, dims=1)
+    all_args = cat(values(fff.arguments)..., dims=1)
+    jac_args = cat([collect(values(fff.arguments))[i] for i in diff if i!=0]..., dims=1)
     # jac_args = Symbol.(jac_args) # strange type of output can by Any[]
     jac_args = Symbol[Symbol(e) for e in jac_args]
 
@@ -260,7 +260,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
                 # return $(to_diff isa Int? :(ret[1]) :  :(ret) )
                 $([:($_a = $a) for (_a, a) in zip(args_scalar, args)]...)
                 $(kernel_code_stripped...)
-                return $(to_diff isa Int? :(res_[1]) :  :(res_) )
+                return $(to_diff isa Int ? :(res_[1]) :  :(res_) )
             end
 
             # if all arguments are array vectors
@@ -269,7 +269,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
                  $([:($_a = $a) for (_a, a) in zip(args_scalar, args)]...)
                  $(kernel_code_stripped...)
                  ret = ( $( [:(Array(res_[$i])) for i=1:length(args_out)]...),)
-                 return $(to_diff isa Int? :(ret[1]) :  :(ret) )
+                 return $(to_diff isa Int ? :(ret[1]) :  :(ret) )
              end
             # if arguments are array vectors and one of them is not a vector (plausibly a matrix then...)
             hackish = ( (($(args...)),) isa Tuple{$([:(AbstractArray{Float64}) for i=1:length(args)]...)} )
@@ -280,7 +280,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
 
             N = Dolang._getsize($(args...))::Int
 
-            if isa(out, Void)
+            if isa(out, Nothing)
                 $([:($a=zeros($t, N)) for (a, t) in zip(args_out, out_types)]...)
             else
                 $([:($a=out[$i]::Vector{$t}) for (i,(a, t)) in enumerate(zip(args_out, out_types))]...)
@@ -299,7 +299,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
                 ret = Dolang.from_SA(ret)
             end
 
-            return $(to_diff isa Int? :(ret[1]) :  :(ret) )
+            return $(to_diff isa Int ? :(ret[1]) :  :(ret) )
         end
     end
 
@@ -335,7 +335,7 @@ end
 function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname, dispatch=nothing)
 
     args = collect(keys(fff.arguments))
-    dispatch_argtype = parse(string(dispatch))
+    dispatch_argtype = Meta.parse(string(dispatch))
     dispatch_arg = dispatch == nothing ? [] : [:(::$(dispatch_argtype))]
     meta_code = quote
         # basic fun for compat

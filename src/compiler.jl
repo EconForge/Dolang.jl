@@ -29,7 +29,7 @@ function _unpack_expr(names::Vector, rhs::Symbol)
     out = Expr(:block); out.args = _args; out
 end
 
-function _unpack_expr(d::Associative, _discard)
+function _unpack_expr(d::AbstractDict, _discard)
     _args = vcat([_unpack_expr(v, k) for (k, v) in d]...)
     out = Expr(:block); out.args = _args; out
 end
@@ -64,7 +64,7 @@ param_block(ff::FunctionFactory, vec::Symbol=:p) =
 
 arg_block(ff::FunctionFactory, vec::Symbol=:V) = _unpack_expr(ff.args, vec)
 
-"Evaluates main expressions in a function group and fills `out` with results"
+"Core.evaluates main expressions in a function group and fills `out` with results"
 function equation_block end
 
 # TODO: this loop is a hack to get around a method ambiguity error caused
@@ -81,7 +81,7 @@ for T in (FlatArgs, GroupedArgs)
                               ff.eqs, 1:n_expr)
             func_block.args = assignments
         else
-            # otherwise, need to parse the targets, evaluate them, and then set
+            # otherwise, need to parse the targets, Core.evaluate them, and then set
             # elements of out equal to the targets
             assignments = map((rhs, i) -> _assign_var_expr(:out, rhs, i),
                               ff.targets, 1:n_expr)
@@ -685,7 +685,7 @@ See [`make_function(ff::FunctionFactory)`](@ref) for more details.
 
 This method is less flexible than constructing the `FunctionFactory` by hand
 because you can only create that have one vector for arguments and one vector
-for symbols. Meaning you cannot construct an associative mapping for `args` or
+for symbols. Meaning you cannot construct an AbstractDict mapping for `args` or
 `params` that groups symbols together.
 """
 function make_function(
@@ -723,25 +723,25 @@ Compile a function using data in `ff`; with methods for
 - various order of derivative
 - Allocating output arguments
 - Non-allocating functions that mutate the input argument
-- (partially-)Vectorized evaluation
+- (partially-)Vectorized Core.evaluation
 
 See [`FunctionFactory`](@ref) for a description of how the fields of `ff`
 impact the generated code.
 
-In non-vectorized evaluation, all function arguments should be vectors and will
+In non-vectorized Core.evaluation, all function arguments should be vectors and will
 be unpacked into scalars according to `ff.args` and `ff.params`. If any
 argument is an  `AbstractMatrix`, then each column of the matrix is assumed to
 be multiple observations of a single variable. All matrix arguments must have
 the same number of rows. Let this number be `n`. Any arguments passed as
 vectors will be implicitly repeated `n` times and the function will be
-evaluated with these vectors and the `n` observations of each matrix argument.
+Core.evaluated with these vectors and the `n` observations of each matrix argument.
 
 ## Note
 
 The output will be an `@generated` function
-that can be evaluated at arbitrary order of analytical derivative -- with
+that can be Core.evaluated at arbitrary order of analytical derivative -- with
 derivative computation and function compilation happening at runtime upon the
-user's first request to evaluate that order derivative.
+user's first request to Core.evaluate that order derivative.
 """
 function make_function(ff::FunctionFactory)
     out = Expr(:block)
