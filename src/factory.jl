@@ -107,9 +107,9 @@ immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
     # incidence table for the eqs
     incidence::IncidenceTable
 
-    function (::Type{FunctionFactory{T1,T2,T3,T4}}){T1,T2,T3,T4}(
+    function (::Type{FunctionFactory{T1,T2,T3,T4}})(
             eqs, args, params, _targets, defs, funname, dispatch
-        )
+        ) where T1 where T2 where T3 where T4
 
         # if there are no _targets, we normalize equations immediately
         if isempty(_targets)
@@ -168,9 +168,9 @@ end
 @compat const FFSkipArg{T1,T2,T3} = FunctionFactory{T1,T2,T3,Type{SkipArg}}
 
 # default outer constructor to do inference and fill in type params
-function FunctionFactory{T1,T2,T3,T4}(eqs::Vector{Expr}, args::T1, params::T2,
+function FunctionFactory(eqs::Vector{Expr}, args::T1, params::T2,
                                      targets, defs::T3,
-                                     funname::Symbol, dispatch::T4)
+                                     funname::Symbol, dispatch::T4) where {T1,T2,T3,T4}
     FunctionFactory{T1,T2,T3,T4}(eqs, args, params, targets, defs, funname,
                                  dispatch)
 end
@@ -181,17 +181,17 @@ function FunctionFactory(eqs::Vector{Expr}, args::ArgType, params::ParamType;
     FunctionFactory(eqs, args, params, targets, defs, funname, SkipArg)
 end
 
-function FunctionFactory{T4}(dispatch::Type{T4}, eqs::Vector{Expr},
+function FunctionFactory(dispatch::Type{T4}, eqs::Vector{Expr},
                              args::ArgType, params::ParamType; targets=Symbol[],
-                             defs=Dict{Symbol,Any}(), funname::Symbol=:anon)
+                             defs=Dict{Symbol,Any}(), funname::Symbol=:anon) where T4
     FunctionFactory(eqs, args, params, targets, defs, funname, T4)
 end
 
-=={T<:Union{IncidenceTable,FunctionFactory}}(x1::T, x2::T) =
+==(x1::T, x2::T) where {T<:Union{IncidenceTable,FunctionFactory}}=
     all(i -> getfield(x1, i) == getfield(x2, i), fieldnames(x1))
 
-nargs{T<:FlatArgs}(ff::FunctionFactory{T}) = length(ff.args)
-nargs{T<:GroupedArgs}(ff::FunctionFactory{T}) =
+nargs(ff::FunctionFactory{T}) where {T<:FlatArgs} = length(ff.args)
+nargs(ff::FunctionFactory{T}) where {T<:GroupedArgs} =
     sum(length(i) for i in values(ff.args))::Int
 
 function validate!(ff::FunctionFactory)

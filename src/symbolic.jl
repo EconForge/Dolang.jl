@@ -45,7 +45,7 @@ end
 
 Same as `normalize(x[1], x[2])`
 """
-normalize{T<:Integer}(x::Tuple{Symbol,T}) = normalize(x[1], x[2])
+normalize(x::Tuple{Symbol,T}) where {T<:Integer} = normalize(x[1], x[2])
 
 """
     normalize(x::Symbol)

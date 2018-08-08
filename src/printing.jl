@@ -95,7 +95,7 @@ end
 
 _latex!(io::IO, s::AbstractString) = _latex!(io, parse(s))
 
-_latex!{T<:Integer}(io::IO, x::Tuple{Symbol,T}) = _latex!(io, x[1], x[2])
+_latex!(io::IO, x::Tuple{Symbol,T}) where {T<:Integer} = _latex!(io, x[1], x[2])
 
 _latex!(io::IO, x::Number) = print(io, string(x))
 
