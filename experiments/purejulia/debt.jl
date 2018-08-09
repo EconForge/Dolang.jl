@@ -115,7 +115,7 @@ init_dr(i,s) = s
 x = init_dr(1,s)
 
 
-val = Core.eval_policy(symbols, calib, transition, felicity, 0.96, mc, approx, init_dr)
+val = eval_policy(symbols, calib, transition, felicity, 0.96, mc, approx, init_dr)
 
 (controls_2, val_2) = solve_policy(symbols, calib, transition, felicity, boundaries, 0.96, mc, approx, init_dr, val)
 

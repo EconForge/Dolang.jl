@@ -40,7 +40,7 @@ function _output_size(n_expr::Int, args...)
                 # that all matrix arguments have conformable shapes
                 if nr != n_row
                     msg = string("Unconformable argument sizes. For vectorized",
-                                 " Core.evaluation all matrix arguments must have ",
+                                 " evaluation all matrix arguments must have ",
                                  "the same number of rows.")
                     throw(DimensionMismatch(msg))
                 end
@@ -131,13 +131,13 @@ function solution_order(d::OrderedDict, it::IncidenceTable, pre_solved::Vector{S
 end
 
 
-function solution_order(_d::AbstractDict, pre_solved::Vector{Symbol}=Symbol[])
+function solution_order(_d::Associative, pre_solved::Vector{Symbol}=Symbol[])
     d = OrderedDict(_d)
     it = Dolang.IncidenceTable(collect(values(d)))
     solution_order(d, it, pre_solved)
 end
 
-solve_triangular_system(d::AbstractDict) = solve_triangular_system(OrderedDict(d))
+solve_triangular_system(d::Associative) = solve_triangular_system(OrderedDict(d))
 
 function solve_triangular_system(d::OrderedDict)
     sol_order = solution_order(d)
@@ -146,23 +146,23 @@ function solve_triangular_system(d::OrderedDict)
     nms = collect(keys(d))[sol_order]
     exprs = collect(values(d))[sol_order]
 
-    # build expression to Core.evaluate system in correct order
-    to_Core.eval = Expr(:block)
-    to_Core.eval.args = [:($(i[1])=$(i[2])) for i in zip(nms, exprs)]
+    # build expression to evaluate system in correct order
+    to_eval = Expr(:block)
+    to_eval.args = [:($(i[1])=$(i[2])) for i in zip(nms, exprs)]
 
     # add one line to return a tuple of all data
     ret = Expr(:tuple); ret.args = nms
 
-    # now Core.evaluate and get data
-    data = Core.eval(Dolang, :(let
-                        $to_Core.eval;
+    # now evaluate and get data
+    data = eval(Dolang, :(let
+                        $to_eval;
                         $ret
                         end))
 
     OrderedDict{Symbol,Real}(zip(nms, data))
 end
 
-mutable struct TriangularSystemException <: Exception
+type TriangularSystemException <: Exception
     missing
 end
 
@@ -192,7 +192,7 @@ solve_dependency(system, [:x,:y,:z])
 the answer is the same as before since `:p` is not needed to
 define the values of `[:x,:y,:z]`.
 """
-function solve_dependencies(deps::AbstractDict{T,Set{T}}, unknowns=nothing) where T
+function solve_dependencies(deps::Associative{T,Set{T}}, unknowns=nothing) where T
     solution = []
     if unknowns == nothing
         needed = Set(keys(deps))
@@ -226,7 +226,7 @@ function solve_dependencies(deps::AbstractDict{T,Set{T}}, unknowns=nothing) wher
 end
 
 
-function get_dependencies(defs::AbstractDict{T,U}) where T where U
+function get_dependencies(defs::Associative{T,U}) where T where U
     deps = OrderedDict{Any,Set{Any}}()
     for (k,v) in (defs)
         ii = intersect( Set(union( collect( values( Dolang.list_symbols(v) ))... )), Set(keys(defs)))
@@ -236,7 +236,7 @@ function get_dependencies(defs::AbstractDict{T,U}) where T where U
     deps
 end
 
-function reorder_triangular_block(defs::AbstractDict{T,U}) where T where U
+function reorder_triangular_block(defs::Associative{T,U}) where T where U
     deps = get_dependencies(defs)
     sol = Dolang.solve_dependencies(deps)
     return OrderedDict((k,defs[k]) for k in sol)
@@ -248,7 +248,7 @@ Keys are timed variables in canonical form (e.g. `(:v,0)`) at date t=0.
 Values are expressions, possibly referencing key variables at different dates.
 The system is recursively solved for the unknowns, by default the keys.
 """
-function solve_definitions(defs::AbstractDict{Tuple{Symbol, Int}, <:SymExpr}, unknowns=keys(defs))
+function solve_definitions(defs::Associative{Tuple{Symbol, Int}, <:SymExpr}, unknowns=keys(defs))
     # defs should map timed-vars to expressions.
     defs = deepcopy(defs)
     for (v,t) in collect(keys(defs))

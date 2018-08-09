@@ -6,7 +6,7 @@ summary = []
 
 for ex in doc["expressions"]
     result = try
-        Meta.parse(ex)
+        parse(ex)
         "OK"
     catch
         "Failed"

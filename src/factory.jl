@@ -2,7 +2,7 @@
 # Exception handling #
 # ------------------ #
 
-struct VariableNotAllowedError <: Exception
+immutable VariableNotAllowedError <: Exception
     bad_var::Symbol
     eq::Expr
     shifts::Set{Int}
@@ -20,17 +20,17 @@ end
 # ---------- #
 
 const FlatArgs = AbstractVector
-@compat const GroupedArgs = AbstractDict{Symbol,<:Any}
+@compat const GroupedArgs = Associative{Symbol,<:Any}
 const ArgType = Union{FlatArgs,GroupedArgs}
 
 const FlatParams = AbstractVector
-@compat const GroupedParams = AbstractDict{Symbol,<:Any}
+@compat const GroupedParams = Associative{Symbol,<:Any}
 const ParamType = Union{FlatParams,GroupedParams}
 
-struct Der{T} end
+immutable Der{T} end
 @compat const TDer{n} = Type{Der{n}}
 
-struct SkipArg end
+immutable SkipArg end
 
 _to_flat(f::FlatArgs) = f
 _to_flat(g::GroupedArgs) = vcat(values(g)...)
@@ -39,7 +39,7 @@ _to_flat(g::GroupedArgs) = vcat(values(g)...)
 # helper functions #
 # ---------------- #
 """
-    build_definition_map(defs::AbstractDict, incidence::IncidenceTable,
+    build_definition_map(defs::Associative, incidence::IncidenceTable,
                          dynvars::Vector{Symbol})
 
 For each key `k` in `defs`, and each time shift in `incidence.by_eq[k]`,
@@ -58,7 +58,7 @@ Dict{Symbol,Union{Expr, Number, Symbol}} with 1 entry:
   :_x_m1_ => :(_a_m1_ / (1 - _c__0_))
 ```
 """
-function build_definition_map(defs::AbstractDict, incidence::IncidenceTable)
+function build_definition_map(defs::Associative, incidence::IncidenceTable)
     out = Dict{Symbol,Union{Symbol,Expr,Number}}()
 
     # NOTE: we need to make the keys of definitions have the form
@@ -89,7 +89,7 @@ end
 # FunctionFactory #
 # --------------- #
 
-struct FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:AbstractDict,T4<:Type}
+immutable FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:Associative,T4<:Type}
     # normalized equations
     eqs::Vector{Expr}
     # canonical  variables to differentiate wrt
@@ -188,7 +188,7 @@ function FunctionFactory(dispatch::Type{T4}, eqs::Vector{Expr},
 end
 
 ==(x1::T, x2::T) where {T<:Union{IncidenceTable,FunctionFactory}}=
-    all(i -> getfield(x1, i) == getfield(x2, i), fieldnames(typeof(x1)))
+    all(i -> getfield(x1, i) == getfield(x2, i), fieldnames(x1))
 
 nargs(ff::FunctionFactory{T}) where {T<:FlatArgs} = length(ff.args)
 nargs(ff::FunctionFactory{T}) where {T<:GroupedArgs} =
@@ -212,10 +212,10 @@ end
                          args::ArgType, params::ParamType; targets=Symbol[],
                          defs=Dict{Symbol,Any}(), funname::Symbol=:anon)
 
-Construct a `FunctionFactory` that Core.evaluates `eqs` using `args` and `params`.
+Construct a `FunctionFactory` that evaluates `eqs` using `args` and `params`.
 
 `args` and `params` can either be flat `Vector` of Dolang symbols (not just
-julia `Symbols`), or an AbstractDict mapping from a grouped argument name, to a
+julia `Symbols`), or an associative mapping from a grouped argument name, to a
 list of symbols in that group. See examples below:
 
 ```julia
@@ -287,7 +287,7 @@ FunctionFactory
 
 SymExpr = Union{Expr,Symbol,Number}
 
-struct FlatFunctionFactory
+immutable FlatFunctionFactory
         # normalized equations
         equations::OrderedDict{Symbol,SymExpr}
         # list of group of (normalized) variables
@@ -344,7 +344,7 @@ function FlatFunctionFactory(ff::FunctionFactory; eliminate_definitions=false)
 end
 
 
-function FlatFunctionFactory(equations::OrderedDict, arguments::OrderedDict, definitions::AbstractDict; eliminate_preamble=false, funname=:anon)
+function FlatFunctionFactory(equations::OrderedDict, arguments::OrderedDict, definitions::Associative; eliminate_preamble=false, funname=:anon)
 
     # eqs: OrderedDict (targets are keys)
     # args: OrderedDict

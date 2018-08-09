@@ -93,7 +93,7 @@ function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
     (has_superscript || "star" in mods) &&  print(io, "}")
 end
 
-_latex!(io::IO, s::AbstractString) = _latex!(io, Meta.parse(s))
+_latex!(io::IO, s::AbstractString) = _latex!(io, parse(s))
 
 _latex!(io::IO, x::Tuple{Symbol,T}) where {T<:Integer} = _latex!(io, x[1], x[2])
 
@@ -188,4 +188,4 @@ function latex(ex::Union{Expr,Symbol})
     String(take!(io))
 end
 
-latex(s::String) = latex(Meta.parse(s))
+latex(s::String) = latex(parse(s))

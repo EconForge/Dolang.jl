@@ -112,8 +112,8 @@ end
 
 macro quickargs(symbols, api, content)
     funcode = copy((content).args[2])
-    new_funcode = rewrite_function(funcode, Core.eval(symbols), Core.eval(api))
-    Core.eval(new_funcode)
+    new_funcode = rewrite_function(funcode, eval(symbols), eval(api))
+    eval(new_funcode)
 end
 
 # Example:

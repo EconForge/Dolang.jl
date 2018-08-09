@@ -180,7 +180,7 @@ my_int_fun(Der{10}, 10, V, p)
 
 ## With grouped `args`
 
-Finally we show one more example of how to use an AbstractDict mapping for the
+Finally we show one more example of how to use an associative mapping for the
 `FunctionFactory` `args` field to produce a function with grouped arguments.
 
 ```@example ff3

@@ -1,6 +1,6 @@
 using Dolang
 
-struct RBC end
+immutable RBC end
 rbc_ff = let
     # construct args
     variables = [:y, :c, :k, :i, :l, :y_l, :z]
@@ -30,10 +30,10 @@ rbc_ff = let
     Dolang.FunctionFactory(RBC, eqs, args, params, funname=:rbc_model)
 end;
 
-print_Core.eval(ex) = (println(ex); Core.eval(ex))
-print_Core.eval(make_method(rbc_ff))
-print_Core.eval(make_method(Der{1}, rbc_ff))
-print_Core.eval(make_method(Der{2}, rbc_ff, mutating=false))
+print_eval(ex) = (println(ex); eval(ex))
+print_eval(make_method(rbc_ff))
+print_eval(make_method(Der{1}, rbc_ff))
+print_eval(make_method(Der{2}, rbc_ff, mutating=false))
 
 # just some reasonable parameter values
 alp = 0.33

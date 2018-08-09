@@ -2,7 +2,7 @@
 # types #
 # ----- #
 
-struct NormalizeError <: Exception
+immutable NormalizeError <: Exception
     ex::Expr
     msg::String
 end
@@ -18,7 +18,7 @@ function Base.showerror(io::IO, ne::NormalizeError)
     print(io, ne.msg)
 end
 
-struct UnknownFunctionError <: Exception
+immutable UnknownFunctionError <: Exception
     func_name::Symbol
     msg::String
 end
@@ -169,7 +169,7 @@ end
 
 Call `normalize(parse(s)::Expr; kwargs...)`
 """
-normalize(s::String; kwargs...) = normalize(Meta.parse(s); kwargs...)
+normalize(s::String; kwargs...) = normalize(parse(s); kwargs...)
 
 """
     normalize(exs::Vector{Expr}; kwargs...)
@@ -199,7 +199,7 @@ time_shift(x::Union{Number,Symbol}, other...) = x
 ```julia
 time_shift(ex::Expr, shift::Integer,
            functions::Set{Symbol}=Set{Symbol}(),
-           defs::AbstractDict=Dict())
+           defs::Associative=Dict())
 ```
 
 Recursively apply a `time_shift` to `ex` according to the following rules based
@@ -251,7 +251,7 @@ end
 ```julia
 time_shift(ex::Expr, shift::Int=0;
            functions::Union{Set{Symbol},Vector{Symbol}}=Vector{Symbol}(),
-           defs::AbstractDict=Dict())
+           defs::Associative=Dict())
 ```
 
 Version of `time_shift` where `functions` and `defs` are keyword arguments with
@@ -446,14 +446,14 @@ whether or not any substitutions happened. This is used to know when to break
 out of a recursion.
 =#
 
-function _subs(s::Symbol, d::AbstractDict, a...)
+function _subs(s::Symbol, d::Associative, a...)
     haskey(d, s) && return (d[s], true)
     (s, false)
 end
 
-_subs(x::Number, d::AbstractDict, a...) = (x, false)
+_subs(x::Number, d::Associative, a...) = (x, false)
 
-function _subs(ex::Expr, d::AbstractDict, funcs::Set{Symbol})
+function _subs(ex::Expr, d::Associative, funcs::Set{Symbol})
 
     if is_time_shift(ex)
 
@@ -503,7 +503,7 @@ end
 
 """
 ```julia
-subs(ex::Union{Expr,Symbol,Number}, d::AbstractDict,
+subs(ex::Union{Expr,Symbol,Number}, d::Associative,
      variables::Set{Symbol},
      funcs::Set{Symbol})
 ```
@@ -514,7 +514,7 @@ Note that the keys of `d` should be the canonical form of variables you wish to
 substitute. For example, to replace `x(1)` with `b/c` you need to have the
 entry `(:x, 1) => :(b/c)` in `d`.
 """
-function subs(ex::Union{Expr,Symbol,Number}, d::AbstractDict,
+function subs(ex::Union{Expr,Symbol,Number}, d::Associative,
               funcs::Set{Symbol}=Set{Symbol}())
     _subs(ex, d, funcs)[1]
 end
@@ -523,7 +523,7 @@ end
 #         #
 ###########
 
-function csubs(expr, d::AbstractDict)
+function csubs(expr, d::Associative)
     dd = reorder_triangular_block(d)
     subs(expr, dd)
 end
@@ -570,7 +570,7 @@ function arg_time(s::Symbol)::Int
             # not a match
             return 0
         else
-            shift = Base.parse(Int, parts[2])
+            shift = parse(Int, parts[2])
             return parts[1] === nothing ? shift : -shift
         end
     else
@@ -593,7 +593,7 @@ end
 arg_name_time(s) = (arg_name(s), arg_time(s))
 
 arg_names(s::AbstractVector) = arg_name.(s)
-arg_names(s::AbstractDict) = vcat([arg_names(v) for v in values(s)]...)
+arg_names(s::Associative) = vcat([arg_names(v) for v in values(s)]...)
 
 # --------- #
 # Utilities #
