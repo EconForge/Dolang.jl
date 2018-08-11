@@ -6,13 +6,13 @@
 # extract a single element. If `x` is a Matrix then extract one column of the
 # matrix
 @inline _unpack_var(x::AbstractVector, i::Integer) = x[i]
-@inline _unpack_var(x::AbstractMatrix, i::Integer, ::Type(COrder)) = view(x, :, i)
-@inline _unpack_var(x::AbstractMatrix, i::Integer, ::Type(FOrder)) = view(x, i, :)
+@inline _unpack_var(x::AbstractMatrix, i::Integer, ::Type{COrder}) = view(x, :, i)
+@inline _unpack_var(x::AbstractMatrix, i::Integer, ::Type{FOrder}) = view(x, i, :)
 @inline _unpack_var(x::AbstractMatrix, i::Integer) = view(x, :, i)
 
 # inlined function to extract a single observations of a vector fo variables.
-@inline _unpack_obs(x::AbstractMatrix, i::Integer, ::Type(COrder)) = view(x, i, :)
-@inline _unpack_obs(x::AbstractMatrix, i::Integer, ::Type(FOrder)) = view(x, :, i)
+@inline _unpack_obs(x::AbstractMatrix, i::Integer, ::Type{COrder}) = view(x, i, :)
+@inline _unpack_obs(x::AbstractMatrix, i::Integer, ::Type{FOrder}) = view(x, :, i)
 @inline _unpack_obs(x::AbstractMatrix, i::Integer) = view(x, i, :)
 @inline _unpack_obs(x::AbstractVector, i::Integer) = x
 
@@ -20,8 +20,8 @@
 # column of a matrix
 @inline _assign_var(lhs::AbstractVector, rhs::Number, i) = setindex!(lhs, rhs, i)
 @inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i) = setindex!(lhs, rhs, :, i)
-@inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i, ::Type(COrder)) = setindex!(lhs, rhs, :, i)
-@inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i, ::Type(FOrder)) = setindex!(lhs, rhs, i, :)
+@inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i, ::Type{COrder}) = setindex!(lhs, rhs, :, i)
+@inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i, ::Type{FOrder}) = setindex!(lhs, rhs, i, :)
 
 # determine the size of the output variable, given the number of expressions
 # in the equation and all the input arguments
@@ -53,10 +53,10 @@ function _output_size(n_expr::Int, args...)
     (n_row, n_expr)
 end
 
-_output_size(n_expr::Int, ::Type(COrder), args...)  = _output_size(n_expr::Int, args...)
+_output_size(n_expr::Int, ::Type{COrder}, args...)  = _output_size(n_expr::Int, args...)
 
-function _output_size(n_expr::Int, order::Type(FOrder), args...)
-    s = _output_size(n_expr::Int, order::Type(FOrder), args...)
+function _output_size(n_expr::Int, order::Type{FOrder}, args...)
+    s = _output_size(n_expr::Int, order::Type{FOrder}, args...)
     (s[2],s[1])
 end
 
@@ -66,7 +66,7 @@ end
 # to input arguments `args...`
 _allocate_out(T::Type, n_expr::Int, args::AbstractVector...) = Array{T}(n_expr)
 
-_allocate_out(T::Type, order::Union{Type(COrder),Type(FOrder)}, n_expr::Int, arg::AbstractMatrix) =
+_allocate_out(T::Type, order::Union{Type{COrder},Type{FOrder}}, n_expr::Int, arg::AbstractMatrix) =
     Array{T}(undef, _output_size(n_expr, order, arg))
 
 _allocate_out(T::Type, n_expr::Int, arg::AbstractMatrix) =
@@ -76,7 +76,7 @@ function _allocate_out(T::Type, n_expr::Int, args...)
     Array{T}(undef, _output_size(n_expr, args...))
 end
 
-function _allocate_out(T::Type, order::Union{Type(COrder),Type(FOrder)}, n_expr::Int, args...)
+function _allocate_out(T::Type, order::Union{Type{COrder},Type{FOrder}}, n_expr::Int, args...)
     Array{T}(undef, _output_size(n_expr, order, args...))
 end
 
@@ -229,7 +229,7 @@ end
 function get_dependencies(defs::AbstractDict{T,U}) where T where U
     deps = OrderedDict{Any,Set{Any}}()
     for (k,v) in (defs)
-        ii = intersect( Set(( collect( values( Dolang.list_symbols(v) ))... ,)), Set(keys(defs)))
+        ii = intersect( Set(( collect( values( Dolang.list_symbols(v) ))... ,   )), Set(keys(defs)))
         # ii = intersect( Set(union( collect( values( Dolang.list_symbols(v) ))... )), Set(keys(defs)))
         ij = Set(ii)
         deps[k] = ij
