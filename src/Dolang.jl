@@ -1,4 +1,3 @@
- __precompile__(true)
 module Dolang
 
 using DataStructures
@@ -8,11 +7,12 @@ const ARITH_SYMBOLS = Set([:+, :-, :*, :/, :^])
 const DOLANG_FUNCTIONS = Set([:sin, :cos, :tan, :exp, :log, :log10])
 push!(DOLANG_FUNCTIONS, ARITH_SYMBOLS...)
 
-
 using Compat: view, String, @compat
 
 import Base: ==
+import REPL
 
+using Printf
 export make_function, Der, FunctionFactory, normalize, is_time_shift, time_shift,
        subs, csubs, steady_state, list_symbols, list_symbols!, list_variables,
        list_parameters

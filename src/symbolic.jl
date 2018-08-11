@@ -470,7 +470,7 @@ function _subs(ex::Expr, d::AbstractDict, funcs::Set{Symbol})
         return ex, false
     end
 
-    out_args = Array{Any}(length(ex.args))
+    out_args = Array{Any}(undef, length(ex.args))
     changed = false
 
     for (i, arg) in enumerate(ex.args)

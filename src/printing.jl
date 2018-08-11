@@ -2,7 +2,7 @@
 # latex printing #
 # -------------- #
 const latex_subs = let
-    repl_latex = Base.REPLCompletions.latex_symbols
+    repl_latex = REPL.REPLCompletions.latex_symbols
     unicode = Dict([(v, k) for (k, v) in repl_latex])
     tex_name = Dict([(strip(k, '\\'), k) for (k, v) in repl_latex])
     poppers = [k for k in keys(tex_name) if length(k)==1]
@@ -12,7 +12,7 @@ const latex_subs = let
     merge(unicode, tex_name)
 end
 
-function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
+function _latex!(io::IO, v::Symbol, n::Union{Nothing,Integer}=nothing)
     # split the symbol into parts
     v_string = string(v)
     v_string = strip(v_string, '_')  # undo Dolang normalization

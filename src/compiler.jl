@@ -169,7 +169,7 @@ function _jacobian_expr_mat(ff::FunctionFactory{T}) where T<:FlatArgs
     neq = length(ff.eqs)
     nvar = nargs(ff)
 
-    exprs = Array{Union{Symbol,Expr,Number}}(neq, nvar)
+    exprs = Array{Union{Symbol,Expr,Number}}(undef, neq, nvar)
     fill!(exprs, 0)
 
     non_zero = 0
@@ -497,7 +497,7 @@ function equation_block(ff::FunctionFactory{T}, ::TDer{2}) where T<:FlatArgs
     # create expressions that fill in the correct elements of i, j, v based
     # on the data in `vals` and the indices in `exprs`
     val_exprs = Union{Expr,Number,Symbol}[]
-    pop_exprs = Array{Expr}(n_terms)
+    pop_exprs = Array{Expr}(undef, n_terms)
     ix = 0
     for (i_eq, stuff) in enumerate(exprs)
         for ((i_v1, i_v2), _the_expr) in stuff

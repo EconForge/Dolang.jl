@@ -115,7 +115,7 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
             diff_args = collect(values(fff.arguments))[d]
             p = length(fff.targets)
             q = length(diff_args)
-            mat = Matrix{Symbol}(p, q)
+            mat = Matrix{Symbol}(undef, p, q)
             for i in 1:p
                 for j in 1:q
                     mat[i, j] = diff_symbol(targets[i], diff_args[j])
@@ -188,12 +188,12 @@ end
 # NOTE: for small arrays (probably <= 10 elements) the splatting below is
 #       faster than `reinterpret(SVector{length(v), Float64}, v)`
 to_SA(v::AbstractVector{Float64}) = SVector(v...)
-to_SA(v::AbstractMatrix{Float64}) = copy(reinterpret(SVector{size(v, 2),Float64}, copy(v'), (size(v, 1),)))
+to_SA(v::AbstractMatrix{Float64}) = copy(reshape(reinterpret(SVector{size(v, 2),Float64}, vec(copy(v'))), (size(v, 1),)))
 
 function from_SA(v::AbstractVector{SMatrix{p,q,Float64,k}}) where p where q where k
-    copy(permutedims(reinterpret(Float64, v, (p, q, size(v, 1))), [3, 1, 2]))
+    copy(permutedims(reshape(reinterpret(Float64, vec(v)), (p, q, size(v, 1))), [3, 1, 2]))
 end
-from_SA(v::AbstractVector{SVector{d,Float64}}) where d  = copy(reinterpret(Float64, v, (d, size(v, 1)))')
+from_SA(v::AbstractVector{SVector{d,Float64}}) where d  = copy(reshape(reinterpret(Float64, vec(v)), (d, size(v, 1)))')
 from_SA(v::SVector{d,Float64}) where d = Vector(v)
 
 # that one is a bit risky as from_SA(to_SA(mat)) != mat

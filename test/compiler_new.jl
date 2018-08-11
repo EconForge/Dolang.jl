@@ -37,10 +37,10 @@ pv = Vector(p)
 
 # we're list of points
 N = 5
-x_vec = reinterpret(SVector{1,Float64}, 1+rand(1,N), (N,))
-y_vec = reinterpret(SVector{3,Float64}, rand(3,N), (N,))
-z_vec = reinterpret(SVector{2,Float64}, rand(2,N), (N,))
-p_vec = reinterpret(SVector{1,Float64}, rand(1,N), (N,))
+x_vec = reshape(reinterpret(SVector{1,Float64}, 1+rand(1,N)), (N,))
+y_vec = reshape(reinterpret(SVector{3,Float64}, rand(3,N)), (N,))
+z_vec = reshape(reinterpret(SVector{2,Float64}, rand(2,N)), (N,))
+p_vec = reshape(reinterpret(SVector{1,Float64}, rand(1,N)), (N,))
 
 # as matrices
 x_mat = Dolang.from_SA(x_vec)

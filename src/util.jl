@@ -67,17 +67,17 @@ end
 _allocate_out(T::Type, n_expr::Int, args::AbstractVector...) = Array{T}(n_expr)
 
 _allocate_out(T::Type, order::Union{Type(COrder),Type(FOrder)}, n_expr::Int, arg::AbstractMatrix) =
-    Array{T}(_output_size(n_expr, order, arg))
+    Array{T}(undef, _output_size(n_expr, order, arg))
 
 _allocate_out(T::Type, n_expr::Int, arg::AbstractMatrix) =
-        Array{T}(_output_size(n_expr, arg))
+        Array{T}(undef, _output_size(n_expr, arg))
 
 function _allocate_out(T::Type, n_expr::Int, args...)
-    Array{T}(_output_size(n_expr, args...))
+    Array{T}(undef, _output_size(n_expr, args...))
 end
 
 function _allocate_out(T::Type, order::Union{Type(COrder),Type(FOrder)}, n_expr::Int, args...)
-    Array{T}(_output_size(n_expr, order, args...))
+    Array{T}(undef, _output_size(n_expr, order, args...))
 end
 
 ## Triangular solver
@@ -229,7 +229,8 @@ end
 function get_dependencies(defs::AbstractDict{T,U}) where T where U
     deps = OrderedDict{Any,Set{Any}}()
     for (k,v) in (defs)
-        ii = intersect( Set(union( collect( values( Dolang.list_symbols(v) ))... )), Set(keys(defs)))
+        ii = intersect( Set(( collect( values( Dolang.list_symbols(v) ))... ,)), Set(keys(defs)))
+        # ii = intersect( Set(union( collect( values( Dolang.list_symbols(v) ))... )), Set(keys(defs)))
         ij = Set(ii)
         deps[k] = ij
     end
