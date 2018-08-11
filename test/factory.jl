@@ -1,9 +1,9 @@
 @testset "factory" begin
 
-const flat_args = [(:a, 0), (:b, 1), (:c, -1)]
-const grouped_args = Dict(:x=>[(:a, 0), (:c, -1)], :y=>[(:b, 1)])
-const flat_params = [:beta, :delta]
-const grouped_params = Dict(:p => [:beta, :delta])
+flat_args = [(:a, 0), (:b, 1), (:c, -1)]
+grouped_args = Dict(:x=>[(:a, 0), (:c, -1)], :y=>[(:b, 1)])
+flat_params = [:beta, :delta]
+grouped_params = Dict(:p => [:beta, :delta])
 
 @testset " convert Grouped" begin
     @test sort(Dolang._to_flat(grouped_args), by=_junk->_junk[1]) == flat_args

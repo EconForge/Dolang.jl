@@ -93,11 +93,11 @@ end
 
 macro quickdef(symbols, api, content)
     funcode = copy((content).args[2])
-    new_funcode = rewrite_function(funcode, eval(symbols), eval(api))
+    new_funcode = rewrite_function(funcode, Core.eval(symbols), Core.eval(api))
     # if debug
         # println(new_funcode)
     # end
-    eval(new_funcode)
+    Core.eval(new_funcode)
 end
 
 symbols = Dict(
