@@ -147,15 +147,15 @@ function solve_triangular_system(d::OrderedDict)
     exprs = collect(values(d))[sol_order]
 
     # build expression to Core.evaluate system in correct order
-    to_Core.eval = Expr(:block)
-    to_Core.eval.args = [:($(i[1])=$(i[2])) for i in zip(nms, exprs)]
+    to_eval = Expr(:block)
+    to_eval.args = [:($(i[1])=$(i[2])) for i in zip(nms, exprs)]
 
     # add one line to return a tuple of all data
     ret = Expr(:tuple); ret.args = nms
 
     # now Core.evaluate and get data
-    data = Core.eval(Dolang, :(let
-                        $to_Core.eval;
+    data = eval(Dolang, :(let
+                        $to_eval;
                         $ret
                         end))
 
