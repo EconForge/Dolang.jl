@@ -76,7 +76,7 @@ By default `ff.dispatch` is set to `Dolang.SkipArg`. When
 section of the signature
 - `arg_names(ff)...` is simply the name of the arguments from `ff.args`. If
 `ff.args` is a `Vector` (more specifically a `Dolang.FlatArgs`), then this will
-be `[:V]`. If `ff.args` is some `Associative` structure, then this will be the
+be `[:V]`. If `ff.args` is some `AbstractDict` structure, then this will be the
 keys of that structure.
 - `param_names(ff)` is the same as `arg_names(ff)`, but applied to the
 `ff.params` field

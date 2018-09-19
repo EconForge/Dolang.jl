@@ -2,7 +2,7 @@
 # latex printing #
 # -------------- #
 const latex_subs = let
-    repl_latex = Base.REPLCompletions.latex_symbols
+    repl_latex = REPL.REPLCompletions.latex_symbols
     unicode = Dict([(v, k) for (k, v) in repl_latex])
     tex_name = Dict([(strip(k, '\\'), k) for (k, v) in repl_latex])
     poppers = [k for k in keys(tex_name) if length(k)==1]
@@ -12,11 +12,11 @@ const latex_subs = let
     merge(unicode, tex_name)
 end
 
-function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
+function _latex!(io::IO, v::Symbol, n::Union{Nothing,Integer}=nothing)
     # split the symbol into parts
     v_string = string(v)
     v_string = strip(v_string, '_')  # undo Dolang normalization
-    front_ix = findfirst(v_string, '_')
+    front_ix = something(findfirst(_x -> _x == '_', v_string), 0)
     if front_ix == 0
         # no subscripts or superscripts
         front = v_string
@@ -50,7 +50,8 @@ function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
     "bar" in mods && print(io, "}")
 
     # now work on subscripts
-    subscripts = strip.(matchall(r"(?<!_)_([a-zA-Z0-9]+)", back), ['_'])
+    _subs = collect(m.match for m in eachmatch(r"(?<!_)_([a-zA-Z0-9]+)", back))
+    subscripts = strip.(_subs, ['_'])
     has_subscript = !isempty(subscripts)
 
     # now print subscripts
@@ -74,7 +75,8 @@ function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
     (has_subscript || isa(n, Integer)) && print(io, "}")
 
     # now work on superscripts
-    superscripts = strip.(matchall(r"__([a-zA-Z0-9]+)", back), ['_'])
+    _sups = collect(m.match for m in eachmatch(r"__([a-zA-Z0-9]+)", back))
+    superscripts = strip.(_sups, ['_'])
     has_superscript = !isempty(superscripts)
     (has_superscript || "star" in mods) &&  print(io, "^{")
 
@@ -93,9 +95,9 @@ function _latex!(io::IO, v::Symbol, n::Union{Void,Integer}=nothing)
     (has_superscript || "star" in mods) &&  print(io, "}")
 end
 
-_latex!(io::IO, s::AbstractString) = _latex!(io, parse(s))
+_latex!(io::IO, s::AbstractString) = _latex!(io, Meta.parse(s))
 
-_latex!{T<:Integer}(io::IO, x::Tuple{Symbol,T}) = _latex!(io, x[1], x[2])
+_latex!(io::IO, x::Tuple{Symbol,T}) where {T<:Integer} = _latex!(io, x[1], x[2])
 
 _latex!(io::IO, x::Number) = print(io, string(x))
 
@@ -188,4 +190,4 @@ function latex(ex::Union{Expr,Symbol})
     String(take!(io))
 end
 
-latex(s::String) = latex(parse(s))
+latex(s::String) = latex(Meta.parse(s))

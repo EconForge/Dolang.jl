@@ -1,5 +1,5 @@
 module Misc
-export MarkovChain, ApproximationSpace, interp_1d, build_grid, eval_policy, solve_policy, get_calibration, mlinspace, triangular_system
+export MarkovChain, ApproximationSpace, interp_1d, build_grid, Core.eval_policy, solve_policy, get_calibration, mlinspace, triangular_system
 
 using Interpolations
 
@@ -53,7 +53,7 @@ end
 using splines
 using Optim
 
-function eval_policy(symbols, calibration, transition, felicity, discount, markov_chain, approx, policy, options=Dict())
+function Core.eval_policy(symbols, calibration, transition, felicity, discount, markov_chain, approx, policy, options=Dict())
 
     grid = build_grid(approx)
     d = size(grid,2)
@@ -273,7 +273,7 @@ function triangular_system(dict::Dict)
             if ~(in(k,keys(solutions)))
                 expr = dict[k]
                 try
-                    sol = eval( :(let $([:($x=$y) for (x, y) in solutions]...); $expr end) )
+                    sol = Core.eval( :(let $([:($x=$y) for (x, y) in solutions]...); $expr end) )
                     solutions[k] = sol
                     context[k] = sol
                     done_smthg = true

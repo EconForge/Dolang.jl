@@ -6,13 +6,13 @@
 # extract a single element. If `x` is a Matrix then extract one column of the
 # matrix
 @inline _unpack_var(x::AbstractVector, i::Integer) = x[i]
-@inline _unpack_var(x::AbstractMatrix, i::Integer, ::Type(COrder)) = view(x, :, i)
-@inline _unpack_var(x::AbstractMatrix, i::Integer, ::Type(FOrder)) = view(x, i, :)
+@inline _unpack_var(x::AbstractMatrix, i::Integer, ::Type{COrder}) = view(x, :, i)
+@inline _unpack_var(x::AbstractMatrix, i::Integer, ::Type{FOrder}) = view(x, i, :)
 @inline _unpack_var(x::AbstractMatrix, i::Integer) = view(x, :, i)
 
 # inlined function to extract a single observations of a vector fo variables.
-@inline _unpack_obs(x::AbstractMatrix, i::Integer, ::Type(COrder)) = view(x, i, :)
-@inline _unpack_obs(x::AbstractMatrix, i::Integer, ::Type(FOrder)) = view(x, :, i)
+@inline _unpack_obs(x::AbstractMatrix, i::Integer, ::Type{COrder}) = view(x, i, :)
+@inline _unpack_obs(x::AbstractMatrix, i::Integer, ::Type{FOrder}) = view(x, :, i)
 @inline _unpack_obs(x::AbstractMatrix, i::Integer) = view(x, i, :)
 @inline _unpack_obs(x::AbstractVector, i::Integer) = x
 
@@ -20,8 +20,8 @@
 # column of a matrix
 @inline _assign_var(lhs::AbstractVector, rhs::Number, i) = setindex!(lhs, rhs, i)
 @inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i) = setindex!(lhs, rhs, :, i)
-@inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i, ::Type(COrder)) = setindex!(lhs, rhs, :, i)
-@inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i, ::Type(FOrder)) = setindex!(lhs, rhs, i, :)
+@inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i, ::Type{COrder}) = setindex!(lhs, rhs, :, i)
+@inline _assign_var(lhs::AbstractMatrix, rhs::AbstractVector, i, ::Type{FOrder}) = setindex!(lhs, rhs, i, :)
 
 # determine the size of the output variable, given the number of expressions
 # in the equation and all the input arguments
@@ -40,7 +40,7 @@ function _output_size(n_expr::Int, args...)
                 # that all matrix arguments have conformable shapes
                 if nr != n_row
                     msg = string("Unconformable argument sizes. For vectorized",
-                                 " evaluation all matrix arguments must have ",
+                                 " Core.evaluation all matrix arguments must have ",
                                  "the same number of rows.")
                     throw(DimensionMismatch(msg))
                 end
@@ -53,10 +53,10 @@ function _output_size(n_expr::Int, args...)
     (n_row, n_expr)
 end
 
-_output_size(n_expr::Int, ::Type(COrder), args...)  = _output_size(n_expr::Int, args...)
+_output_size(n_expr::Int, ::Type{COrder}, args...)  = _output_size(n_expr::Int, args...)
 
-function _output_size(n_expr::Int, order::Type(FOrder), args...)
-    s = _output_size(n_expr::Int, order::Type(FOrder), args...)
+function _output_size(n_expr::Int, order::Type{FOrder}, args...)
+    s = _output_size(n_expr::Int, order::Type{FOrder}, args...)
     (s[2],s[1])
 end
 
@@ -64,20 +64,20 @@ end
 
 # Allocate an array of eltype `T` for `n_expr` variables that corresponds
 # to input arguments `args...`
-_allocate_out(T::Type, n_expr::Int, args::AbstractVector...) = Array{T}(n_expr)
+_allocate_out(T::Type, n_expr::Int, args::AbstractVector...) = Array{T}(undef, n_expr)
 
-_allocate_out(T::Type, order::Union{Type(COrder),Type(FOrder)}, n_expr::Int, arg::AbstractMatrix) =
-    Array{T}(_output_size(n_expr, order, arg))
+_allocate_out(T::Type, order::Union{Type{COrder},Type{FOrder}}, n_expr::Int, arg::AbstractMatrix) =
+    Array{T}(undef, _output_size(n_expr, order, arg))
 
 _allocate_out(T::Type, n_expr::Int, arg::AbstractMatrix) =
-        Array{T}(_output_size(n_expr, arg))
+        Array{T}(undef, _output_size(n_expr, arg))
 
 function _allocate_out(T::Type, n_expr::Int, args...)
-    Array{T}(_output_size(n_expr, args...))
+    Array{T}(undef, _output_size(n_expr, args...))
 end
 
-function _allocate_out(T::Type, order::Union{Type(COrder),Type(FOrder)}, n_expr::Int, args...)
-    Array{T}(_output_size(n_expr, order, args...))
+function _allocate_out(T::Type, order::Union{Type{COrder},Type{FOrder}}, n_expr::Int, args...)
+    Array{T}(undef, _output_size(n_expr, order, args...))
 end
 
 ## Triangular solver
@@ -131,13 +131,13 @@ function solution_order(d::OrderedDict, it::IncidenceTable, pre_solved::Vector{S
 end
 
 
-function solution_order(_d::Associative, pre_solved::Vector{Symbol}=Symbol[])
+function solution_order(_d::AbstractDict, pre_solved::Vector{Symbol}=Symbol[])
     d = OrderedDict(_d)
     it = Dolang.IncidenceTable(collect(values(d)))
     solution_order(d, it, pre_solved)
 end
 
-solve_triangular_system(d::Associative) = solve_triangular_system(OrderedDict(d))
+solve_triangular_system(d::AbstractDict) = solve_triangular_system(OrderedDict(d))
 
 function solve_triangular_system(d::OrderedDict)
     sol_order = solution_order(d)
@@ -146,23 +146,25 @@ function solve_triangular_system(d::OrderedDict)
     nms = collect(keys(d))[sol_order]
     exprs = collect(values(d))[sol_order]
 
-    # build expression to evaluate system in correct order
+    # build expression to Core.evaluate system in correct order
     to_eval = Expr(:block)
     to_eval.args = [:($(i[1])=$(i[2])) for i in zip(nms, exprs)]
 
     # add one line to return a tuple of all data
     ret = Expr(:tuple); ret.args = nms
 
-    # now evaluate and get data
-    data = eval(Dolang, :(let
-                        $to_eval;
-                        $ret
-                        end))
+    # now Core.evaluate and get data
+    data = eval(:(
+        let
+            $to_eval
+            $ret
+        end
+    ))
 
     OrderedDict{Symbol,Real}(zip(nms, data))
 end
 
-type TriangularSystemException <: Exception
+mutable struct TriangularSystemException <: Exception
     missing
 end
 
@@ -192,7 +194,7 @@ solve_dependency(system, [:x,:y,:z])
 the answer is the same as before since `:p` is not needed to
 define the values of `[:x,:y,:z]`.
 """
-function solve_dependencies(deps::Associative{T,Set{T}}, unknowns=nothing) where T
+function solve_dependencies(deps::AbstractDict{T,Set{T}}, unknowns=nothing) where T
     solution = []
     if unknowns == nothing
         needed = Set(keys(deps))
@@ -225,18 +227,23 @@ function solve_dependencies(deps::Associative{T,Set{T}}, unknowns=nothing) where
     return solution
 end
 
-
-function get_dependencies(defs::Associative{T,U}) where T where U
+function get_dependencies(defs::AbstractDict{T,U}) where T where U
     deps = OrderedDict{Any,Set{Any}}()
-    for (k,v) in (defs)
-        ii = intersect( Set(union( collect( values( Dolang.list_symbols(v) ))... )), Set(keys(defs)))
+    def_keys = keys(defs)
+    for (k, v) in (defs)
+        # get list of all symbols in this equation
+        _syms = collect(values(list_symbols(v)))
+        allsyms = length(_syms) > 0 ? Set(union(_syms...)) : Set()
+
+        # intersect that with the keys in our definitions
+        ii = intersect(allsyms, def_keys)
         ij = Set(ii)
         deps[k] = ij
     end
     deps
 end
 
-function reorder_triangular_block(defs::Associative{T,U}) where T where U
+function reorder_triangular_block(defs::AbstractDict{T,U}) where T where U
     deps = get_dependencies(defs)
     sol = Dolang.solve_dependencies(deps)
     return OrderedDict((k,defs[k]) for k in sol)
@@ -248,21 +255,21 @@ Keys are timed variables in canonical form (e.g. `(:v,0)`) at date t=0.
 Values are expressions, possibly referencing key variables at different dates.
 The system is recursively solved for the unknowns, by default the keys.
 """
-function solve_definitions(defs::Associative{Tuple{Symbol, Int}, <:SymExpr}, unknowns=keys(defs))
+function solve_definitions(defs::AbstractDict{Tuple{Symbol, Int}, <:SymExpr}, unknowns=keys(defs))
     # defs should map timed-vars to expressions.
-    defs = deepcopy(defs)
-    for (v,t) in collect(keys(defs))
+    _defs = deepcopy(defs)
+    for (v,t) in collect(keys(_defs))
         # t should always be 0
         @assert t==0
         for shift in (-1,1)
-            defs[(v,shift)] = Dolang.time_shift(defs[(v,t)], shift)
+            _defs[(v,shift)] = Dolang.time_shift(_defs[(v,t)], shift)
         end
     end
-    deps = Dolang.get_dependencies(defs)
+    deps = Dolang.get_dependencies(_defs)
     solution = Dolang.solve_dependencies(deps, unknowns)
     reordered = OrderedDict()
     for k in solution
-        reordered[k] = defs[k]
+        reordered[k] = _defs[k]
     end
     return reordered
 end

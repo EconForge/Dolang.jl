@@ -29,7 +29,7 @@ function _unpack_expr(names::Vector, rhs::Symbol)
     out = Expr(:block); out.args = _args; out
 end
 
-function _unpack_expr(d::Associative, _discard)
+function _unpack_expr(d::AbstractDict, _discard)
     _args = vcat([_unpack_expr(v, k) for (k, v) in d]...)
     out = Expr(:block); out.args = _args; out
 end
@@ -64,14 +64,14 @@ param_block(ff::FunctionFactory, vec::Symbol=:p) =
 
 arg_block(ff::FunctionFactory, vec::Symbol=:V) = _unpack_expr(ff.args, vec)
 
-"Evaluates main expressions in a function group and fills `out` with results"
+"Core.evaluates main expressions in a function group and fills `out` with results"
 function equation_block end
 
 # TODO: this loop is a hack to get around a method ambiguity error caused
 #       by the version of this function for arbitrary order derivative for
 #       FlatArg
 for T in (FlatArgs, GroupedArgs)
-    @eval function equation_block{T<:$(T)}(ff::FunctionFactory{T}, ::TDer{0}=Der{0})
+    @eval function equation_block(ff::FunctionFactory{T}, ::TDer{0}=Der{0}) where T<:$(T)
         n_expr = length(ff.eqs)
         func_block = Expr(:block)
 
@@ -81,7 +81,7 @@ for T in (FlatArgs, GroupedArgs)
                               ff.eqs, 1:n_expr)
             func_block.args = assignments
         else
-            # otherwise, need to parse the targets, evaluate them, and then set
+            # otherwise, need to parse the targets, Core.evaluate them, and then set
             # elements of out equal to the targets
             assignments = map((rhs, i) -> _assign_var_expr(:out, rhs, i),
                               ff.targets, 1:n_expr)
@@ -92,7 +92,7 @@ for T in (FlatArgs, GroupedArgs)
     end
 end
 
-function body_block{n}(ff::FunctionFactory, ::TDer{n})
+function body_block(ff::FunctionFactory, ::TDer{n}) where n
     _args = [param_block(ff), arg_block(ff), equation_block(ff, Der{n}),
              :(return out)]
     out = Expr(:block); out.args = _args; out
@@ -102,27 +102,27 @@ end
 # Function Signatures #
 # ------------------- #
 
-arg_names{T1<:FlatArgs}(::FunctionFactory{T1}) = [:V]
+arg_names(::FunctionFactory{T1}) where T1<:FlatArgs = [:V]
 
 # WARNING: This function will only work in a reliable way if the keys are
 #          guaranteed to come out in the same order each time. To ensure this
 #          we reccomend using an instance of `OrderedDict` from the
 #          DataStructures.jl package instead of a `Dict` from Base.
-arg_names{T1<:GroupedArgs}(ff::FunctionFactory{T1}) =
+arg_names(ff::FunctionFactory{T1}) where T1<:GroupedArgs =
     collect(keys(ff.args))::Vector{Symbol}
 
-param_names{T1,T2<:FlatParams}(::FunctionFactory{T1,T2}) = [:p]
+param_names(::FunctionFactory{T1,T2}) where T1 where T2<:FlatParams = [:p]
 
-param_names{T1,T2<:GroupedParams}(ff::FunctionFactory{T1,T2}) =
+param_names(ff::FunctionFactory{T1,T2}) where T1 where T2<:GroupedParams =
     collect(keys(ff.params))::Vector{Symbol}
 
-_extra_args{n}(ff::FunctionFactory, d::TDer{n}) =
+_extra_args(ff::FunctionFactory, d::TDer{n}) where n =
     ff.dispatch == SkipArg ? Any[:(::Dolang.TDer{$n})] :
                                 [:(::Dolang.TDer{$n}),
                                  :($(DISPATCH_ARG)::$(ff.dispatch))]
 
-function signature{n,T1<:FlatArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0},
-                                   argtype::Symbol=:AbstractVector)
+function signature(ff::FunctionFactory{T1}, d::TDer{n}=Der{0},
+                                   argtype::Symbol=:AbstractVector) where n where T1<:FlatArgs
     Expr(
         :call,
         ff.funname,
@@ -132,8 +132,8 @@ function signature{n,T1<:FlatArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0},
     )
 end
 
-function signature{n,T1<:GroupedArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0},
-                                      argtype::Symbol=:AbstractVector)
+function signature(ff::FunctionFactory{T1}, d::TDer{n}=Der{0},
+                                      argtype::Symbol=:AbstractVector) where n where T1<:GroupedArgs
     Expr(
         :call,
         ff.funname,
@@ -144,8 +144,8 @@ function signature{n,T1<:GroupedArgs}(ff::FunctionFactory{T1}, d::TDer{n}=Der{0}
 end
 
 "Method signature for mutating version of the function"
-function signature!{n}(ff::FunctionFactory, d::TDer{n}=Der{0},
-                       argtype::Symbol=:AbstractVector)
+function signature!(ff::FunctionFactory, d::TDer{n}=Der{0},
+                       argtype::Symbol=:AbstractVector) where n
     sig = signature(ff, d, argtype)
 
     # convert name to `!` version and insert `out` as first argument
@@ -160,7 +160,7 @@ end
 
 # first we need a couple of helper methods
 
-function _jacobian_expr_mat{T<:FlatArgs}(ff::FunctionFactory{T})
+function _jacobian_expr_mat(ff::FunctionFactory{T}) where T<:FlatArgs
     # NOTE: I'm starting with the easy version, where I just differentiate
     #       with respect to all arguments in the order they were given. It
     #       would be better if I went though `ff.incidence.by_var` and only
@@ -169,7 +169,7 @@ function _jacobian_expr_mat{T<:FlatArgs}(ff::FunctionFactory{T})
     neq = length(ff.eqs)
     nvar = nargs(ff)
 
-    exprs = Array{Union{Symbol,Expr,Number}}(neq, nvar)
+    exprs = Array{Union{Symbol,Expr,Number}}(undef, neq, nvar)
     fill!(exprs, 0)
 
     non_zero = 0
@@ -195,12 +195,12 @@ _output_size(ff::FunctionFactory, ::TDer{1}) =
     (length(ff.eqs), nargs(ff))
 
 # Now fill in FunctionFactory API
-function allocate_block{T<:FlatArgs}(ff::FunctionFactory{T}, d::TDer{1})
+function allocate_block(ff::FunctionFactory{T}, d::TDer{1}) where T<:FlatArgs
     expected_size = _output_size(ff, d)
     :(out = zeros(Float64, $(expected_size)))
 end
 
-function sizecheck_block{T<:FlatArgs}(ff::FunctionFactory{T}, d::TDer{1})
+function sizecheck_block(ff::FunctionFactory{T}, d::TDer{1}) where T<:FlatArgs
     expected_size = _output_size(ff, d)
     ex = quote
         if size(out) != $expected_size
@@ -215,7 +215,7 @@ function sizecheck_block{T<:FlatArgs}(ff::FunctionFactory{T}, d::TDer{1})
     ex
 end
 
-function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{1})
+function equation_block(ff::FunctionFactory{T}, ::TDer{1}) where T<:FlatArgs
     expr_mat, non_zero = _jacobian_expr_mat(ff)
     neq = size(expr_mat, 1)
     nvar = size(expr_mat, 2)
@@ -242,7 +242,7 @@ function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{1})
     out
 end
 
-function _jacobian_expr_mat{T<:GroupedArgs}(ff::FunctionFactory{T})
+function _jacobian_expr_mat(ff::FunctionFactory{T}) where T<:GroupedArgs
     # NOTE: I'm starting with the easy version, where I just differentiate
     #       with respect to all arguments in the order they were given. It
     #       would be better if I went though `ff.incidence.by_var` and only
@@ -274,7 +274,7 @@ function _jacobian_expr_mat{T<:GroupedArgs}(ff::FunctionFactory{T})
     all_exprs, non_zero
 end
 
-_output_sizes{T<:GroupedArgs}(ff::FunctionFactory{T}, ::TDer{1}) =
+_output_sizes(ff::FunctionFactory{T}, ::TDer{1}) where  T<:GroupedArgs =
     [(length(ff.eqs), length(v)) for v in values(ff.args)]
 
 # Now fill in FunctionFactory API
@@ -306,7 +306,7 @@ function sizecheck_block(ff::FunctionFactory, d::TDer{1})
     ex
 end
 
-function equation_block{T<:GroupedArgs}(ff::FunctionFactory{T}, ::TDer{1})
+function equation_block(ff::FunctionFactory{T}, ::TDer{1}) where T<:GroupedArgs
     expr_mats, non_zero = _jacobian_expr_mat(ff)
 
     # construct expressions that define the body of this function.
@@ -340,8 +340,8 @@ end
 # NOTE: allocations for the higher order derivatiaves are done in in the
 #       equation_block because it requires us to know the number of non-zero
 #       derivative terms, which we only know after we have constructed them.
-allocate_block{D}(ff::FunctionFactory, ::TDer{D}) = nothing
-sizecheck_block{D}(ff::FunctionFactory, ::TDer{D}) = nothing
+allocate_block(ff::FunctionFactory, ::TDer{D}) where D = nothing
+sizecheck_block(ff::FunctionFactory, ::TDer{D}) where D = nothing
 
 function make_deriv_loop(i::Int, der_order::Int)
     i < 1 && error("i must be positive")
@@ -400,7 +400,7 @@ end
 # code to generate derivative expressions. This could be put in the body of
 # the `@generated` function, but that makes it hard for me to see the code
 # that is generated, so I make it a standalone function.
-@compat function derivative_exprs_impl{D}(::Type{<:FunctionFactory{<:FlatArgs}}, ::TDer{D})
+function derivative_exprs_impl(::Type{<:FunctionFactory{<:FlatArgs}}, ::TDer{D}) where D
     # first, build the body of loops that differentiate an equation.
     body = make_deriv_loop(1, D)
 
@@ -431,11 +431,11 @@ end
     end
 end
 
-@generated function derivative_exprs{T<:FlatArgs,D}(ff::FunctionFactory{T}, ::TDer{D})
+@generated function derivative_exprs(ff::FunctionFactory{T}, ::TDer{D}) where T<:FlatArgs where D
     derivative_exprs_impl(ff, Der{D})
 end
 
-function equation_block{T<:FlatArgs,D}(ff::FunctionFactory{T}, ::TDer{D})
+function equation_block(ff::FunctionFactory{T}, ::TDer{D}) where T<:FlatArgs where D
     exprs = derivative_exprs(ff, Der{D})
     n_eqs = length(exprs)
     n_derivs_per_expr = map(length, exprs)
@@ -478,7 +478,7 @@ end
 # end
 
 # Ordering of hessian is H[eq, (v1,v2)]
-function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{2})
+function equation_block(ff::FunctionFactory{T}, ::TDer{2}) where T<:FlatArgs
     exprs = derivative_exprs(ff, Der{2})
     n_expr = length(exprs)
     nvar = nargs(ff)
@@ -497,7 +497,7 @@ function equation_block{T<:FlatArgs}(ff::FunctionFactory{T}, ::TDer{2})
     # create expressions that fill in the correct elements of i, j, v based
     # on the data in `vals` and the indices in `exprs`
     val_exprs = Union{Expr,Number,Symbol}[]
-    pop_exprs = Array{Expr}(n_terms)
+    pop_exprs = Array{Expr}(undef, n_terms)
     ix = 0
     for (i_eq, stuff) in enumerate(exprs)
         for ((i_v1, i_v2), _the_expr) in stuff
@@ -562,14 +562,14 @@ end
 # Putting functions together #
 # -------------------------- #
 
-func_body{n}(ff::FunctionFactory, d::TDer{n}) =
+func_body(ff::FunctionFactory, d::TDer{n}) where n =
     Expr(:block, allocate_block(ff, d), body_block(ff, d))
 
-func_body!{n}(ff::FunctionFactory, d::TDer{n}) =
+func_body!(ff::FunctionFactory, d::TDer{n}) where n =
     Expr(:block, sizecheck_block(ff, d), body_block(ff, d))
 
-function _build_function{n}(ff::FunctionFactory, d::TDer{n},
-                            sig_func::Function, body_func::Function)
+function _build_function(ff::FunctionFactory, d::TDer{n},
+                            sig_func::Function, body_func::Function) where n
     Expr(:function, sig_func(ff, d), body_func(ff, d))
 end
 
@@ -589,7 +589,7 @@ end
 #       don't do that because then we get overhead for allocating _and_
 #       for checking the size of out
 "Build allocating version of the method"
-build_function{n}(ff::FunctionFactory, d::TDer{n}) =
+build_function(ff::FunctionFactory, d::TDer{n}) where n =
     _build_function(ff, d, signature, func_body)
 
 "Build non-allocating version of the method"
@@ -602,7 +602,7 @@ for D in [0, 1]
 end
 
 # we don't support non-allocating methods for derivatives above 1
-build_function!{D}(ff::FunctionFactory, ::TDer{D}) =
+build_function!(ff::FunctionFactory, ::TDer{D}) where D =
     warn("Non-allocating order $(D) derivatives not supported")
 
 
@@ -610,8 +610,8 @@ build_function!{D}(ff::FunctionFactory, ::TDer{D}) =
 # Vectorized functions #
 # -------------------- #
 
-vec_signature!{n}(ff::FunctionFactory, d::TDer{n}=Der{0}) = signature!(ff, d, :AbstractArray)
-vec_signature{n}(ff::FunctionFactory, d::TDer{n}=Der{0}) = signature(ff, d, :AbstractArray)
+vec_signature!(ff::FunctionFactory, d::TDer{n}=Der{0})  where n = signature!(ff, d, :AbstractArray)
+vec_signature(ff::FunctionFactory, d::TDer{n}=Der{0}) where n = signature(ff, d, :AbstractArray)
 
 function vec_body_block(ff::FunctionFactory, d::TDer{0})
     # use signature to figure out how to call non-vectorized version within the
@@ -648,16 +648,16 @@ function vec_body_block(ff::FunctionFactory, d::TDer{0})
     )
 end
 
-vec_func_body{n}(ff::FunctionFactory, d::TDer{n}) =
+vec_func_body(ff::FunctionFactory, d::TDer{n}) where n =
     Expr(:block, allocate_block(ff, d), vec_body_block(ff, d))
 
-vec_func_body!{n}(ff::FunctionFactory, d::TDer{n}) =
+vec_func_body!(ff::FunctionFactory, d::TDer{n}) where n =
     Expr(:block, sizecheck_block(ff, d), vec_body_block(ff, d))
 
-build_vec_function{n}(ff::FunctionFactory, d::TDer{n}) =
+build_vec_function(ff::FunctionFactory, d::TDer{n}) where n =
     _build_function(ff, d, vec_signature, vec_func_body)
 
-build_vec_function!{n}(ff::FunctionFactory, d::TDer{n}) =
+build_vec_function!(ff::FunctionFactory, d::TDer{n}) where n =
     _build_function(ff, d, vec_signature!, vec_func_body!)
 
 # -------- #
@@ -685,7 +685,7 @@ See [`make_function(ff::FunctionFactory)`](@ref) for more details.
 
 This method is less flexible than constructing the `FunctionFactory` by hand
 because you can only create that have one vector for arguments and one vector
-for symbols. Meaning you cannot construct an associative mapping for `args` or
+for symbols. Meaning you cannot construct an AbstractDict mapping for `args` or
 `params` that groups symbols together.
 """
 function make_function(
@@ -723,25 +723,25 @@ Compile a function using data in `ff`; with methods for
 - various order of derivative
 - Allocating output arguments
 - Non-allocating functions that mutate the input argument
-- (partially-)Vectorized evaluation
+- (partially-)Vectorized Core.evaluation
 
 See [`FunctionFactory`](@ref) for a description of how the fields of `ff`
 impact the generated code.
 
-In non-vectorized evaluation, all function arguments should be vectors and will
+In non-vectorized Core.evaluation, all function arguments should be vectors and will
 be unpacked into scalars according to `ff.args` and `ff.params`. If any
 argument is an  `AbstractMatrix`, then each column of the matrix is assumed to
 be multiple observations of a single variable. All matrix arguments must have
 the same number of rows. Let this number be `n`. Any arguments passed as
 vectors will be implicitly repeated `n` times and the function will be
-evaluated with these vectors and the `n` observations of each matrix argument.
+Core.evaluated with these vectors and the `n` observations of each matrix argument.
 
 ## Note
 
 The output will be an `@generated` function
-that can be evaluated at arbitrary order of analytical derivative -- with
+that can be Core.evaluated at arbitrary order of analytical derivative -- with
 derivative computation and function compilation happening at runtime upon the
-user's first request to evaluate that order derivative.
+user's first request to Core.evaluate that order derivative.
 """
 function make_function(ff::FunctionFactory)
     out = Expr(:block)
@@ -749,25 +749,33 @@ function make_function(ff::FunctionFactory)
     sig = super_signature(ff, signature)
     body = Expr(:block, :(ff = $ff), :(Dolang.func_body(ff, Der{D})))
     gen_func_body = Expr(:function, sig, body)
-    push!(out.args, Expr(:macrocall, Symbol("@generated"), gen_func_body))
+    # push!(out.args, Expr(:macrocall, Symbol("@generated"), gen_func_body))
+    push!(out.args, :(@generated $gen_func_body))
+
 
     # make generated, mutating function
     sig! = super_signature(ff, signature!)
     body! = Expr(:block, :(ff = $ff), :(Dolang.func_body!(ff, Der{D})))
     gen_func!_body = Expr(:function, sig!, body!)
-    push!(out.args, Expr(:macrocall, Symbol("@generated"), gen_func!_body))
+    # push!(out.args, Expr(:macrocall, Symbol("@generated"), gen_func!_body))
+    push!(out.args, :(@generated $gen_func!_body))
+
 
     # NOTE: I add these specializations to overcome method abiguity introduced
     #       by the vectorized routines below
     sig0 = signature(ff, Der{0})
     body0 = Expr(:block, :(ff = $ff), :(Dolang.func_body(ff, Der{0})))
     func_body0 = Expr(:function, sig0, body0)
-    push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0))
+    # push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0))
+    push!(out.args, :(@generated $func_body0))
+
 
     sig0! = signature!(ff, Der{0})
     body0! = Expr(:block, :(ff = $ff), :(Dolang.func_body!(ff, Der{0})))
     func_body0! = Expr(:function, sig0!, body0!)
-    push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0!))
+    # push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0!))
+    push!(out.args, :(@generated $func_body0!))
+
 
     # also make a method(s) without the Der{0} for backwards compat
     for sig_func in (signature, signature!)
@@ -799,7 +807,7 @@ function extra_methods(ff::FunctionFactory)
     out = Expr[]
     return out
 end
-function extra_methods{T<:FlatArgs}(ff::FunctionFactory{T})
+function extra_methods(ff::FunctionFactory{T}) where T<:FlatArgs
     out = Expr[]
     return out
 end
