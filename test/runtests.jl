@@ -2,7 +2,7 @@ module DolangTests
 
 using Dolang
 using DataStructures
-using Test
+using Test, SparseArrays
 using StaticArrays
 #
 # tests = length(ARGS) > 0 ? ARGS : [
