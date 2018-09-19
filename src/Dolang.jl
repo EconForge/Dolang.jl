@@ -8,7 +8,7 @@ const DOLANG_FUNCTIONS = Set([:sin, :cos, :tan, :exp, :log, :log10])
 push!(DOLANG_FUNCTIONS, ARITH_SYMBOLS...)
 
 import Base: ==
-import REPL
+import REPL, SparseArrays
 
 using Printf
 export make_function, Der, FunctionFactory, normalize, is_time_shift, time_shift,

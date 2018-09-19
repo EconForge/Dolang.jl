@@ -1,7 +1,5 @@
 @testset "compiler" begin
 
-using Dolang, DataStructures, Base.Test
-
 eqs = [:(foo(0) = log(a(0))+b(0)/x(-1)), :(bar(0) = c(1)+u*d(1))]
 args = [(:a, -1), (:a, 0), (:b, 0), (:c, 0), (:c, 1), (:d, 1)]
 params = [:u]
@@ -517,16 +515,16 @@ end
         @test want_d!_vec == Dolang.build_vec_function!(ffd, Der{0})
     end
 
-    @testset " Core.evaluating compiled code" begin
+    @testset "evaluating compiled code" begin
         # prep convenience make_function method arguments
         variables = vcat(args, :u)
         to_diff = 1:length(args)
         conv_code = make_function(eqs, variables, to_diff, name=:anon, targets=targets, defs=defs)
-        Core.eval(current_module(), conv_code)
-        Core.eval(current_module(), Dolang.make_function(ff))
+        Core.eval(@__MODULE__, conv_code)
+        Core.eval(@__MODULE__, Dolang.make_function(ff))
         for (fun, fun!) in [(myfun, myfun!), (anon, anon!)]
             u = rand()
-            V = rand(6)+4
+            V = rand(6) .+ 4
             am, a, b, c, cp, dp = V
             p = [u]
 
@@ -545,12 +543,12 @@ end
             @test want ≈ out
 
             # test vectorized version
-            Vmat = repmat(V', 40, 1)
+            Vmat = repeat(V', 40, 1)
             @test maximum(abs, want' .- fun(Vmat, p)) < 1e-15
             @test maximum(abs, want' .- fun(Dolang.Der{0}, Vmat, p)) < 1e-15
 
             # test vectorized mutating version
-            out_mat = Array{Float64}(40, 2)
+            out_mat = Array{Float64}(undef, 40, 2)
             fun!(out_mat, Vmat, p)
             @test maximum(abs, want' .- out_mat) < 1e-15
 
@@ -624,7 +622,7 @@ end
     p = [0.99, 5.0, 1.0, 23.9579, 0.025, 0.33, 0.8, 0.0, 0.016]
 
     code = make_function(ff_grouped)
-    Core.eval(current_module(), code)
+    Core.eval(@__MODULE__, code)
 
     # allocating
     want = [1.0123335492995267e-5, 4.255452989987418e-9]

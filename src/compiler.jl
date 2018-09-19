@@ -222,7 +222,7 @@ function equation_block(ff::FunctionFactory{T}, ::TDer{1}) where T<:FlatArgs
 
     # construct expressions that define the body of this function.
     # we need neq*nvar of them
-    expr_args = Array{Expr}(non_zero)
+    expr_args = Array{Expr}(undef, non_zero)
 
     # To do this we use linear indexing tricks to access `out` and `expr_mat`.
     # Note the offset on the index to expr_args also (needed because allocating)
@@ -250,7 +250,7 @@ function _jacobian_expr_mat(ff::FunctionFactory{T}) where T<:GroupedArgs
     args = ff.args
     neq = length(ff.eqs)
 
-    all_exprs = [Array{Union{Symbol,Expr,Number}}(neq, length(v)) for v in values(args)]
+    all_exprs = [Array{Union{Symbol,Expr,Number}}(undef, neq, length(v)) for v in values(args)]
     map(x -> fill!(x, 0), all_exprs)
 
     non_zero = fill(0, length(all_exprs))
@@ -311,7 +311,7 @@ function equation_block(ff::FunctionFactory{T}, ::TDer{1}) where T<:GroupedArgs
 
     # construct expressions that define the body of this function.
     # we need neq*nvar of them
-    expr_args = Array{Expr}(sum(non_zero))
+    expr_args = Array{Expr}(undef, sum(non_zero))
 
     # To do this we use linear indexing tricks to access `out` and `expr_mat`.
     # Note the offset on the index to expr_args also (needed because allocating)
@@ -411,12 +411,12 @@ function derivative_exprs_impl(::Type{<:FunctionFactory{<:FlatArgs}}, ::TDer{D})
         nvar = nargs(ff)
 
         # instantiate the array that will hold the output
-        terms = Vector{Vector{Tuple{NTuple{$D,Int},Union{Expr,Symbol,Number}}}}(0)
+        terms = Vector{Vector{Tuple{NTuple{$D,Int},Union{Expr,Symbol,Number}}}}(undef, 0)
 
         # loop over equations and call the body we built above to populate
         # terms
         for i_eq in 1:neq
-            eq_terms = Vector{Tuple{NTuple{$D,Int},Union{Expr,Symbol,Number}}}(0)
+            eq_terms = Vector{Tuple{NTuple{$D,Int},Union{Expr,Symbol,Number}}}(undef, 0)
             ex = _rhs_only(ff.eqs[i_eq])
             eq_prepped = prep_deriv(ex)
             eq_incidence = ff.incidence.by_eq[i_eq]
@@ -442,7 +442,7 @@ function equation_block(ff::FunctionFactory{T}, ::TDer{D}) where T<:FlatArgs whe
     out_eq_T = Dict{NTuple{D,Int},Float64}
     out_T = Vector{out_eq_T}
 
-    populate_exprs = Vector{Expr}(sum(n_derivs_per_expr))
+    populate_exprs = Vector{Expr}(undef, sum(n_derivs_per_expr))
     ix = 0
     for i_eq in 1:n_eqs
         for (ind, val) in exprs[i_eq]
@@ -511,7 +511,7 @@ function equation_block(ff::FunctionFactory{T}, ::TDer{2}) where T<:FlatArgs
             push!(val_exprs, Expr(:(=), val_sym, _the_expr))
 
             # value of j
-            j = sub2ind((nvar, nvar), i_v1, i_v2)
+            j = LinearIndices((nvar, nvar))[i_v1, i_v2]
             pop_exprs[ix] = Expr(:block,
                 :(setindex!(i, $(i_eq), $(ix))),
                 :(setindex!(j, $(j), $(ix))),
@@ -521,7 +521,7 @@ function equation_block(ff::FunctionFactory{T}, ::TDer{2}) where T<:FlatArgs
             if i_v1 != i_v2
                 # here we also need to fill the symmetric off diagonal element
                 ix += 1
-                j2 = sub2ind((nvar, nvar), i_v2, i_v1)
+                j2 = LinearIndices((nvar, nvar))[i_v2, i_v1]
                 pop_exprs[ix] = Expr(:block,
                     :(setindex!(i, $(i_eq), $(ix))),
                     :(setindex!(j, $(j2), $(ix))),
@@ -540,9 +540,9 @@ function equation_block(ff::FunctionFactory{T}, ::TDer{2}) where T<:FlatArgs
 
     # finally construct the whole blocks
     out = quote
-        i = Array{Int}($(n_terms))
-        j = Array{Int}($(n_terms))
-        v = Array{Float64}($(n_terms))
+        i = Array{Int}(undef, $(n_terms))
+        j = Array{Int}(undef, $(n_terms))
+        v = Array{Float64}(undef, $(n_terms))
 
         # include vals
         $vals
@@ -710,9 +710,8 @@ end
 
 function super_signature(ff::FunctionFactory, sig_func)
     sig = sig_func(ff)
-    sig.args[1] = Expr(:curly, sig.args[1], :D)
     sig.args[2] = :(::Dolang.TDer{D})
-    sig
+    Expr(:where, sig, :D)
 end
 
 """
@@ -745,6 +744,21 @@ user's first request to Core.evaluate that order derivative.
 """
 function make_function(ff::FunctionFactory)
     out = Expr(:block)
+    # also make a method(s) without the Der{0} for backwards compat
+    for sig_func in (signature, signature!)
+        sig = sig_func(ff, Der{0})
+        no_der_sig = deepcopy(sig)
+        splice!(no_der_sig.args, 2)
+        call_der0_sig = deepcopy(sig)
+        call_der0_sig.args[2] = :(Dolang.Der{0})
+        no_der_func = Expr(:function, no_der_sig, call_der0_sig)
+        push!(out.args, no_der_func)
+    end
+
+    # also make vectorized functions for Der{0}
+    push!(out.args, build_vec_function(ff, Der{0}))
+    push!(out.args, build_vec_function!(ff, Der{0}))
+
     # make generated, allocating function
     sig = super_signature(ff, signature)
     body = Expr(:block, :(ff = $ff), :(Dolang.func_body(ff, Der{D})))
@@ -775,22 +789,6 @@ function make_function(ff::FunctionFactory)
     func_body0! = Expr(:function, sig0!, body0!)
     # push!(out.args, Expr(:macrocall, Symbol("@generated"), func_body0!))
     push!(out.args, :(@generated $func_body0!))
-
-
-    # also make a method(s) without the Der{0} for backwards compat
-    for sig_func in (signature, signature!)
-        sig = sig_func(ff, Der{0})
-        no_der_sig = deepcopy(sig)
-        splice!(no_der_sig.args, 2)
-        call_der0_sig = deepcopy(sig)
-        call_der0_sig.args[2] = :(Dolang.Der{0})
-        no_der_func = Expr(:function, no_der_sig, call_der0_sig)
-        push!(out.args, no_der_func)
-    end
-
-    # also make vectorized functions for Der{0}
-    push!(out.args, build_vec_function(ff, Der{0}))
-    push!(out.args, build_vec_function!(ff, Der{0}))
 
     extras = extra_methods(ff)
     if !isempty(extras)
