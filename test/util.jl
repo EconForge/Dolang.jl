@@ -1,6 +1,6 @@
 @testset "util" begin
     x = [1, 2, 3]
-    X = eye(3)
+    X = [1 0 0; 0 1 0; 0 0 1]
 
     @test Dolang._unpack_var(x, 1) == 1
     @test Dolang._unpack_var(x, 2) == 2
@@ -29,7 +29,7 @@
     @test Dolang._output_size(4, X, x, X) == (3, 4)
     @test Dolang._output_size(4, x, X, x) == (3, 4)
 
-    @test_throws DimensionMismatch Dolang._output_size(4, X, eye(4))
+    @test_throws DimensionMismatch Dolang._output_size(4, X, rand(4, 4))
 
     foo = Dolang._allocate_out(Int, 4, x)
     @test isa(foo, Vector{Int})
@@ -146,9 +146,9 @@ end  # @testset "util"
     @testset "Solve definitions" begin
 
         defs = Dict(
+            (:rho, 0) => :(c(0) / c(-1)),
             (:V, 0)   => :(c ^ (1 - gamma) / (1 - gamma)),
             (:c, 0)   => :(y(0) ^ theta - i(0)),
-            (:rho, 0) => :(c(0) / c(-1))
         )
         solved_defs = OrderedDict(
             (:V, 0)   => :(c ^ (1 - gamma) / (1 - gamma)),

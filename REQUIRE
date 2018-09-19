@@ -1,6 +1,4 @@
 julia 0.6
 DataStructures
-Compat 0.18
 SymEngine
 StaticArrays
-REPL

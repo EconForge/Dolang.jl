@@ -332,11 +332,11 @@ function gen_generated_kernel(fff::FlatFunctionFactory)
 end
 
 
-function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname, dispatch=nothing)
+function gen_generated_gufun(fff::FlatFunctionFactory; funname=fff.funname, dispatch=Nothing)
 
     args = collect(keys(fff.arguments))
     dispatch_argtype = Meta.parse(string(dispatch))
-    dispatch_arg = dispatch == nothing ? [] : [:(::$(dispatch_argtype))]
+    dispatch_arg = dispatch == Nothing ? [] : [:(::$(dispatch_argtype))]
     meta_code = quote
         # basic fun for compat
         @generated function $funname($(dispatch_arg...), $(args...), out=nothing)

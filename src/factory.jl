@@ -20,15 +20,15 @@ end
 # ---------- #
 
 const FlatArgs = AbstractVector
-@compat const GroupedArgs = AbstractDict{Symbol,<:Any}
+const GroupedArgs = AbstractDict{Symbol,<:Any}
 const ArgType = Union{FlatArgs,GroupedArgs}
 
 const FlatParams = AbstractVector
-@compat const GroupedParams = AbstractDict{Symbol,<:Any}
+const GroupedParams = AbstractDict{Symbol,<:Any}
 const ParamType = Union{FlatParams,GroupedParams}
 
 struct Der{T} end
-@compat const TDer{n} = Type{Der{n}}
+const TDer{n} = Type{Der{n}}
 
 struct SkipArg end
 
@@ -165,7 +165,7 @@ function Base.show(io::IO, ::MIME"text/plain", ff::FunctionFactory)
     @printf io "%16s: %s\n" "Has targets?" !isempty(ff.targets)
 end
 
-@compat const FFSkipArg{T1,T2,T3} = FunctionFactory{T1,T2,T3,Type{SkipArg}}
+const FFSkipArg{T1,T2,T3} = FunctionFactory{T1,T2,T3,Type{SkipArg}}
 
 # default outer constructor to do inference and fill in type params
 function FunctionFactory(eqs::Vector{Expr}, args::T1, params::T2,

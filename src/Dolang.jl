@@ -7,8 +7,6 @@ const ARITH_SYMBOLS = Set([:+, :-, :*, :/, :^])
 const DOLANG_FUNCTIONS = Set([:sin, :cos, :tan, :exp, :log, :log10])
 push!(DOLANG_FUNCTIONS, ARITH_SYMBOLS...)
 
-using Compat: view, String, @compat
-
 import Base: ==
 import REPL
 
@@ -18,7 +16,7 @@ export make_function, Der, FunctionFactory, normalize, is_time_shift, time_shift
        list_parameters
 
 # come convenience methods
-_replace_star_star(s::AbstractString) = replace(s, "**", "^")
+_replace_star_star(s::AbstractString) = replace(s, "**" => "^")
 
 _to_expr(x::Expr) = x
 _to_expr(x::Union{Symbol,Number}) = Expr(:block, x)

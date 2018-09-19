@@ -1,9 +1,9 @@
 module DolangTests
 
 using Dolang
-using Compat
 using DataStructures
-using Base.Test
+using Test
+using StaticArrays
 #
 # tests = length(ARGS) > 0 ? ARGS : [
 #                                    "symbolic",
@@ -18,12 +18,12 @@ using Base.Test
 #     include("$(t).jl")
 # end
 
-# include("symbolic.jl")
-# include("incidence.jl")
-# include("factory.jl")
+include("symbolic.jl")
+include("incidence.jl")
+include("factory.jl")
 # include("compiler.jl")
 include("compiler_new.jl")
-# include("util.jl")
-# include("printing.jl")
+include("util.jl")
+include("printing.jl")
 
 end

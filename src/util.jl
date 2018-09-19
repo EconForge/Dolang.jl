@@ -64,7 +64,7 @@ end
 
 # Allocate an array of eltype `T` for `n_expr` variables that corresponds
 # to input arguments `args...`
-_allocate_out(T::Type, n_expr::Int, args::AbstractVector...) = Array{T}(n_expr)
+_allocate_out(T::Type, n_expr::Int, args::AbstractVector...) = Array{T}(undef, n_expr)
 
 _allocate_out(T::Type, order::Union{Type{COrder},Type{FOrder}}, n_expr::Int, arg::AbstractMatrix) =
     Array{T}(undef, _output_size(n_expr, order, arg))
@@ -154,10 +154,12 @@ function solve_triangular_system(d::OrderedDict)
     ret = Expr(:tuple); ret.args = nms
 
     # now Core.evaluate and get data
-    data = eval(Dolang, :(let
-                        $to_eval;
-                        $ret
-                        end))
+    data = eval(:(
+        let
+            $to_eval
+            $ret
+        end
+    ))
 
     OrderedDict{Symbol,Real}(zip(nms, data))
 end
@@ -229,8 +231,8 @@ end
 function get_dependencies(defs::AbstractDict{T,U}) where T where U
     deps = OrderedDict{Any,Set{Any}}()
     for (k,v) in (defs)
-        ii = intersect( Set(( collect( values( Dolang.list_symbols(v) ))... ,   )), Set(keys(defs)))
-        # ii = intersect( Set(union( collect( values( Dolang.list_symbols(v) ))... )), Set(keys(defs)))
+        # ii = intersect( Set(( collect( values( Dolang.list_symbols(v) ))... ,   )), Set(keys(defs)))
+        ii = intersect( Set(union( collect( values( Dolang.list_symbols(v) ))... )), Set(keys(defs)))
         ij = Set(ii)
         deps[k] = ij
     end
@@ -251,19 +253,19 @@ The system is recursively solved for the unknowns, by default the keys.
 """
 function solve_definitions(defs::AbstractDict{Tuple{Symbol, Int}, <:SymExpr}, unknowns=keys(defs))
     # defs should map timed-vars to expressions.
-    defs = deepcopy(defs)
-    for (v,t) in collect(keys(defs))
+    _defs = deepcopy(defs)
+    for (v,t) in collect(keys(_defs))
         # t should always be 0
         @assert t==0
         for shift in (-1,1)
-            defs[(v,shift)] = Dolang.time_shift(defs[(v,t)], shift)
+            _defs[(v,shift)] = Dolang.time_shift(_defs[(v,t)], shift)
         end
     end
-    deps = Dolang.get_dependencies(defs)
+    deps = Dolang.get_dependencies(_defs)
     solution = Dolang.solve_dependencies(deps, unknowns)
     reordered = OrderedDict()
     for k in solution
-        reordered[k] = defs[k]
+        reordered[k] = _defs[k]
     end
     return reordered
 end

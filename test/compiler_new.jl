@@ -1,5 +1,4 @@
-using StaticArrays
-using Dolang, DataStructures, Base.Test
+@testset "compiler_new" begin
 
 eqs = [:(foo(0) = log(a(0))+b(0)/x(-1)), :(bar(0) = c(1)+u*d(1))]
 args = [(:a, -1), (:a, 0), (:b, 0), (:c, 0), (:c, 1), (:d, 1)]
@@ -8,10 +7,10 @@ defs = Dict(:x=>:(a(0)/(1-c(1))))
 targets = [(:foo, 0), (:bar, 0)]
 funname = :myfun
 
-const flat_args = [(:a, 0), (:b, 1), (:c, -1)]
-const grouped_args = OrderedDict(:x=>[(:a, -1),], :y=>[(:a, 0), (:b, 0), (:c, 0)], :z=>[(:c, 1), (:d, 1)])
-const flat_params = [:beta, :delta]
-const grouped_params = Dict(:p => [:u])
+flat_args = [(:a, 0), (:b, 1), (:c, -1)]
+grouped_args = OrderedDict(:x=>[(:a, -1),], :y=>[(:a, 0), (:b, 0), (:c, 0)], :z=>[(:c, 1), (:d, 1)])
+flat_params = [:beta, :delta]
+grouped_params = Dict(:p => [:u])
 
 args2 = vcat(args, targets)::Vector{Tuple{Symbol,Int}}
 
@@ -37,7 +36,7 @@ pv = Vector(p)
 
 # we're list of points
 N = 5
-x_vec = reshape(reinterpret(SVector{1,Float64}, 1+rand(1,N)), (N,))
+x_vec = reshape(reinterpret(SVector{1,Float64}, 1 .+ rand(1,N)), (N,))
 y_vec = reshape(reinterpret(SVector{3,Float64}, rand(3,N)), (N,))
 z_vec = reshape(reinterpret(SVector{2,Float64}, rand(2,N)), (N,))
 p_vec = reshape(reinterpret(SVector{1,Float64}, rand(1,N)), (N,))
@@ -151,4 +150,5 @@ p_mat = Dolang.from_SA(p_vec)
 
     end
 
+end
 end
