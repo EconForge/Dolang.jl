@@ -227,12 +227,16 @@ function solve_dependencies(deps::AbstractDict{T,Set{T}}, unknowns=nothing) wher
     return solution
 end
 
-
 function get_dependencies(defs::AbstractDict{T,U}) where T where U
     deps = OrderedDict{Any,Set{Any}}()
-    for (k,v) in (defs)
-        # ii = intersect( Set(( collect( values( Dolang.list_symbols(v) ))... ,   )), Set(keys(defs)))
-        ii = intersect( Set(union( collect( values( Dolang.list_symbols(v) ))... )), Set(keys(defs)))
+    def_keys = keys(defs)
+    for (k, v) in (defs)
+        # get list of all symbols in this equation
+        _syms = collect(values(list_symbols(v)))
+        allsyms = length(_syms) > 0 ? Set(union(_syms...)) : Set()
+
+        # intersect that with the keys in our definitions
+        ii = intersect(allsyms, def_keys)
         ij = Set(ii)
         deps[k] = ij
     end
