@@ -4,7 +4,7 @@
 # slow and fails shamelessly if only SVectors are supplied
 function _getsize(arrays::Union{AbstractArray,<:SVector}...)
 # function _getsize(arrays::Union{AbstractVector,Adjoint,<:SVector}...)
-    vectors_length = Int[length(a) for a in arrays if isa(a, AbstractArray)]
+    vectors_length = Int[length(a) for a in arrays if ~isa(a, SVector)]
     @assert length(vectors_length)>0
     maximum(vectors_length)
 end
