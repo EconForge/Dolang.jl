@@ -357,8 +357,7 @@ function FlatFunctionFactory(equations::OrderedDict, arguments::OrderedDict, def
     needed_defs = setdiff(all_vars, present_vars)
 
     defs = solve_definitions(definitions, needed_defs)
-
-    defs_normalized = OrderedDict{Symbol,SymExpr}([normalize(k)=>normalize.(v) for (k,v) in defs])
+    defs_normalized = OrderedDict{Symbol,SymExpr}([normalize(k)=>normalize(v) for (k,v) in defs])
     args_normalized = OrderedDict{Symbol,Vector{Symbol}}([k=>normalize.(v) for (k,v) in arguments])
     eqs_normalized = OrderedDict{Symbol, SymExpr}([normalize(k)=>normalize(v) for (k,v) in equations])
     targets = [keys(eqs_normalized)...]
