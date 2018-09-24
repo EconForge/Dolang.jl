@@ -15,164 +15,164 @@ Pages = ["symbolic.md"]
 Depth = 2
 ```
 
-## `normalize`
+## `stringify`
 
-The `normalize` function converts expressions and symbols into Dolang's internal
+The `stringify` function converts expressions and symbols into Dolang's internal
 representation. There are various methods for this function:
 
 ```@docs
-normalize(::Symbol)
+stringify(::Symbol)
 ```
 
 **Examples**
 
 ```jldoctest
-julia> normalize(:c)
+julia> stringify(:c)
 :_c_
 
-julia> normalize(:_c)
+julia> stringify(:_c)
 :__c_
 
-julia> normalize(:_c_)
+julia> stringify(:_c_)
 :_c_
 
-julia> normalize(:x_ijk)
+julia> stringify(:x_ijk)
 :_x_ijk_
 
-julia> normalize(:x_ijk_)
+julia> stringify(:x_ijk_)
 :_x_ijk__
 
-julia> normalize(:_x_ijk_)
+julia> stringify(:_x_ijk_)
 :_x_ijk_
 ```
 
 ```@docs
-normalize(::Number)
+stringify(::Number)
 ```
 
 **Examples**
 
 ```jldoctest
-julia> normalize(-1)
+julia> stringify(-1)
 -1
 
-julia> normalize(0)
+julia> stringify(0)
 0
 
-julia> normalize(1)
+julia> stringify(1)
 1
 ```in
 
 ```@docs
-normalize(::Symbol, ::Integer)
+stringify(::Symbol, ::Integer)
 ```
 
 **Examples**
 
 ```jldoctest
-julia> normalize(:x, 0)
+julia> stringify(:x, 0)
 :_x__0_
 
-julia> normalize(:x, 1)
+julia> stringify(:x, 1)
 :_x__1_
 
-julia> normalize(:x, -1)
+julia> stringify(:x, -1)
 :_x_m1_
 
-julia> normalize(:x, -100)
+julia> stringify(:x, -100)
 :_x_m100_
 
-julia> normalize("x", 0)
+julia> stringify("x", 0)
 :_x__0_
 
-julia> normalize("x", 1)
+julia> stringify("x", 1)
 :_x__1_
 
-julia> normalize("x", -1)
+julia> stringify("x", -1)
 :_x_m1_
 
-julia> normalize("x", -100)
-:_x_m100_
-```
-
-```@docs
-normalize(::Tuple{Symbol,Integer})
-```
-
-**Examples**
-
-```jldoctest
-julia> normalize((:x, 0))
-:_x__0_
-
-julia> normalize((:x, 1))
-:_x__1_
-
-julia> normalize((:x, -1))
-:_x_m1_
-
-julia> normalize((:x, -100))
+julia> stringify("x", -100)
 :_x_m100_
 ```
 
 ```@docs
-normalize(::Expr)
+stringify(::Tuple{Symbol,Integer})
 ```
 
 **Examples**
 
 ```jldoctest
-julia> normalize(:(a(1) - b - c(2) + d(-1)))
+julia> stringify((:x, 0))
+:_x__0_
+
+julia> stringify((:x, 1))
+:_x__1_
+
+julia> stringify((:x, -1))
+:_x_m1_
+
+julia> stringify((:x, -100))
+:_x_m100_
+```
+
+```@docs
+stringify(::Expr)
+```
+
+**Examples**
+
+```jldoctest
+julia> stringify(:(a(1) - b - c(2) + d(-1)))
 :(((_a__1_ - _b_) - _c__2_) + _d_m1_)
 
-julia> normalize(:(sin(x)))
+julia> stringify(:(sin(x)))
 :(sin(_x_))
 
-julia> normalize(:(sin(x(0))))
+julia> stringify(:(sin(x(0))))
 :(sin(_x__0_))
 
-julia> normalize(:(dot(x, y(1))))
+julia> stringify(:(dot(x, y(1))))
 :(dot(_x_, _y__1_))
 
-julia> normalize(:(beta * c(0)/c(1) * (alpha*y(1)/k(1) * (1-mu(1)) + 1 - delta_k) - 1))
+julia> stringify(:(beta * c(0)/c(1) * (alpha*y(1)/k(1) * (1-mu(1)) + 1 - delta_k) - 1))
 :(((_beta_ * _c__0_) / _c__1_) * ((((_alpha_ * _y__1_) / _k__1_) * (1 - _mu__1_) + 1) - _delta_k_) - 1)
 
-julia> normalize(:(x = log(y(-1))); targets=[:x])  # with targets
+julia> stringify(:(x = log(y(-1))); targets=[:x])  # with targets
 :(_x_ = log(_y_m1_))
 
-julia> normalize(:(x = log(y(-1))))  # without targets
+julia> stringify(:(x = log(y(-1))))  # without targets
 :(log(_y_m1_) - _x_)
 ```
 
 ```@docs
-normalize(::String)
+stringify(::String)
 ```
 
 **Examples**: see above for more
 
 ```jldoctest
-julia> normalize("x = log(y(-1))"; targets=[:x])  # with targets
+julia> stringify("x = log(y(-1))"; targets=[:x])  # with targets
 :(_x_ = log(_y_m1_))
 
-julia> normalize("x = log(y(-1))")  # without targets
+julia> stringify("x = log(y(-1))")  # without targets
 :(log(_y_m1_) - _x_)
 ```
 
 ```@docs
-normalize(::Vector{Expr})
+stringify(::Vector{Expr})
 ```
 
 **Examples**:
 
 ```jldoctest
-julia> normalize([:(sin(x(0))), :(dot(x, y(1))), :(x = log(y(-1)))])
+julia> stringify([:(sin(x(0))), :(dot(x, y(1))), :(x = log(y(-1)))])
 quote
     sin(_x__0_)
     dot(_x_, _y__1_)
     log(_y_m1_) - _x_
 end
 
-julia> normalize([:(sin(x(0))), :(dot(x, y(1))), :(x = log(y(-1)))], targets=[:x])
+julia> stringify([:(sin(x(0))), :(dot(x, y(1))), :(x = log(y(-1)))], targets=[:x])
 quote
     sin(_x__0_)
     dot(_x_, _y__1_)
@@ -183,7 +183,7 @@ end
 ## `time_shift`
 
 `time_shift` shifts an expression by a specified number of time periods. As
-with normalize, there are many methods for this function, which will will
+with stringify, there are many methods for this function, which will will
 describe one at a time.
 
 ```@docs

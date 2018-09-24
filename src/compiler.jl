@@ -24,7 +24,7 @@ _rhs_only(ex::Expr) =
     ex.head == :(=) ? Expr(:call, :(-), ex.args[2], ex.args[1]) : ex
 
 function _unpack_expr(names::Vector, rhs::Symbol)
-    _args = [:($(normalize(names[i])) = Dolang._unpack_var($rhs, $i))
+    _args = [:($(stringify(names[i])) = Dolang._unpack_var($rhs, $i))
              for i in 1:length(names)]
     out = Expr(:block); out.args = _args; out
 end
@@ -183,7 +183,7 @@ function _jacobian_expr_mat(ff::FunctionFactory{T}) where T<:FlatArgs
 
             if haskey(eq_incidence, v) && in(shift, eq_incidence[v])
                 non_zero += 1
-                my_deriv = deriv(eq_prepped, normalize(args[i_var]))
+                my_deriv = deriv(eq_prepped, stringify(args[i_var]))
                 exprs[i_eq, i_var] = post_deriv(my_deriv)
             end
         end
@@ -265,7 +265,7 @@ function _jacobian_expr_mat(ff::FunctionFactory{T}) where T<:GroupedArgs
 
                 if haskey(eq_incidence, v) && in(shift, eq_incidence[v])
                     non_zero[i] += 1
-                    my_deriv = deriv(eq_prepped, normalize(var))
+                    my_deriv = deriv(eq_prepped, stringify(var))
                     all_exprs[i][i_eq, i_var] = post_deriv(my_deriv)
                 end
             end
@@ -367,7 +367,7 @@ function make_deriv_loop(i::Int, der_order::Int)
     if i == der_order
         index_tuple = Expr(:tuple, [Symbol("iv_", j) for j in 1:i]...)
         inner_loop_guts = quote
-            $diff_sym = deriv($sym_to_diff, normalize(ff.args[$i_sym]))
+            $diff_sym = deriv($sym_to_diff, stringify(ff.args[$i_sym]))
 
             # might still be zero if terms were independent
             if $diff_sym != 0
@@ -377,7 +377,7 @@ function make_deriv_loop(i::Int, der_order::Int)
     else
         inner_loop_guts = Expr(
             :block,
-            :($diff_sym = deriv($sym_to_diff, normalize(ff.args[$i_sym]))),
+            :($diff_sym = deriv($sym_to_diff, stringify(ff.args[$i_sym]))),
             make_deriv_loop(i+1, der_order)
         )
     end

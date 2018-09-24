@@ -43,8 +43,8 @@ _to_flat(g::GroupedArgs) = vcat(values(g)...)
                          dynvars::Vector{Symbol})
 
 For each key `k` in `defs`, and each time shift in `incidence.by_eq[k]`,
-construct a mapping between the time shifted normalized symbol for `k` to the
-normalized expression that it should be replaced with.
+construct a mapping between the time shifted stringified symbol for `k` to the
+stringified expression that it should be replaced with.
 
 ## Example
 
@@ -75,8 +75,8 @@ function build_definition_map(defs::AbstractDict, incidence::IncidenceTable)
         if haskey(incidence.by_var, def_var)
             _ex = csubs(defs[def_var], norm_defs)
             for time in incidence.by_var[def_var]
-                new_key = normalize((def_var, time))
-                out[new_key] = normalize(
+                new_key = stringify((def_var, time))
+                out[new_key] = stringify(
                     time_shift(_ex, time, funcs)
                 )
             end
@@ -90,13 +90,13 @@ end
 # --------------- #
 
 struct FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:AbstractDict,T4<:Type}
-    # normalized equations
+    # stringified equations
     eqs::Vector{Expr}
     # canonical  variables to differentiate wrt
     args::T1
-    # canonical (not-normalized) variables not to differentiate wrt (e.g. parameters)
+    # canonical (not-stringified) variables not to differentiate wrt (e.g. parameters)
     params::T2
-    # normalized target names
+    # stringified target names
     targets::Vector{Symbol}
     # definitions to be (recursively) substituted into eqs
     defs::T3
@@ -111,11 +111,11 @@ struct FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:AbstractDict,T4<:Type}
             eqs, args, params, _targets, defs, funname, dispatch
         ) where T1 where T2 where T3 where T4
 
-        # if there are no _targets, we normalize equations immediately
+        # if there are no _targets, we stringify equations immediately
         if isempty(_targets)
             eqs = map(_rhs_only, eqs)
         end
-        targets = normalize.(_targets)
+        targets = stringify.(_targets)
 
         # Need FlatParams so `visit!` and `IncidenceTable` skip them when
         # visiting expressions
@@ -124,14 +124,14 @@ struct FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:AbstractDict,T4<:Type}
         # create incidence table of equations
         incidence = IncidenceTable(eqs, _flat_params)
 
-        # construct mapping from normalized definition name to desired
+        # construct mapping from stringified definition name to desired
         # expression
         def_map = build_definition_map(defs, incidence)
 
-        # now normalize the equations and make subs
-        # _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))
-        _f(x) = _to_expr(csubs(normalize(x, targets=targets), def_map))
-        normalized_eqs = _f.(eqs)
+        # now stringify the equations and make subs
+        # _f(x) = _to_expr(csubs(stringify(x, targets=targets), def_map))
+        _f(x) = _to_expr(csubs(stringify(x, targets=targets), def_map))
+        stringified_eqs = _f.(eqs)
 
         # also need to add definitions to incidence table so that derivative
         # code is correct
@@ -150,7 +150,7 @@ struct FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:AbstractDict,T4<:Type}
         end
 
         ff = new{T1,T2,T3,T4}(
-            normalized_eqs, args, params, targets, defs, funname, dispatch,
+            stringified_eqs, args, params, targets, defs, funname, dispatch,
             incidence
         )
     end
@@ -196,7 +196,7 @@ nargs(ff::FunctionFactory{T}) where {T<:GroupedArgs} =
 
 function validate!(ff::FunctionFactory)
     full_incidence = IncidenceTable(ff.eqs)
-    known = vcat(normalize.(ff.args), normalize.(ff.params), ff.targets)
+    known = vcat(stringify.(ff.args), stringify.(ff.params), ff.targets)
 
     for (eq_num, seen) in full_incidence.by_eq
         for variable in keys(seen)
@@ -265,7 +265,7 @@ FunctionFactory
 
 # a FlatFunctionFactory object contains only what is needed
 # to compile functions.
-# Everything is "normalized", i.e. no time-variables.
+# Everything is "stringified", i.e. no time-variables.
 #
 # "preamble" can contain variables needed to compute the "equations".
 #
@@ -288,9 +288,9 @@ FunctionFactory
 SymExpr = Union{Expr,Symbol,Number}
 
 struct FlatFunctionFactory
-        # normalized equations
+        # stringified equations
         equations::OrderedDict{Symbol,SymExpr}
-        # list of group of (normalized) variables
+        # list of group of (stringified) variables
         arguments::OrderedDict{Symbol, Vector{Symbol}}
         # list of assigned variables
         targets::Vector{Symbol}   ### Redundant
@@ -318,12 +318,12 @@ function FlatFunctionFactory(ff::FunctionFactory; eliminate_definitions=false)
     # we assume silently :p is not given as an argument in ff
     if isa(ff.args, OrderedDict)
         for k in keys(ff.args)
-            arguments[k] = [Dolang.normalize(e) for e in ff.args[k]]
+            arguments[k] = [Dolang.stringify(e) for e in ff.args[k]]
         end
     else
-        arguments[:x] = [Dolang.normalize(e) for e in ff.args]
+        arguments[:x] = [Dolang.stringify(e) for e in ff.args]
     end
-    arguments[:p] = [Dolang.normalize(p) for p in ff.params]
+    arguments[:p] = [Dolang.stringify(p) for p in ff.params]
 
     # we ignore definitions assuming they have already been substituted
     preamble = OrderedDict{Symbol, Expr}()
@@ -357,11 +357,11 @@ function FlatFunctionFactory(equations::OrderedDict, arguments::OrderedDict, def
     needed_defs = setdiff(all_vars, present_vars)
 
     defs = solve_definitions(definitions, needed_defs)
-    defs_normalized = OrderedDict{Symbol,SymExpr}([normalize(k)=>normalize(v) for (k,v) in defs])
-    args_normalized = OrderedDict{Symbol,Vector{Symbol}}([k=>normalize.(v) for (k,v) in arguments])
-    eqs_normalized = OrderedDict{Symbol, SymExpr}([normalize(k)=>normalize(v) for (k,v) in equations])
-    targets = [keys(eqs_normalized)...]
-    return FlatFunctionFactory( eqs_normalized, args_normalized, targets, defs_normalized, funname)
+    defs_stringified = OrderedDict{Symbol,SymExpr}([stringify(k)=>stringify(v) for (k,v) in defs])
+    args_stringified = OrderedDict{Symbol,Vector{Symbol}}([k=>stringify.(v) for (k,v) in arguments])
+    eqs_stringified = OrderedDict{Symbol, SymExpr}([stringify(k)=>stringify(v) for (k,v) in equations])
+    targets = [keys(eqs_stringified)...]
+    return FlatFunctionFactory( eqs_stringified, args_stringified, targets, defs_stringified, funname)
 
 end
 

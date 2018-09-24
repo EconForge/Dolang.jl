@@ -1,4 +1,4 @@
-# normalized symbol for indexed variables
+# stringified symbol for indexed variables
 # a    -> :a
 # a(1) -> :a__f_
 # a(-1) -> :a__b_
