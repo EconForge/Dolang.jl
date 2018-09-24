@@ -106,7 +106,7 @@ eqs = [
     :(sin(x(0)) + exp(2*x(1))),
     :(y(0) / (2 * (1 - β))),
 ]
-# NOTE: Arguments can be pre-normalized and contain unicode
+# NOTE: Arguments can be pre-stringified and contain unicode
 variables = [(:x, 0), (:y, 0), :_x__1_, :β]  
 to_diff = 1:3
 code = make_function(eqs, variables, to_diff, dispatch=Int, name=:my_int_fun)

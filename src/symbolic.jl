@@ -2,19 +2,19 @@
 # types #
 # ----- #
 
-struct NormalizeError <: Exception
+struct stringifyError <: Exception
     ex::Expr
     msg::String
 end
 
-function NormalizeError(ex::Expr)
-    msg = """Dolang does not know how to normalize
+function stringifyError(ex::Expr)
+    msg = """Dolang does not know how to stringify
     \t$(ex)
     """
-    NormalizeError(ex, msg)
+    stringifyError(ex, msg)
 end
 
-function Base.showerror(io::IO, ne::NormalizeError)
+function Base.showerror(io::IO, ne::stringifyError)
     print(io, ne.msg)
 end
 
@@ -24,36 +24,36 @@ struct UnknownFunctionError <: Exception
 end
 
 # --------- #
-# normalize #
+# stringify #
 # --------- #
 
 """
-    normalize(var::Union{String,Symbol}, n::Integer)
+    stringify(var::Union{String,Symbol}, n::Integer)
 
-Normalize the string or symbol in the following way:
+stringify the string or symbol in the following way:
 
 - if `n >= 0` return `_var__n_`
 - if `n < 0` return `_var_mn_`
 
 """
-function normalize(var::Union{String,Symbol}, n::Integer)
-    Symbol(normalize(var), n >= 0 ? "_" : "m", abs(n), "_")
+function stringify(var::Union{String,Symbol}, n::Integer)
+    Symbol(stringify(var), n >= 0 ? "_" : "m", abs(n), "_")
 end
 
 """
-    normalize(x::Tuple{Symbol,Integer})
+    stringify(x::Tuple{Symbol,Integer})
 
-Same as `normalize(x[1], x[2])`
+Same as `stringify(x[1], x[2])`
 """
-normalize(x::Tuple{Symbol,T}) where {T<:Integer} = normalize(x[1], x[2])
+stringify(x::Tuple{Symbol,T}) where {T<:Integer} = stringify(x[1], x[2])
 
 """
-    normalize(x::Symbol)
+    stringify(x::Symbol)
 
-Normalize the symbol by returning `_x_` if `x` doesn't alread have leading
+stringify the symbol by returning `_x_` if `x` doesn't alread have leading
 and trailling `_` characters
 """
-function normalize(x::Symbol)
+function stringify(x::Symbol)
     str_x = string(x)
     if str_x[1] == str_x[end] == '_'
         return x
@@ -63,32 +63,32 @@ function normalize(x::Symbol)
 end
 
 """
-    normalize(x::Number)
+    stringify(x::Number)
 
 Just return `x`
 """
-normalize(x::Number) = x
+stringify(x::Number) = x
 
 """
-    normalize(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
+    stringify(ex::Expr; targets::Union{Vector{Expr},Vector{Symbol}}=Symbol[])
 
-Recursively normalize `ex` according to the following rules (structure of list
+Recursively stringify `ex` according to the following rules (structure of list
 below is `input form of ex: returned expression`):
 
-- `lhs = rhs` and `targets` is not empty: `normalize(lhs) = normalize(rhs)`,
+- `lhs = rhs` and `targets` is not empty: `stringify(lhs) = stringify(rhs)`,
   where `lhs` must be one of the symbols in `targets`
-- `quote ex end`:  `normalize(ex)`
-- `var(n::Integer)`: `normalize(var, n)`
+- `quote ex end`:  `stringify(ex)`
+- `var(n::Integer)`: `stringify(var, n)`
 - `a ⚡ b` and `⚡` one of `+`, `*`, `-`, `/`, `^`, `+`, `*`:
-  `normalize(a) ⚡ normalize(b)`
-- `f(args...)`: `f(map(normalize, args)...)`
+  `stringify(a) ⚡ stringify(b)`
+- `f(args...)`: `f(map(stringify, args)...)`
 """
-function normalize(
+function stringify(
         ex::Expr;
         targets=Symbol[]
     )
 
-    norm_targets = normalize.(targets)
+    norm_targets = stringify.(targets)
 
     # make sure `lhs == rhs` is treated the same as `lhs = rhs`
     if (ex.head == :(=)) || (ex.head == :call && ex.args[1] == :(==))
@@ -101,39 +101,39 @@ function normalize(
         end
         # translate lhs = rhs to rhs - lhs
         if isempty(targets)
-            return Expr(:call, :(-), normalize(rhs), normalize(lhs))
+            return Expr(:call, :(-), stringify(rhs), stringify(lhs))
         end
 
         # ensure lhs is in targets
-        if !(normalize(lhs) in norm_targets)
+        if !(stringify(lhs) in norm_targets)
             msg = string(
                 "Error normalizing expression\n\t$(ex)\n",
                 "Expected expression of the form `lhs = rhs` ",
                 "where `lhs` is one of $(join(targets, ", "))"
             )
-            throw(NormalizeError(ex, msg))
+            throw(stringifyError(ex, msg))
         end
 
-        return Expr(:(=), normalize(lhs), normalize(rhs))
+        return Expr(:(=), stringify(lhs), stringify(rhs))
     end
 
 
     if ex.head == :block
         # for 0.5
         if length(ex.args) == 2 && isa(ex.args[1], LineNumberNode)
-            return normalize(ex.args[2])
+            return stringify(ex.args[2])
         end
 
         # for 0.6
         if length(ex.args) == 2 && isa(ex.args[1], Expr) && ex.args[1].head == :line
-            return normalize(ex.args[2])
+            return stringify(ex.args[2])
         end
 
         # often we have an Expr simliar to the above, except that we have filtered
         # out the line nodes. We end up with a block with one arg.
         # This is that case.
         if length(ex.args) == 1
-            return normalize(ex.args[1])
+            return stringify(ex.args[1])
         end
     end
 
@@ -142,9 +142,9 @@ function normalize(
         # translate x(n) --> x__n_ and x(-n) -> x_mn_
         if length(ex.args) == 2 && isa(ex.args[2], Integer)
             if isa(ex.args[1], Symbol)
-                return normalize(ex.args[1], ex.args[2])
+                return stringify(ex.args[1], ex.args[2])
             else
-                throw(NormalizeError(ex))
+                throw(stringifyError(ex))
             end
         end
 
@@ -154,31 +154,31 @@ function normalize(
         # single symbol. My current solution is to just swap the order of the
         # `*`
         if ex.args[1] == :(*) && length(ex.args) == 3 && isa(ex.args[2], Number)
-            return Expr(:call, :(*), normalize(ex.args[3]), ex.args[2])
+            return Expr(:call, :(*), stringify(ex.args[3]), ex.args[2])
         end
 
         # otherwise it is just some other function call
-        return Expr(:call, ex.args[1], normalize.(ex.args[2:end])...)
+        return Expr(:call, ex.args[1], stringify.(ex.args[2:end])...)
     end
 
-    throw(NormalizeError(ex))
+    throw(stringifyError(ex))
 end
 
 """
-    normalize(s::AbstractString; kwargs...)
+    stringify(s::AbstractString; kwargs...)
 
-Call `normalize(parse(s)::Expr; kwargs...)`
+Call `stringify(parse(s)::Expr; kwargs...)`
 """
-normalize(s::String; kwargs...) = normalize(Meta.parse(s); kwargs...)
+stringify(s::String; kwargs...) = stringify(Meta.parse(s); kwargs...)
 
 """
-    normalize(exs::Vector{Expr}; kwargs...)
+    stringify(exs::Vector{Expr}; kwargs...)
 
-Construct a `begin`/`end` block formed by calling `normalize(i; kwargs...)` for
+Construct a `begin`/`end` block formed by calling `stringify(i; kwargs...)` for
 all `i` in `exs`
 """
-normalize(exs::Vector{Expr}; kwargs...) =
-    Expr(:block, map(i -> normalize(i; kwargs...), exs)...)
+stringify(exs::Vector{Expr}; kwargs...) =
+    Expr(:block, map(i -> stringify(i; kwargs...), exs)...)
 
 # ---------- #
 # time_shift #
@@ -215,7 +215,7 @@ on the form of `ex` (list below has the form "contents of ex: return expr"):
 function time_shift(ex::Expr, shift::Integer,
                     functions::Set{Symbol})
 
-    # need to pattern match here to make sure we don't normalize function names
+    # need to pattern match here to make sure we don't stringify function names
     if is_time_shift(ex)
         var = ex.args[1]
         i = ex.args[2]
@@ -533,7 +533,7 @@ end
 # ---------#
 
 function arg_name(s::Symbol)::Symbol
-    # is the symbol already normalized?
+    # is the symbol already stringified?
     str_s = string(s)
     if str_s[1] == str_s[end] == '_'
         parts = match(r"^_(.+)_[m_]\d+_$", str_s)
@@ -560,10 +560,10 @@ function arg_name(ex::Expr)::Symbol
 end
 
 function arg_time(s::Symbol)::Int
-    # is the symbol already normalized?
+    # is the symbol already stringified?
     str_s = string(s)
     if str_s[1] == str_s[end] == '_'
-        # yep, we are already normalized, need to extract the
+        # yep, we are already stringified, need to extract the
         r = r"(m)?(\d+)_$"
         parts = match(r, str_s)
         if parts === nothing

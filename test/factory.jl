@@ -89,7 +89,7 @@ end
         _FF = _FF
         ff = _FF(eqs, args, params, targets=targets, defs=defs, funname=funname)
 
-        # test that equations were normalized properly
+        # test that equations were stringified properly
         norm_eq1 = :(_foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_)))
         norm_eq2 = :(_bar__0_ = _c__1_ + _u_ * _d__1_)
         norm_eq = [norm_eq1, norm_eq2]
@@ -98,7 +98,7 @@ end
         # test that exceptions are thrown for unknown variables appearing
         # in the equations
         bad_eqs = vcat(eqs, :(whoami = a-b))::Vector{Expr}
-        @test_throws(Dolang.NormalizeError,
+        @test_throws(Dolang.stringifyError,
                      _FF(bad_eqs, args, params, targets=targets, defs=defs,
                          funname=funname))
 
