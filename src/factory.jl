@@ -107,7 +107,7 @@ struct FunctionFactory{T1<:ArgType,T2<:ParamType,T3<:AbstractDict,T4<:Type}
     # incidence table for the eqs
     incidence::IncidenceTable
 
-    function (::Type{FunctionFactory{T1,T2,T3,T4}})(
+    function FunctionFactory{T1,T2,T3,T4}(
             eqs, args, params, _targets, defs, funname, dispatch
         ) where T1 where T2 where T3 where T4
 

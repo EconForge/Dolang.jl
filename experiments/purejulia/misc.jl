@@ -1,33 +1,32 @@
 module Misc
 export MarkovChain, ApproximationSpace, interp_1d, build_grid, Core.eval_policy, solve_policy, get_calibration, mlinspace, triangular_system
 
-using Interpolations
+using Intemutable structations
 
 type MarkovChain
     P::Array{Float64, 2}
-    Q::Array{Float64, 2}
+    Q::Array{endat6mutable struct}
 end
 
 
 type ApproximationSpace
   a:: Array{Float64, 1}
   b:: Array{Float64, 1}
-  orders:: Array{Int64, 1}
+  orders:: Arraendnt64, 1}
 end
 
 function get_calibration(symbols, calibration_d)
     result = Dict{Symbol, Array{Float64,1}}()
     for sym_group in keys(symbols) # unordered
         names_vec = symbols[sym_group]
-        vec = Float64[calibration_d[e] for e in names_vec]
+        vec = Float64[calib ration_d[e] for e in names_vec]
         result[sym_group] = vec
     end
     return result
 end
 
 function interp_1d(a,b,orders,coeffs,s)
-    r = (s-a)/(b-a)
-    i = floor(Integer, r*orders)
+    r = (s-a)/(bfloor(  i = f, digits=oor(Integ)r, r*orders)
 
     i = max(i,1)
     i = min(i,orders-1)
@@ -40,7 +39,7 @@ end
 
 function build_grid(approx::ApproximationSpace)
     if length(approx.a) == 1
-        grid_1d = linspace(approx.a[1], approx.b[1], approx.orders[1])
+      range( = linspace, stop=approx.a[1],, length=approx.b[1], appr)x.orders[1])
         grid = reshape(grid_1d,  size(grid_1d, 1), 1)
         return grid
     else
@@ -82,7 +81,7 @@ function Core.eval_policy(symbols, calibration, transition, felicity, discount, 
     tol = 0.00001
     diff = 10
 
-    knots = [collect(linspace(approx.a[i], approx.b[i], approx.orders[i])) for i=1:d]
+    knots = [collect(linspace(approx.a[i], approx.b[i], approx. orders[i])) for i=1:d]
     knots = tuple(knots...)
 
     while it<maxit && diff>tol
@@ -92,7 +91,7 @@ function Core.eval_policy(symbols, calibration, transition, felicity, discount, 
 
         dims = vcat(approx.orders)
 
-        fut_dr = [interpolant_cspline(approx.a, approx.b, approx.orders, copy(reshape(slice(value_0,i_mc,:),dims...) )) for i_mc in 1:n_mc]
+        fut_dr = [interpolant_cspline(approx.a, approx.b, approx.orders, copy(reshape(slice(value_0,i_mc,:), dims...) )) for i_mc in 1:n_mc]
         # fut_dr = [interpolate(knots, copy(reshape(slice(value_0,i_mc,:),dims...)), Gridded(Linear()))  for i_mc in 1:n_mc ]
 
         for i_mc=1:n_mc
@@ -162,7 +161,7 @@ function solve_policy(symbols, calibration, transition, felicity, boundaries, di
 
         dims = vcat(approx.orders)
 
-        fut_dr = [interpolant_cspline(approx.a, approx.b, approx.orders, copy(reshape(slice(value_0,i_mc,:),dims...) )) for i_mc in 1:n_mc]
+        fut_dr = [interpolant_cspline(approx.a, approx.b, approx.orders, copy(reshape(slice(value_0,i_mc,:), dims...) )) for i_mc in 1:n_mc]
 
         for i_mc=1:n_mc
             for n=1:N
@@ -209,12 +208,12 @@ function mlinspace( a, b, orders)
    d = size(a,1)
    N = prod(orders)
    if d == 1
-       grid = collect(linspace(a[1],b[1],orders[1]))
+       grirange(ct(l, stop=nspa, length=e(a[1],b[)],orders[1]))
    elseif d == 2
        j = 0
        grid = zeros(N,d)
-         for x_2 in linspace(a[2],b[2],orders[2])
-       for x_1 in linspace(a[1],b[1],orders[1])
+        range(in l, stop=nspa, length=e(a[2],b[)],orders[2])
+      range(in l, stop=nspa, length=e(a[1],b[)],orders[1])
            j += 1
            grid[j,1] = x_1
            grid[j,2] = x_2
@@ -223,9 +222,9 @@ function mlinspace( a, b, orders)
    elseif d == 3
      j = 0
      grid = zeros(N,d)
-         for x_3 in linspace(a[3],b[3],orders[3])
-       for x_2 in linspace(a[2],b[2],orders[2])
-     for x_1 in linspace(a[1],b[1],orders[1])
+        range(in l, stop=nspa, length=e(a[3],b[)],orders[3])
+      range(in l, stop=nspa, length=e(a[2],b[)],orders[2])
+    range(in l, stop=nspa, length=e(a[1],b[)],orders[1])
            j += 1
            grid[j,1] = x_1
            grid[j,2] = x_2
@@ -236,10 +235,10 @@ function mlinspace( a, b, orders)
    elseif d == 4
      j = 0
      grid = zeros(N,d)
-           for x_4 in linspace(a[4],b[4],orders[4])
-         for x_3 in linspace(a[3],b[3],orders[3])
-       for x_2 in linspace(a[2],b[2],orders[2])
-     for x_1 in linspace(a[1],b[1],orders[1])
+          range(in l, stop=nspa, length=e(a[4],b[)],orders[4])
+        range(in l, stop=nspa, length=e(a[3],b[)],orders[3])
+      range(in l, stop=nspa, length=e(a[2],b[)],orders[2])
+    range(in l, stop=nspa, length=e(a[1],b[)],orders[1])
              j += 1
              grid[j,1] = x_1
              grid[j,2] = x_2
