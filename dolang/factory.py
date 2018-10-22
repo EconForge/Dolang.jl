@@ -1,7 +1,12 @@
 from typing import List, Dict, Tuple
-from .dataclasses import dataclass
 import ast
 from ast import NodeTransformer, Call
+
+try:
+    from .dataclasses import dataclass
+except:
+    from dataclasses import dataclass
+
 
 from dolang.codegen import to_source
 import sympy as symlib

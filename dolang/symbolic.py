@@ -2,7 +2,12 @@ from dolang.language import functions as functions_dict
 from dolang.codegen import to_source
 from typing import Tuple, List, Dict, Set, TypeVar, Union
 from ast import NodeTransformer, Name, UnaryOp, UAdd, USub, Load, Call
-from .dataclasses import dataclass
+
+try:
+    from .dataclasses import dataclass
+except:
+    from dataclasses import dataclass
+
 import ast
 from ast import Expr
 from functools import wraps
