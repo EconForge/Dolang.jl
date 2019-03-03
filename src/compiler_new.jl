@@ -130,7 +130,11 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
 
     all_eqs = cat(values(fff.preamble)..., equations, dims=1)
     all_args = cat(values(fff.arguments)..., dims=1)
-    jac_args = cat([collect(values(fff.arguments))[i] for i in diff if i!=0]..., dims=1)
+    if maximum(diff)>0
+        jac_args = cat([collect(values(fff.arguments))[i] for i in diff if i!=0]..., dims=1)
+    else
+        jac_args = []
+    end
     # jac_args = Symbol.(jac_args) # strange type of output can by Any[]
     jac_args = Symbol[Symbol(e) for e in jac_args]
 
