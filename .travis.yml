@@ -6,6 +6,7 @@ os:
   # - osx  # we don't do any binary dependencies or OS specific magic
 julia:
     - 1.0
+    - 1.1
     - nightly
 matrix:
   allow_failures:
