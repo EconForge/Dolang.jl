@@ -91,9 +91,6 @@ def eval_ast(mod):
 
     context['inf'] = numpy.inf
 
-    context['maximum'] = numpy.maximum
-    context['minimum'] = numpy.minimum
-
     context['exp'] = numpy.exp
     context['log'] = numpy.log
     context['sin'] = numpy.sin
@@ -103,6 +100,10 @@ def eval_ast(mod):
     context['atan'] = numpy.arctan
     context['atanh'] = numpy.arctanh
 
+    context['maximum'] = numpy.maximum
+    context['minimum'] = numpy.minimum
+    context['max'] = numpy.maximum
+    context['min'] = numpy.minimum
     context['abs'] = numpy.abs
 
     name = mod.body[0].name

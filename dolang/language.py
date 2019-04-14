@@ -8,7 +8,12 @@ functions = {
     'tan': math.tan,
     'atan': math.atan,
     'tanh': math.tanh,
-    'atanh': math.atanh
+    'atanh': math.atanh,
+    'min': min,
+    'max': max,
+    'minimum': min,
+    'maximum': max,
+    'abs': abs
 }
 
 constants = {
