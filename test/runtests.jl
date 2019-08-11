@@ -25,5 +25,6 @@ include("compiler.jl")
 include("compiler_new.jl")
 include("util.jl")
 include("printing.jl")
+include("minilanguage.jl")
 
 end
