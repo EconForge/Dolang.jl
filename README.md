@@ -52,7 +52,7 @@ How does it work (for now)?
 
     - symbolic operations can then be done by manipulating the expression trees directly or by using a symbolic engine
 
-## Objects in Yaml  (codename dolaml)
+## Objects in YAML  (codename dolaml)
 
 For instance
 
