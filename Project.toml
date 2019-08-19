@@ -1,0 +1,9 @@
+name = "Dolang"
+uuid = "e5c7262c-e9d2-5620-ad8e-1af14eb8a8e3"
+version = "3.0.3"
+
+[deps]
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
+YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
