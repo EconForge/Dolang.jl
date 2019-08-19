@@ -79,7 +79,7 @@ const yaml_basis_tags = [
 #     return data
 # end
 
-function yaml_node_from_string(txt::AbstractString, minilanguage::Language)
+function yaml_node_from_string(txt::AbstractString, minilanguage::Language=Language())
     # Didn't find how to access the top node more easily.
     #
     yml_types = Dict{AbstractString,Function}()
@@ -92,7 +92,7 @@ function yaml_node_from_string(txt::AbstractString, minilanguage::Language)
     return YAML.load(txt, yml_types)
 end
 
-function yaml_node_from_file(fn::AbstractString, minilanguage::Language)
+function yaml_node_from_file(fn::AbstractString, minilanguage::Language=Language())
     txt = open(f->read(f,String), fn)
     txt = replace(txt, "\r"=>"")
     return yaml_node_from_string(txt, minilanguage)
@@ -254,7 +254,13 @@ function eval_node(node::YAML.SequenceNode, calibration::AbstractDict{Symbol, <:
     children = [eval_node(ch, calibration, minilang, greek_tol) for ch in node]
     tag = node.tag
     if tag == "tag:yaml.org,2002:seq"
-        return children
+        if typeof(children) <: Vector{Vector{Float64}}
+            res = vcat([x' for x in children]...)
+            println(res)
+            return res
+        else
+            return children
+        end
     else # custom object with positional arguments
         childs = tuple(children...)
         try

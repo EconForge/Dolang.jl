@@ -1,11 +1,3 @@
-@testset "minilanguage" begin
-
-
-import Dolang: Language, construct_object, add_language_elements!, eval_node
-import Dolang: FromGreek, ToGreek
-import Dolang: LangInvalidCall, LangUnknownTag, ParsingError, yaml_node_from_file
-# the two objects replace  imports from Dolo
-
 struct MvNormal
     mu::Vector{Float64}
     Sigma::Matrix{Float64}
@@ -16,6 +8,15 @@ struct Cartesian
     b::Vector{Float64}
     orders::Vector{Int64}
 end
+
+@testset "minilanguage" begin
+
+
+import Dolang: Language, construct_object, add_language_elements!, eval_node
+import Dolang: FromGreek, ToGreek
+import Dolang: LangInvalidCall, LangUnknownTag, ParsingError, yaml_node_from_file
+# the two objects replace  imports from Dolo
+
 
 # we create a mini-language with two keywords:
 # UNormal(μ=0.0, σ=1.0) # keyword object with greek arguments
