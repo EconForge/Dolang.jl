@@ -82,7 +82,7 @@ const yaml_basis_tags = [
 function yaml_node_from_string(txt::AbstractString, minilanguage::Language=Language())
     # Didn't find how to access the top node more easily.
     #
-    yml_types = Dict{AbstractString,Function}()
+    yml_types = Dict{String,Function}()
     for tag in yaml_basis_tags
         yml_types[tag] = (c,n)->n
     end
