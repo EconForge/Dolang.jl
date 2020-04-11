@@ -2,8 +2,9 @@ module DolangTests
 
 using Dolang
 using DataStructures
-using Test, SparseArrays
 using StaticArrays
+using SparseArrays
+using Test
 #
 # tests = length(ARGS) > 0 ? ARGS : [
 #                                    "symbolic",
