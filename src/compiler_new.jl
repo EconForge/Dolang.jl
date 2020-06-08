@@ -23,54 +23,107 @@ list_syms(eq::Number) = Symbol[]
 
 diff_symbol(k::Symbol, j::Symbol) = Symbol("∂", k, "_∂", j)
 
-function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
-    # given a list of equations:
-    # x=p+a
-    # y=p+x
-    # and a list of symbols to differetiate with
-    # [:a, :p]
-    # produces a new list of equations with derivatives:
-    # x=p+a
-    # ∂x_∂a = 1
-    # ∂x_∂p = 1
-    # y=p+x
-    # ∂y_∂a = ..
-    # ∂y_∂p = ...
 
-    diff_eqs = OrderedDict{Symbol, SymExpr}()
-    for (var, eq) in dd
-        diff_eqs[var] = eq
-        deps = list_syms(eq) # list of variables eq depends on
+function add_derivatives(all_eqs, gradient_components)
 
-        for k in [kk for kk in deps if !(kk in jac_args)]
-            for l in jac_args
-                dv = diff_symbol(var, k)
-                ddv = diff_symbol(k, l)
-                cdv = diff_symbol(var, l)
-                if haskey(diff_eqs, ddv)
-                    if !haskey(diff_eqs, dv)
-                        deq = Dolang.deriv(eq, k)
-                        diff_eqs[dv] = deq
-                    end
-                    if cdv in keys(diff_eqs)
-                        diff_eqs[cdv] = :($(diff_eqs[cdv])+$dv*$ddv)
-                    else
-                        diff_eqs[cdv] = :($dv*$ddv)
+    new_eqs = OrderedDict{Symbol, Union{Expr, Int64, Float64}}()
+    for g in gradient_components
+        k = diff_symbol(g,g)
+        new_eqs[k] = 1
+    end
+
+    for (sym, eq) in all_eqs
+
+        new_eqs[sym] = eq
+        # symbols the equation depends on
+        deps = Dolang.list_parameters(eq)
+
+        for θ in gradient_components
+
+            deq_terms = []
+
+            for a in deps
+
+                # compute dy/da * da/dθ
+
+                if a == θ
+                    push!(deq_terms, ( deriv(eq, a), 1) )
+                elseif !(a in keys(new_eqs))  # I should keep a list of defined variables
+                    # nothing to do
+                else
+                    da_dθ = diff_symbol(a, θ)
+                    if da_dθ in keys(new_eqs) # otherwise it is 0
+                        dy_da = diff_symbol(sym, a)
+                        if !(dy_da in keys(new_eqs))
+                            new_eqs[dy_da] = deriv(eq, a)
+                        end
+                        push!(deq_terms, (dy_da, da_dθ) )
                     end
                 end
             end
+            if length(deq_terms)>0
+                if length(deq_terms)==1
+                    rhs = Expr(:call, :*, deq_terms[1]...)
+                else
+                    rhs = Expr(:call, :+, [Expr(:call, :*, a, b) for (a,b) in deq_terms]...)
+                end
+                new_eqs[diff_symbol(sym, θ)] = rhs
+            end
         end
-        for k in [kk for kk in deps if kk in jac_args]
-            dv = diff_symbol(var, k)
-            deq = Dolang.deriv(eq, k)
-            diff_eqs[dv] = deq
-        end
-
     end
 
-    return diff_eqs
+    return new_eqs
 
 end
+
+# function add_derivatives(dd::OrderedDict, jac_args::Vector{Symbol})
+#     # given a list of equations:
+#     # x=p+a
+#     # y=p+x
+#     # and a list of symbols to differetiate with
+#     # [:a, :p]
+#     # produces a new list of equations with derivatives:
+#     # x=p+a
+#     # ∂x_∂a = 1
+#     # ∂x_∂p = 1
+#     # y=p+x
+#     # ∂y_∂a = ..
+#     # ∂y_∂p = ...
+
+#     diff_eqs = OrderedDict{Symbol, SymExpr}()
+#     for (var, eq) in dd
+#         diff_eqs[var] = eq
+#         deps = list_syms(eq) # list of variables eq depends on
+
+#         for k in [kk for kk in deps if !(kk in jac_args)]
+#             for l in jac_args
+#                 dv = diff_symbol(var, k)
+#                 ddv = diff_symbol(k, l)
+#                 cdv = diff_symbol(var, l)
+#                 if haskey(diff_eqs, ddv)
+#                     if !haskey(diff_eqs, dv)
+#                         deq = Dolang.deriv(eq, k)
+#                         diff_eqs[dv] = deq
+#                     end
+#                     if cdv in keys(diff_eqs)
+#                         diff_eqs[cdv] = :($(diff_eqs[cdv])+$dv*$ddv)
+#                     else
+#                         diff_eqs[cdv] = :($dv*$ddv)
+#                     end
+#                 end
+#             end
+#         end
+#         for k in [kk for kk in deps if kk in jac_args]
+#             dv = diff_symbol(var, k)
+#             deq = Dolang.deriv(eq, k)
+#             diff_eqs[dv] = deq
+#         end
+
+#     end
+
+#     return diff_eqs
+
+# end
 
 """
 Create a non allocating kernel from the function factory.
