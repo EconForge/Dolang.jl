@@ -69,7 +69,6 @@ function build_definition_map(defs::AbstractDict, incidence::IncidenceTable)
         norm_defs[(_def, 0)] = _ex
     end
 
-    funcs = Set{Symbol}()
 
     for def_var in keys(defs)
         if haskey(incidence.by_var, def_var)
@@ -77,7 +76,7 @@ function build_definition_map(defs::AbstractDict, incidence::IncidenceTable)
             for time in incidence.by_var[def_var]
                 new_key = stringify((def_var, time))
                 out[new_key] = stringify(
-                    time_shift(_ex, time, funcs)
+                    time_shift(_ex, time)
                 )
             end
         end

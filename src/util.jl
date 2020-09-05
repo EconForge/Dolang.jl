@@ -227,14 +227,21 @@ function solve_dependencies(deps::AbstractDict{T,Set{T}}, unknowns=nothing) wher
     return solution
 end
 
-function get_dependencies(defs::AbstractDict{T,U}) where T where U
+function get_dependencies(defs::AbstractDict{T,U}; target=:all) where T where U
     deps = OrderedDict{Any,Set{Any}}()
     def_keys = keys(defs)
     for (k, v) in (defs)
         # get list of all symbols in this equation
-        _syms = collect(values(list_symbols(v)))
-        allsyms = length(_syms) > 0 ? Set(union(_syms...)) : Set()
-
+        # _syms = collect(values(list_variables(v)))
+        # allsyms = length(_syms) > 0 ? Set(union(_syms...)) : Set()
+        if target==:variables
+            allsyms = list_variables(v)
+        elseif target==:parameters
+            allsyms = list_parameters(v)
+        else
+            ll = list_symbols(v)
+            allsyms = cat(ll.parameters, ll.variables; dims=1)
+        end
         # intersect that with the keys in our definitions
         ii = intersect(allsyms, def_keys)
         ij = Set(ii)

@@ -17,7 +17,7 @@ end
 _sym_sarray(v::AbstractVector{Symbol}) = Expr(:call,:SVector, v...)
 _sym_sarray(v::AbstractMatrix{Symbol}) = Expr(:call, :(SMatrix{$(size(v)...)}), v...)
 
-list_syms(eq::Expr) = get(list_symbols(eq), :parameters, Set{Symbol}())
+list_syms(eq::Expr) = list_symbols(eq).parameters
 list_syms(eq::Symbol) = [eq]
 list_syms(eq::Number) = Symbol[]
 
