@@ -146,22 +146,22 @@ end  # @testset "util"
     @testset "Solve definitions" begin
 
         defs = Dict(
-            (:rho, 0) => :(c(0) / c(-1)),
-            (:V, 0)   => :(c ^ (1 - gamma) / (1 - gamma)),
-            (:c, 0)   => :(y(0) ^ theta - i(0)),
+            (:rho, 0) => :(c[t] / c[t-1]),
+            (:V, 0)   => :(c[t] ^ (1 - gamma) / (1 - gamma)),
+            (:c, 0)   => :(y[t] ^ theta - i[t]),
         )
         solved_defs = OrderedDict(
-            (:V, 0)   => :(c ^ (1 - gamma) / (1 - gamma)),
-            (:c, 0)   => :(y(0) ^ theta - i(0)),
-            (:c, -1)  => :(y(-1) ^ theta - i(-1)),
-            (:rho, 0) => :(c(0) / c(-1))
+            (:V, 0)   => :(c[t] ^ (1 - gamma) / (1 - gamma)),
+            (:c, 0)   => :(y[t] ^ theta - i[t]),
+            (:c, -1)  => :(y[t-1] ^ theta - i[t-1]),
+            (:rho, 0) => :(c[t] / c[t-1])
         )
         @test solved_defs == Dolang.solve_definitions(defs)
 
         solved_defs_reduced = OrderedDict(
-            (:c, 1)   => :(y(1) ^ theta - i(1)),
-            (:c, 0)  => :(y(0) ^ theta - i(0)),
-            (:rho, 1) => :(c(1) / c(0))
+            (:c, 1)   => :(y[t+1] ^ theta - i[t+1]),
+            (:c, 0)  => :(y[t] ^ theta - i[t]),
+            (:rho, 1) => :(c[t+1] / c[t])
         )
 
         @test solved_defs_reduced == Dolang.solve_definitions(defs, [(:rho,1)])
