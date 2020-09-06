@@ -43,8 +43,8 @@ stringify the string or symbol in the following way:
 - if `n < 0` return `_var_mn_`
 
 """
-function stringify(var::Union{String,Symbol}, n::Integer)
-    Symbol(stringify(var), n >= 0 ? "_" : "m", abs(n), "_")
+function stringify(var::Symbol, n::Integer)
+    Symbol(var, "_", n >= 0 ? "_" : "m", abs(n), "_")
 end
 
 """
@@ -65,7 +65,10 @@ function stringify(x::Symbol)
         return x
     end
     str_x = string(x)
-    return Symbol(string("_", x, "_"))
+    if str_x[end] == "_"
+        return x
+    end
+    return Symbol(string(x, "_"))
 end
 
 # ---------- #
@@ -118,7 +121,7 @@ end
 function sanitize(expr::Expr; variables::Vector{Symbol}=Symbol[])
     m = match_var(expr) 
     if m !== nothing
-        return stringify(m)
+        return create_variable(m...)
     end
     m = match_varfun(expr)
     if (m !== nothing)
@@ -241,7 +244,7 @@ end
 list_variables(expr) = list_symbols(expr).variables
 list_parameters(expr) = list_symbols(expr).parameters
 
-stringify(s::AbstractString) = stringify(parse_string(replace(s,"|", "⟂")))
+stringify(s::AbstractString) = stringify(parse_string(compat_string(s)))
 
 function stringify(tree, parameters)
     function fun(u)

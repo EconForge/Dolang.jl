@@ -1,33 +1,33 @@
 @testset "symbolic" begin
 
-@testset "Dolang.eq_expr" begin
-    ex1 = :(z[0] = x + y(1))
-    ex2 = :(z[0] == x + y(1))
+# @testset "Dolang.eq_expr" begin
+#     ex1 = :(z[0] = x + y(1))
+#     ex2 = :(z[0] == x + y(1))
 
-    for ex in (ex1, ex2)
-        @test Dolang.stringify(ex) == :(_x_ + _y__1_ - _z__0_)
-        @test Dolang.stringify(ex, targets=[:_z__0_]) == :(_z__0_ = _x_ + _y__1_)
-        @test Dolang.stringify(ex, targets=[(:z, 0)]) == :(_z__0_ = _x_ + _y__1_)
-    end
+#     for ex in (ex1, ex2)
+#         @test Dolang.stringify(ex) == :(_x_ + _y__1_ - _z__0_)
+#         @test Dolang.stringify(ex, targets=[:_z__0_]) == :(_z__0_ = _x_ + _y__1_)
+#         @test Dolang.stringify(ex, targets=[(:z, 0)]) == :(_z__0_ = _x_ + _y__1_)
+#     end
 
-end
+# end
 
 @testset "Dolang.stringify" begin
     @testset "Dolang.stringify(::Union{Symbol,String}, Integer)" begin
-        @test Dolang.stringify(:x, 0) == :_x__0_
-        @test Dolang.stringify(:x, 1) == :_x__1_
-        @test Dolang.stringify(:x, -1) == :_x_m1_
-        @test Dolang.stringify(:x, -100) == :_x_m100_
+        @test Dolang.stringify(:x, 0) == :x__0_
+        @test Dolang.stringify(:x, 1) == :x__1_
+        @test Dolang.stringify(:x, -1) == :x_m1_
+        @test Dolang.stringify(:x, -100) == :x_m100_
 
-        # @test Dolang.stringify("x", 0) == :_x__0_
-        # @test Dolang.stringify("x", 1) == :_x__1_
-        # @test Dolang.stringify("x", -1) == :_x_m1_
-        # @test Dolang.stringify("x", -100) == :_x_m100_
+        # @test Dolang.stringify("x", 0) == :x__0_
+        # @test Dolang.stringify("x", 1) == :x__1_
+        # @test Dolang.stringify("x", -1) == :x_m1_
+        # @test Dolang.stringify("x", -100) == :x_m100_
 
-        @test Dolang.stringify((:x, 0)) == :_x__0_
-        @test Dolang.stringify((:x, 1)) == :_x__1_
-        @test Dolang.stringify((:x, -1)) == :_x_m1_
-        @test Dolang.stringify((:x, -100)) == :_x_m100_
+        @test Dolang.stringify((:x, 0)) == :x__0_
+        @test Dolang.stringify((:x, 1)) == :x__1_
+        @test Dolang.stringify((:x, -1)) == :x_m1_
+        @test Dolang.stringify((:x, -100)) == :x_m100_
     end
 
     @testset "numbers" begin
@@ -40,46 +40,45 @@ end
     @testset "symbols" begin
         for i=1:10
             s = gensym()
-            want = Symbol("_", s, "_")
+            want = Symbol(s, "_")
             @test Dolang.stringify(s) == want
-            @test Dolang.stringify(want) == want
         end
     end
 
     @testset "x_(shift_Integer)" begin
         # for i=1:10, T in (Int8, Int16, Int32, Int64)
         for i=1:10, T in (Int64,)
-            @test Dolang.stringify(string("x[t+", T(i), "]")) == Symbol("_x__$(i)_")
-            @test Dolang.stringify(string("x[t", T(-i), "]")) == Symbol("_x_m$(i)_")
+            @test Dolang.stringify(string("x[t+", T(i), "]")) == Symbol("x__$(i)_")
+            @test Dolang.stringify(string("x[t", T(-i), "]")) == Symbol("x_m$(i)_")
         end
     end
 
     @testset "other function calls" begin
         @testset "one argument" begin
-            @test Dolang.stringify("sin(x)") == :(sin(_x_))
-            @test Dolang.stringify("sin(x[t-1])") == :(sin(_x_m1_))
-            @test Dolang.stringify("foobar(x[t+2])") == :(foobar(_x__2_))
+            @test Dolang.stringify("sin(x)") == :(sin(x_))
+            @test Dolang.stringify("sin(x[t-1])") == :(sin(x_m1_))
+            @test Dolang.stringify("foobar(x[t+2])") == :(foobar(x__2_))
         end
 
         @testset "two arguments" begin
-            @test Dolang.stringify("dot(x, y[t+1])") == :(dot(_x_, _y__1_))
-            @test Dolang.stringify("plot(x[t-1], y)") == :(plot(_x_m1_, _y_))
-            @test Dolang.stringify("bingbong(x[t+2], y)") == :(bingbong(_x__2_, _y_))
+            @test Dolang.stringify("dot(x, y[t+1])") == :(dot(x_, y__1_))
+            @test Dolang.stringify("plot(x[t-1], y)") == :(plot(x_m1_, y_))
+            @test Dolang.stringify("bingbong(x[t+2], y)") == :(bingbong(x__2_, y_))
         end
 
         @testset "more args" begin
             for i=3:10
                 ex = Expr(:call, :my_func, [:(x[t+$j]) for j in 1:i]...)
-                want = Expr(:call, :my_func, [Symbol("_x__", j, "_") for j in 1:i]...)
+                want = Expr(:call, :my_func, [Symbol("x__", j, "_") for j in 1:i]...)
                 @test Dolang.stringify(ex) == want
             end
         end
 
         @testset "arithmetic" begin
-            @test Dolang.stringify(:(a[t+1] + b + c[t+2] + d[t-1])) == :(_a__1_ + _b_ + _c__2_ + _d_m1_)
-            @test Dolang.stringify(:(a[t+1] * b * c[t+2] * d[t-1])) == :(_a__1_ * _b_ * _c__2_ * _d_m1_)
-            @test Dolang.stringify(:(a[t+1] - b - c[t+2] - d[t-1])) == :(((_a__1_ - _b_) - _c__2_) - _d_m1_)
-            @test Dolang.stringify(:(a[t+ 1]^ b)) == :(_a__1_ ^ _b_)
+            @test Dolang.stringify(:(a[t+1] + b + c[t+2] + d[t-1])) == :(a__1_ + b_ + c__2_ + d_m1_)
+            @test Dolang.stringify(:(a[t+1] * b * c[t+2] * d[t-1])) == :(a__1_ * b_ * c__2_ * d_m1_)
+            @test Dolang.stringify(:(a[t+1] - b - c[t+2] - d[t-1])) == :(((a__1_ - b_) - c__2_) - d_m1_)
+            @test Dolang.stringify(:(a[t+ 1]^ b)) == :(a__1_ ^ b_)
         end
 
     end
@@ -97,10 +96,10 @@ end
     # end
 
     @testset "stringify(::Tuple{Symbol,Int})" begin
-        @test Dolang.stringify((:x, 0)) == :_x__0_
-        @test Dolang.stringify((:x, 1)) == :_x__1_
-        @test Dolang.stringify((:x, -1)) == :_x_m1_
-        @test Dolang.stringify((:x, -100)) == :_x_m100_
+        @test Dolang.stringify((:x, 0)) == :x__0_
+        @test Dolang.stringify((:x, 1)) == :x__1_
+        @test Dolang.stringify((:x, -1)) == :x_m1_
+        @test Dolang.stringify((:x, -100)) == :x_m100_
     end
     
 end

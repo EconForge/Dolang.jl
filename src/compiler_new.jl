@@ -26,7 +26,7 @@ diff_symbol(k::Symbol, j::Symbol) = Symbol("∂", k, "_∂", j)
 
 function add_derivatives(all_eqs, gradient_components)
 
-    new_eqs = OrderedDict{Symbol, Union{Expr, Int64, Float64}}()
+    new_eqs = OrderedDict{Symbol, Union{Expr, Symbol, Int64, Float64}}()
     for g in gradient_components
         k = diff_symbol(g,g)
         new_eqs[k] = 1
