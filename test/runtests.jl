@@ -21,9 +21,7 @@ using Test
 
 include("symbolic.jl")
 include("incidence.jl")
-include("factory.jl")
-include("compiler.jl")
-include("compiler_new.jl")
+# include("compiler_new.jl")
 include("util.jl")
 include("printing.jl")
 include("minilanguage.jl")

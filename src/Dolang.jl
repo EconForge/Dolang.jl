@@ -11,7 +11,7 @@ import Base: ==
 import REPL
 
 using Printf
-export make_function, Der, FunctionFactory, stringify, is_time_shift, time_shift,
+export make_function, Der, FlatFunctionFactory, stringify, is_time_shift, time_shift,
        subs, csubs, steady_state, list_symbols, list_symbols!, list_variables,
        list_parameters
 
@@ -39,7 +39,6 @@ include("symbolic.jl")
 include("incidence.jl")
 include("factory.jl")
 include("util.jl")
-include("compiler.jl")
 include("compiler_new.jl")
 include("printing.jl")
 include("minilanguage.jl")
