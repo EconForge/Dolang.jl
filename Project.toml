@@ -4,7 +4,6 @@ version = "3.1.2"
 
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-Lerche = "d42ef402-04e6-4356-9f73-091573ea58dc"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
@@ -15,7 +14,8 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
 DataStructures = "0.18"
-StaticArrays = "v0.12"
+StaticArrays = "0.12"
+MacroTools = "0.5.5"
 SymEngine = "0.8"
 YAML = "0.4"
 julia = "1.3"
