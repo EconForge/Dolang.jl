@@ -6,7 +6,7 @@
 
 equation_block: _NEWLINE? (equation) (_NEWLINE equation )* _NEWLINE?
 complementarity_block: _NEWLINE? (double_complementarity | formula) (_NEWLINE double_complementarity | _NEWLINE formula )* _NEWLINE?
-assignment_block: _NEWLINE? assignment (_NEWLINE assignment )* _NEWLINE?
+assignment_block: _NEWLINE? (assignment) (_NEWLINE assignment )* _NEWLINE?
 
 assignment: variable "=" formula
 
@@ -34,13 +34,13 @@ _PERP: "⟂" | "|"
 _POW: "^"|"**"
 
 ?atom: NUMBER           -> number
-        | "-" atom         -> neg
-        | pow
-        | symbol            
-        | "(" sum ")"
-        | expectation
-        | call
-        | variable
+    | "-" atom         -> neg
+    | pow
+    | call
+    | "(" formula ")"
+    | symbol       
+    | expectation
+    | variable
 
 !symbol: NAME -> symbol
 expectation: ("E["|"𝔼[") formula "]" -> expectation
@@ -53,7 +53,9 @@ subperiod: INT | NAME
 ?date_index: "t" SIGNED_INT2 -> date
     | SIGNED_INT -> date
 ?call: FUNCTION "(" sum ")" -> call
-FUNCTION: "sin"|"cos"|"exp"|"log"
+
+// this is to help the lark version
+FUNCTION.2: "sin"|"cos"|"exp"|"log"
 
 SIGNED_INT2: ("+"|"-") INT
 

@@ -1,3 +1,4 @@
+__precompile__(false)
 module Dolang
 
 using DataStructures
@@ -42,5 +43,6 @@ include("util.jl")
 include("compiler_new.jl")
 include("printing.jl")
 include("minilanguage.jl")
+include("grammar.jl")
 
 end  # module
