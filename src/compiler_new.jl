@@ -270,8 +270,10 @@ If at least one of the arguments is a list of points, the result is a list of
 points (or a tuple mad of lists of points). In this case preallocated
 structures can be passed as `out`.
 """
-function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
+function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};   
     funname=fff.funname)
+
+    @assert length(fff.preamble) == 0
 
     if to_diff isa Int
         diff = [to_diff]::Array{Int}
