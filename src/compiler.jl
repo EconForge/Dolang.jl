@@ -166,7 +166,7 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
             push!(output_names, targets)
         else
             diff_args = collect(values(fff.arguments))[d]
-            p = length(fff.targets)
+            p = length(targets)
             q = length(diff_args)
             mat = Matrix{Symbol}(undef, p, q)
             for i in 1:p
@@ -270,7 +270,7 @@ If at least one of the arguments is a list of points, the result is a list of
 points (or a tuple mad of lists of points). In this case preallocated
 structures can be passed as `out`.
 """
-function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
+function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};   
     funname=fff.funname)
 
     if to_diff isa Int
@@ -293,8 +293,10 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
     args_out = [Symbol("out_", i) for i in 1:length(diff)]
     args_length = [length(v) for v in values(fff.arguments)]
 
+    targets = [keys(fff.equations)...]
+
     out_types = []
-    p = length(fff.targets)
+    p = length(targets)
     for d in diff
         if d == 0
             push!(out_types, :(SVector{$p,Float64}))

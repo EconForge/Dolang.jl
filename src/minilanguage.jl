@@ -71,31 +71,31 @@ const yaml_basis_tags = [
 ]
 
 # with upcoming version of YAML.jl
-# function yaml_node_from_string(txt::AbstractString)
-#     cons = YAML.Constructor()
-#     YAML.add_multi_constructor!((c,s,m)->m, cons, "tag:yaml.org")
-#     YAML.add_multi_constructor!((c,s,m)->m, cons, "!")
-#     data = YAML.load(txt, cons)
-#     return data
-# end
-
-function yaml_node_from_string(txt::AbstractString, minilanguage::Language=Language())
-    # Didn't find how to access the top node more easily.
-    #
-    yml_types = Dict{String,Function}()
-    for tag in yaml_basis_tags
-        yml_types[tag] = (c,n)->n
-    end
-    for tag in keys(minilanguage.objects)
-        yml_types[tag] = (c,n)->n
-    end
-    return YAML.load(txt, yml_types)
+function yaml_node_from_string(txt::AbstractString)
+    cons = YAML.Constructor()
+    YAML.add_multi_constructor!((c,s,m)->m, cons, "tag:yaml.org")
+    YAML.add_multi_constructor!((c,s,m)->m, cons, "!")
+    data = YAML.load(txt, cons)
+    return data
 end
+
+# function yaml_node_from_string(txt::AbstractString, minilanguage::Language=Language())
+#     # Didn't find how to access the top node more easily.
+#     #
+#     yml_types = Dict{String,Function}()
+#     for tag in yaml_basis_tags
+#         yml_types[tag] = (c,n)->n
+#     end
+#     for tag in keys(minilanguage.objects)
+#         yml_types[tag] = (c,n)->n
+#     end
+#     return YAML.load(txt, yml_types)
+# end
 
 function yaml_node_from_file(fn::AbstractString, minilanguage::Language=Language())
     txt = open(f->read(f,String), fn)
     txt = replace(txt, "\r"=>"")
-    return yaml_node_from_string(txt, minilanguage)
+    return yaml_node_from_string(txt) # , minilanguage)
 end
 
 ##
