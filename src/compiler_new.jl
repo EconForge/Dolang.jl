@@ -273,8 +273,6 @@ structures can be passed as `out`.
 function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};   
     funname=fff.funname)
 
-    @assert length(fff.preamble) == 0
-
     if to_diff isa Int
         diff = [to_diff]::Array{Int}
     else

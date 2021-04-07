@@ -100,6 +100,7 @@ end
 Converter() = Converter(false)
 
 @rule variable(t::Converter, tree) = begin
+
     s = Symbol(tree[1].children[1].value)
     d = parse(Int,tree[2].children[1].value)
     if t.stringify
@@ -110,7 +111,9 @@ Converter() = Converter(false)
 end
 @rule symbol(t::Converter, tree) = begin
     s = Symbol(tree[1].value)
-    if t.stringify
+    if s == :inf
+        :(Inf)
+    elseif t.stringify
         stringify(s)
     else
         s
