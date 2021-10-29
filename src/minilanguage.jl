@@ -127,6 +127,9 @@ function eval_string(s::AbstractVector{Expr}, d:: AbstractDict{Symbol, <:Number}
         data = eval(expr)
 end
 
+
+eval_string(s::Symbol, d::AbstractDict{Symbol, <:Number}) = get(d,s,s)
+
 eval_string(s::Expr, d::AbstractDict{Symbol, <:Number}) = eval_string([s], d)[1]
 
 function eval_string(s::AbstractString, d::AbstractDict{Symbol, <:Number}=Dict{Symbol, Float64}())
