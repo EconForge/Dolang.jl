@@ -1,6 +1,6 @@
 name = "Dolang"
 uuid = "e5c7262c-e9d2-5620-ad8e-1af14eb8a8e3"
-version = "3.2.0"
+version = "3.2.1"
 
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
