@@ -259,7 +259,6 @@ function eval_node(node::YAML.SequenceNode, calibration::AbstractDict{Symbol, <:
     if tag == "tag:yaml.org,2002:seq"
         if typeof(children) <: Vector{Vector{Float64}}
             res = vcat([x' for x in children]...)
-            println(res)
             return res
         else
             return children
