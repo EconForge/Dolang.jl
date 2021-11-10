@@ -125,6 +125,43 @@ end
 
 # end
 
+
+function clean_unused(code)
+
+    lines = code.args[2].args
+
+    uses = Vector{Symbol}[]
+    defs = Symbol[]
+
+    for l in lines
+        if l.head==:(=)
+        rhs = l.args[2] 
+        tt = []
+        MacroTools.postwalk(x-> ( ((x isa(Symbol)) && string(x)[end]=='_' ) ? push!(tt, x) : nothing ) , rhs)
+        push!(uses, tt)
+        push!(defs, l.args[1])
+        end
+
+    end
+
+
+    newlines = [:(return res_)]
+    useful = [ :(res_) ]
+    for j=1:length(lines)-1
+        i = length(lines) - j 
+        if occursin("oo", string(defs[i])) || (defs[i] ∈ useful)
+            push!(newlines, lines[i])
+            append!(useful, uses[i])
+        end
+    end
+
+    newcode = deepcopy(code)
+    reverse!(newlines)
+    newcode.args[2].args = newlines
+    return newcode
+
+end
+
 """
 Create a non allocating kernel from the function factory.
 
@@ -145,9 +182,9 @@ function myfun(x::SVector{1, Float64}, y::SVector{3, Float64}, z::SVector{2, Flo
     _bar__0_ = _c__1_ + _u_ * _d__1_
     d__foo__0__d__a_m1_ = (-(1 / (1 - _c__0_)) * _b__0_) / (_a_m1_ / (1 - _c__0_)) ^ 2
     d__bar__0__d__a_m1_ = 0
-    oo_0 = SVector(_foo__0_, _bar__0_)
-    oo_1 = SMatrix{2, 1}(d__foo__0__d__a_m1_, d__bar__0__d__a_m1_)
-    res_ = (oo_0, oo_1)
+    oo_0_ = SVector(_foo__0_, _bar__0_)
+    oo_1_ = SMatrix{2, 1}(d__foo__0__d__a_m1_, d__bar__0__d__a_m1_)
+    res_ = (oo_0_, oo_1_)
     return res_
 end
 ```
@@ -224,7 +261,7 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
 
     return_args = []
     for (d, names) in enumerate(output_names)
-        outname = Symbol("oo_", d)
+        outname = Symbol("oo_", d, "_")
         push!(code, :($outname = $(_sym_sarray(names))))
         push!(return_args, outname)
     end
@@ -237,7 +274,9 @@ function gen_kernel(fff::FlatFunctionFactory, diff::Vector{Int}; funname=fff.fun
     typed_args = [:($k::SVector{$(length(v)), Float64}) for (k, v) in arguments]
     fun_args = Expr(:call, funname, typed_args...)
 
-    Expr(:function, fun_args, Expr(:block, code...))
+    ncode = Expr(:function, fun_args, Expr(:block, code...))
+
+    return clean_unused(ncode)
 
 end
 
@@ -309,6 +348,7 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
     code = quote
         function $funname($(args...),out=nothing)
 
+            @fastmath begin 
             # @inline $kernel_code # unpure...
             # revisit in the future
 
@@ -359,6 +399,8 @@ function gen_gufun(fff::FlatFunctionFactory, to_diff::Union{Array{Int}, Int};
             end
 
             return $(to_diff isa Int ? :(ret[1]) :  :(ret) )
+        end
+
         end
     end
 
