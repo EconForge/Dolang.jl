@@ -28,6 +28,7 @@ import SymEngine
 deriv(eq::SymEngine.Basic, x) = SymEngine.diff(eq, x)
 # somebody will probably object to it:
 deriv(eq::Expr, x::Symbol) = Meta.parse(string(SymEngine.diff(SymEngine.Basic(eq), SymEngine.Basic(x))))
+deriv(a::Symbol, b::Symbol) = a==b ? 1.0 : 0.0
 @inline prep_deriv(eq) = SymEngine.Basic(eq)
 @inline post_deriv(eq) = SymEngine.walk_expression(eq)
 
