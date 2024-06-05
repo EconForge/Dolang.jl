@@ -4,3 +4,4 @@ __pycache__/*
 scratch.jl
 docs/build/
 .vscode/settings.json
+Manifest.toml
