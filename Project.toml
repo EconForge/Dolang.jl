@@ -1,6 +1,6 @@
 name = "Dolang"
 uuid = "e5c7262c-e9d2-5620-ad8e-1af14eb8a8e3"
-version = "3.3.0"
+version = "3.3.1"
 
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
@@ -13,9 +13,12 @@ SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
-DataStructures = "^0.18"
-Lerche = "^0.5.2"
-MacroTools = "^0.5.6"
-StaticArrays = "^1.2.13"
-YAML = "^0.4.7"
-julia = "1.9"
+DataStructures = "0.18.20"
+Lerche = "0.5.5"
+MacroTools = "0.5.13"
+Printf = "1.11.0"
+REPL = "1.11.0"
+StaticArrays = "1.9.8"
+SymEngine = "0.12.0"
+YAML = "0.4.12"
+julia = "1.10"
