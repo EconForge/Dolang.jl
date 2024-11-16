@@ -137,7 +137,7 @@ function clean_unused(code)
         if l.head==:(=)
         rhs = l.args[2] 
         tt = []
-        MacroTools.postwalk(x-> ( ((x isa(Symbol)) && string(x)[end]=='_' ) ? push!(tt, x) : nothing ) , rhs)
+        MacroTools.postwalk(x-> ( ((x isa(Symbol))  ) ? push!(tt, x) : nothing ) , rhs)
         push!(uses, tt)
         push!(defs, l.args[1])
         end
@@ -161,6 +161,149 @@ function clean_unused(code)
     return newcode
 
 end
+
+
+"""
+Create a non allocating kernel from the function factory.
+
+`fff`: assumed to be a `FlatFunctionFactory` object with empty preamble.
+`diff`: index of variables to differentiate with or list of indices of variables positions.
+
+The generated kernel looks like (diff=[0, 1])
+```
+function myfun(x::SVector{1, Float64}, y::SVector{3, Float64}, z::SVector{2, Float64}, p::SVector{1, Float64})
+    _a_m1_ = x[1]
+    _a__0_ = y[1]
+    _b__0_ = y[2]
+    _c__0_ = y[3]
+    _c__1_ = z[1]
+    _d__1_ = z[2]
+    _u_ = p[1]
+    _foo__0_ = log(_a__0_) + _b__0_ / (_a_m1_ / (1 - _c__0_))
+    _bar__0_ = _c__1_ + _u_ * _d__1_
+    d__foo__0__d__a_m1_ = (-(1 / (1 - _c__0_)) * _b__0_) / (_a_m1_ / (1 - _c__0_)) ^ 2
+    d__bar__0__d__a_m1_ = 0
+    oo_0_ = SVector(_foo__0_, _bar__0_)
+    oo_1_ = SMatrix{2, 1}(d__foo__0__d__a_m1_, d__bar__0__d__a_m1_)
+    res_ = (oo_0_, oo_1_)
+    return res_
+end
+```
+
+If diff is a scalar, the result of the kernel is a static vector (or a static matrix).
+If diff is a list, the result is a tuple.
+"""
+function gen_kernel2(fff::FlatFunctionFactory, diff::Union{Int, Vector{Int}}; funname=fff.funname, arguments=fff.arguments, dispatch=nothing)
+
+    targets = [keys(fff.equations)...]
+    equations = [values(fff.equations)...]
+    # names of symbols to output
+    output_names = []
+    for d in diff
+        if d == 0
+            push!(output_names, targets)
+        else
+            diff_args = collect(values(fff.arguments))[d]
+            p = length(targets)
+            q = length(diff_args)
+            mat = Matrix{Symbol}(undef, p, q)
+            for i in 1:p
+                for j in 1:q
+                    mat[i, j] = diff_symbol(targets[i], diff_args[j])
+                end
+            end
+            push!(output_names, mat)
+        end
+    end
+
+
+    argnames = collect(keys(arguments))
+
+    all_eqs = cat(values(fff.preamble)..., equations, dims=1)
+    all_args = cat(values(fff.arguments)..., dims=1)
+    if maximum(diff)>0
+        jac_args = cat([collect(values(fff.arguments))[i] for i in diff if i!=0]..., dims=1)
+    else
+        jac_args = []
+    end
+    # jac_args = Symbol.(jac_args) # strange type of output can by Any[]
+    jac_args = Symbol[Symbol(e) for e in jac_args]
+
+    # concatenate preamble and equations (doesn't make much sense...)
+    dd = OrderedDict()
+    for (k, v) in (fff.preamble)
+        dd[k] = v
+    end
+    for (target, eq) in zip(targets, equations)
+        dd[target] = eq
+    end
+    # compute all equations to write
+    diff_eqs = add_derivatives(dd, jac_args)
+    for out in output_names
+        for k in out
+            if !(haskey(diff_eqs, k))
+                diff_eqs[k] = 0.0
+            end
+        end
+    end
+
+    diff_eqs = reorder_triangular_block(diff_eqs)
+
+    # create function block
+    code = []
+
+    push!(code, :(T=getprecision(model)))
+
+    for (k, args) in zip(argnames, values(arguments))
+        for (i, a) in enumerate(args)
+            push!(code, :($a = ($k)[$i]))
+        end
+    end
+    for (k, v) in diff_eqs
+        push!(code, :($k=$v))
+    end
+
+    return_args = []
+    for (d, names) in enumerate(output_names)
+        outname = Symbol("oo_", d, "_")
+        push!(code, :($outname = $(_sym_sarray(names))))
+        push!(return_args, outname)
+    end
+
+    # this is to make inserting the resulting code in another function easier
+    if typeof(diff) <: Int
+        push!(code, :(res_ = $(return_args[1])))
+        push!(code, :(return res_))
+    else
+        push!(code, :(res_ = $(Expr(:tuple, return_args...))))
+        push!(code, :(return res_))
+    end
+
+    cast_scalars = u->MacroTools.postwalk(x -> ((x isa Real) & !(x isa Integer)) ? :(convert(T,$x)) : x, u)
+
+    code = cast_scalars.(code)
+    # now we construct the function
+    # typed_args = [:($k::SVector{$(length(v)), Float64}) for (k, v) in arguments]
+
+    typed_args = [:($k::SVector{$(length(v))}) for (k, v) in arguments]
+    # typed_args[end]= :(p::P)
+
+    # if !(dispatch isa Nothing)
+    #     prepend!(typed_args, :(::$dispatch))
+    # end
+
+    # n_p = length(arguments[[keys(arguments)...][end]][2])
+
+    typed_args = [:(model::$dispatch), typed_args...]
+    
+    # fun_args = Expr(:call, funname, typed_args...)
+    fun_args = :(($funname)($(typed_args...)))
+    ncode = Expr(:function, fun_args, Expr(:block, code...))
+
+    return clean_unused(ncode)
+
+end
+
 
 """
 Create a non allocating kernel from the function factory.
