@@ -188,31 +188,23 @@ Base.showerror(io::IO, e::ParsingError) = print(io, "Language Error: $(e.pos.l1)
 # construct object from tag and arguments
 #
 
-function construct_object(lang, tag, args::AbstractDict{<:Any,<:Any})
+function construct_object(lang, tag, args::AbstractDict{<:Any,<:Any}; key=nothing)
     if !( tag in keys(lang.objects))
         throw(LangUnknownTag(tag))
     end
     constructor = lang.objects[tag]
     try
-        return constructor(;args...)
+        if key === nothing
+            return constructor(;args...)
+        else
+            vars = tuple((Symbol(e) for e in split(String(key),","))...)
+            return constructor(vars; args...)
+        end
     catch err
         throw( LangInvalidCall(tag, err) )
     end
 end
 
-function construct_object(lang, tag, args)
-    if !(tag in keys(lang.objects))
-        throw(LangUnknownTag(tag))
-    end
-    constructor = lang.objects[tag]
-    try
-        return constructor(args...)
-    catch err
-        throw( LangInvalidCall(tag, err) )
-    end
-end
-
-#
 # option types
 # maybe this is not needed anymore thanks to constant propagation
 
@@ -253,7 +245,7 @@ end
 
 
 # sequences
-function eval_node(node::YAML.SequenceNode, calibration::AbstractDict{Symbol, <:Number}, minilang::Language=Language(), greek_tol::GreekTolerance=NoGreek())
+function eval_node(node::YAML.SequenceNode, calibration::AbstractDict{Symbol, <:Number}, minilang::Language=Language(), greek_tol::GreekTolerance=NoGreek(); key=nothing)
     children = [eval_node(ch, calibration, minilang, greek_tol) for ch in node]
     tag = node.tag
     if tag == "tag:yaml.org,2002:seq"
@@ -266,7 +258,7 @@ function eval_node(node::YAML.SequenceNode, calibration::AbstractDict{Symbol, <:
     else # custom object with positional arguments
         childs = tuple(children...)
         try
-            return construct_object(minilang, tag, childs)
+            return construct_object(minilang, tag, childs; key=key)
         catch err
             throw(ParsingError(node, err))
         end
@@ -274,7 +266,7 @@ function eval_node(node::YAML.SequenceNode, calibration::AbstractDict{Symbol, <:
 end
 
 # map
-function eval_node(node::YAML.MappingNode, calibration::AbstractDict{Symbol, <:Number}, minilang::Language=Language(), greek_tol::GreekTolerance=NoGreek())
+function eval_node(node::YAML.MappingNode, calibration::AbstractDict{Symbol, <:Number}, minilang::Language=Language(), greek_tol::GreekTolerance=NoGreek(); key=nothing)
     d = Dict()
     for i=1:length(node)
         k = Symbol(node.value[i][1].value)
@@ -289,6 +281,36 @@ function eval_node(node::YAML.MappingNode, calibration::AbstractDict{Symbol, <:N
         end
         v = eval_node(node.value[i][2], calibration, minilang, greek_tol)
         d[k] = v
+    end
+    if node.tag == "tag:yaml.org,2002:map"
+        return d
+    else # custom object with positional arguments
+        try
+            return construct_object(minilang, node.tag, d; key=key)
+        catch err
+            throw(ParsingError(node, err))
+        end
+    end
+end
+
+
+
+function eval_node_with_keys(node::YAML.MappingNode, calibration::AbstractDict{Symbol, <:Number}, minilang::Language=Language(), greek_tol::GreekTolerance=NoGreek())
+    d = []
+    for i=1:length(node)
+        k = Symbol(node.value[i][1].value)
+        if typeof(greek_tol)<:FromGreek
+            if haskey(symbols_from_greek, k)
+                k = symbols_from_greek[k]
+            end
+        elseif typeof(greek_tol)<:ToGreek
+            if haskey(symbols_to_greek, k)
+                k = symbols_to_greek[k]
+            end
+        end
+
+        v = eval_node(node.value[i][2], calibration, minilang, greek_tol; key=k)
+        push!(d, v)
     end
     if node.tag == "tag:yaml.org,2002:map"
         return d
