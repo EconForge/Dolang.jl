@@ -279,7 +279,7 @@ function gen_kernel2(fff::FlatFunctionFactory, diff::Union{Int, Vector{Int}}; fu
         push!(code, :(return res_))
     end
 
-    cast_scalars = u->MacroTools.postwalk(x -> ((x isa Real) & !(x isa Integer)) ? :(convert(T,$x)) : x, u)
+    cast_scalars = u->MacroTools.postwalk(x -> ( (x==:Inf) | ((x isa Real)&(!(x isa Integer))) ) ? :(convert(T,$x)) : x, u)
 
     code = cast_scalars.(code)
     # now we construct the function
