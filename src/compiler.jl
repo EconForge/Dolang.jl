@@ -266,6 +266,7 @@ function gen_kernel2(fff::FlatFunctionFactory, diff::Union{Int, Vector{Int}}; fu
     return_args = []
     for (d, names) in enumerate(output_names)
         outname = Symbol("oo_", d, "_")
+        @show names
         push!(code, :($outname = $(_sym_sarray(names))))
         push!(return_args, outname)
     end
