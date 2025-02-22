@@ -2,20 +2,38 @@ using Lerche
 
 grammar_path = joinpath(dirname(pathof(@__MODULE__)), "grammar.lark")
 
+
+println(grammar_path)
 txt = read(open(grammar_path), String)
-const parser = Lark(txt, 
+# const parser = Lark(txt, 
+#     parser="lalr", start="formula");
+
+# const parser_equation = Lark(txt, 
+#     parser="lalr", start="equation");
+
+# const parser_assignment = Lark(txt, 
+#     parser="lalr", start="assignment");
+
+# const parser_equation_block = Lark(txt, 
+#     parser="lalr", start="equation_block");
+
+# const parser_assignment_block = Lark(txt, 
+#     parser="lalr", start="assignment_block");
+
+
+ parser = Lark(txt, 
     parser="lalr", start="formula");
 
-const parser_equation = Lark(txt, 
+ parser_equation = Lark(txt, 
     parser="lalr", start="equation");
 
-const parser_assignment = Lark(txt, 
+ parser_assignment = Lark(txt, 
     parser="lalr", start="assignment");
 
-    const parser_equation_block = Lark(txt, 
+ parser_equation_block = Lark(txt, 
     parser="lalr", start="equation_block");
 
-const parser_assignment_block = Lark(txt, 
+ parser_assignment_block = Lark(txt, 
     parser="lalr", start="assignment_block");
 
 
@@ -121,6 +139,7 @@ end
 end
 
 @rule call(t::Converter, children) =  Expr(:call, Symbol(children[1].value), children[2:end]...)
+@rule calltwo(t::Converter, children) =  Expr(:call, Symbol(children[1].value), children[2:end]...)
 @rule add(t::Converter, children) =  Expr(:call, :+, children...)
 @rule mul(t::Converter, children) =  Expr(:call, :*, children...)
 @rule div(t::Converter, children) =  Expr(:call, :/, children...)

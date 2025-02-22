@@ -20,7 +20,30 @@ ff = Dolang.FunctionFactory(eqs, args, params, targets=targets, defs=defs,
 
 ff2 = Dolang.FunctionFactory(eqs, grouped_args, params, targets=targets, defs=defs,
                             funname=funname)
-
+                            using Dolo
+                            using DoloYAML
+                            import DoloYAML: orphan
+                            using TimerOutputs
+                            
+                            import Dolo: initial_guess
+                            
+                            const NT = Threads.nthreads()
+                            
+                            if NT > 1
+                                # use multithreading library KernelAbstractions
+                                engine = :cpu
+                            else
+                                # only one CPU
+                                engine = nothing
+                            end
+                            
+                            println("Running simulations with $NT threads.")
+                            
+                            include("implementations.jl")
+                            
+                            model = DoloYAML.yaml_import("models/consumption_savings_new.yaml")
+                            dmodel = Dolo.discretize(model)
+                            
 
 # we're all static arrays
 x = @SVector [1.0]

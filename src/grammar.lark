@@ -36,6 +36,7 @@ _POW: "^"|"**"
 ?atom: NUMBER           -> number
     | "-" atom         -> neg
     | pow
+    | calltwo
     | call
     | "(" formula ")"
     | symbol       
@@ -52,10 +53,13 @@ subperiod: INT | NAME
 !cname: NAME -> name
 ?date_index: "t" SIGNED_INT2 -> date
     | SIGNED_INT -> date
-?call: FUNCTION "(" sum ")" -> call
 
+?call: FUNCTION "(" sum ")" -> call
 // this is to help the lark version
-FUNCTION.2: "sin"|"cos"|"exp"|"log"
+FUNCTION.2: "sin"|"cos"|"exp"|"log"|"nep"
+
+?calltwo: FUNCTIONTWO "(" sum "," sum ")" -> calltwo
+FUNCTIONTWO.2: "FB"|"min"|"max"
 
 SIGNED_INT2: ("+"|"-") INT
 
