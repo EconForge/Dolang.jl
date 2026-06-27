@@ -557,7 +557,13 @@ end
 # genfun((Val(1),Val(2)), x, y, z, p, out=)
 # where the first argument denotes the arguments to differentiate with (0, is zero-order diff)
 
-_get_nums(::Union{Val{n}, Type{Val{n}}, Type{Type{Val{n}}}}) where n = n
+_get_nums(::Val{n}) where n = n
+_get_nums(::Type{Val{n}}) where n = n
+if isdefined(Core, :TypeEgal)
+    _get_nums(T::Union{Core.TypeEq, Core.TypeEgal}) = _get_nums(Base.type_parameter(T))
+else
+    _get_nums(::Type{Type{Val{n}}}) where n = n
+end
 _get_nums(t::Type{<:Tuple}) = [_get_nums(i) for i in getfield(t, 3)]
 _get_oorders(x::Array{Int,0}) = x[1]
 _get_oorders(x::Union{Tuple,<:Array{Int}}) = x
